@@ -4,10 +4,8 @@
 <meta charset="UTF-8">
 <title>AI FLOW Login</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-
 body{
   min-height:100vh;
   background:radial-gradient(circle at top left,#123524,#050816 45%,#020617);
@@ -17,7 +15,6 @@ body{
   align-items:center;
   justify-content:center;
 }
-
 .box{
   width:420px;
   background:#0f172a;
@@ -25,52 +22,10 @@ body{
   border-radius:28px;
   padding:36px;
 }
-
-.logo{
-  font-size:34px;
-  font-weight:900;
-  margin-bottom:8px;
-}
-
+.logo{font-size:34px;font-weight:900;margin-bottom:8px}
 .logo span{color:#4ade80}
-
-.sub{
-  color:#94a3b8;
-  margin-bottom:26px;
-  line-height:1.5;
-}
-
-.tabs{
-  display:flex;
-  background:#020617;
-  padding:6px;
-  border-radius:16px;
-  margin-bottom:22px;
-}
-
-.tab{
-  flex:1;
-  padding:12px;
-  border:0;
-  border-radius:12px;
-  background:transparent;
-  color:#94a3b8;
-  font-weight:800;
-  cursor:pointer;
-}
-
-.tab.active{
-  background:#4ade80;
-  color:#020617;
-}
-
-label{
-  display:block;
-  margin-bottom:8px;
-  color:#cbd5e1;
-  font-size:14px;
-}
-
+.sub{color:#94a3b8;margin-bottom:26px;line-height:1.5}
+label{display:block;margin-bottom:8px;color:#cbd5e1;font-size:14px}
 input{
   width:100%;
   padding:15px;
@@ -81,24 +36,18 @@ input{
   color:white;
   font-size:15px;
 }
-
-.main{
+.btn{
   width:100%;
   padding:15px;
   border:0;
   border-radius:14px;
-  background:#4ade80;
-  color:#020617;
   font-weight:900;
   cursor:pointer;
+  margin-bottom:12px;
 }
-
-.msg{
-  margin-top:16px;
-  color:#94a3b8;
-  min-height:22px;
-}
-
+.login{background:#4ade80;color:#020617}
+.register{background:#1e293b;color:white;border:1px solid rgba(255,255,255,.1)}
+.msg{margin-top:12px;color:#94a3b8;min-height:22px}
 .error{color:#fb7185}
 .success{color:#4ade80}
 </style>
@@ -108,15 +57,7 @@ input{
 
 <div class="box">
   <div class="logo">AI <span>FLOW</span></div>
-
-  <div class="sub">
-    Login or create an account to access your AI sales dashboard.
-  </div>
-
-  <div class="tabs">
-    <button type="button" id="loginTab" class="tab active">Login</button>
-    <button type="button" id="registerTab" class="tab">Register</button>
-  </div>
+  <div class="sub">Login or create an account to access your AI sales dashboard.</div>
 
   <label>Email</label>
   <input id="email" type="email" placeholder="client@example.com">
@@ -124,23 +65,98 @@ input{
   <label>Password</label>
   <input id="password" type="password" placeholder="Password">
 
-  <button type="button" class="main" id="mainBtn">Login</button>
+  <button class="btn login" id="loginBtn">Login</button>
+  <button class="btn register" id="registerBtn">Create New Account</button>
 
   <div id="msg" class="msg"></div>
 </div>
 
 <script>
-let mode = "login";
-
-const loginTab = document.getElementById("loginTab");
-const registerTab = document.getElementById("registerTab");
-const mainBtn = document.getElementById("mainBtn");
 const msg = document.getElementById("msg");
 
-function setMode(nextMode){
-  mode = nextMode;
+function getValues(){
+  return {
+    email: document.getElementById("email").value.trim(),
+    password: document.getElementById("password").value.trim()
+  };
+}
 
-  loginTab.classList.remove("active");
-  registerTab.classList.remove("active");
+async function registerUser(){
+  const data = getValues();
 
- 
+  msg.className = "msg";
+  msg.innerText = "Creating account...";
+
+  if(!data.email || !data.password){
+    msg.className = "msg error";
+    msg.innerText = "Enter email and password.";
+    return;
+  }
+
+  try{
+    const res = await fetch("/register",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if(!res.ok || result.error){
+      msg.className = "msg error";
+      msg.innerText = result.error || "Register error.";
+      return;
+    }
+
+    msg.className = "msg success";
+    msg.innerText = "Account created. Now click Login.";
+  }catch(e){
+    msg.className = "msg error";
+    msg.innerText = "Connection error.";
+  }
+}
+
+async function loginUser(){
+  const data = getValues();
+
+  msg.className = "msg";
+  msg.innerText = "Logging in...";
+
+  if(!data.email || !data.password){
+    msg.className = "msg error";
+    msg.innerText = "Enter email and password.";
+    return;
+  }
+
+  try{
+    const res = await fetch("/login-api",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if(!res.ok || result.error){
+      msg.className = "msg error";
+      msg.innerText = result.error || "Login error.";
+      return;
+    }
+
+    localStorage.setItem("ai_flow_email", result.email);
+    localStorage.setItem("ai_flow_role", result.role);
+    localStorage.setItem("ai_flow_company_id", result.companyId);
+
+    window.location.href = result.role === "admin" ? "/admin" : "/dashboard";
+  }catch(e){
+    msg.className = "msg error";
+    msg.innerText = "Connection error.";
+  }
+}
+
+document.getElementById("loginBtn").onclick = loginUser;
+document.getElementById("registerBtn").onclick = registerUser;
+</script>
+
+</body>
+</html>
