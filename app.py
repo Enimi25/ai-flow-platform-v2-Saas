@@ -1151,13 +1151,15 @@ async def chat(request: Request):
                 "companyId": company_id,
             }
         )
-    @app.get("/login")
+@app.get("/login")
 async def login_page():
     return FileResponse("login.html")
+
 
 @app.get("/dashboard")
 async def dashboard_page():
     return FileResponse("dashboard.html")
+
 
 @app.get("/admin")
 async def admin_page():
