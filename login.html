@@ -1,12 +1,175 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>LOGIN</title>
+<meta charset="UTF-8">
+<title>AI FLOW Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;
+  background:radial-gradient(circle at top left,#123524,#050816 45%,#020617);
+  color:white;
+  font-family:Arial,sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.box{
+  width:420px;
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:28px;
+  padding:36px;
+}
+.logo{
+  font-size:34px;
+  font-weight:900;
+  margin-bottom:8px;
+}
+.logo span{color:#4ade80}
+.sub{
+  color:#94a3b8;
+  margin-bottom:26px;
+  line-height:1.5;
+}
+.tabs{
+  display:flex;
+  background:#020617;
+  padding:6px;
+  border-radius:16px;
+  margin-bottom:22px;
+}
+.tab{
+  flex:1;
+  padding:12px;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:#94a3b8;
+  font-weight:800;
+  cursor:pointer;
+}
+.tab.active{
+  background:#4ade80;
+  color:#020617;
+}
+label{
+  display:block;
+  margin-bottom:8px;
+  color:#cbd5e1;
+  font-size:14px;
+}
+input{
+  width:100%;
+  padding:15px;
+  margin-bottom:18px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.1);
+  background:#020617;
+  color:white;
+  font-size:15px;
+}
+button.main{
+  width:100%;
+  padding:15px;
+  border:0;
+  border-radius:14px;
+  background:#4ade80;
+  color:#020617;
+  font-weight:900;
+  cursor:pointer;
+}
+.msg{
+  margin-top:16px;
+  color:#94a3b8;
+  min-height:22px;
+}
+.error{color:#fb7185}
+.success{color:#4ade80}
+</style>
 </head>
 
-<body style="background:black;color:white;font-family:Arial;padding:40px;">
+<body>
 
-<h1>LOGIN PAGE WORKS ✅</h1>
+<div class="box">
+  <div class="logo">AI <span>FLOW</span></div>
+  <div class="sub">Login or create an account to access your AI sales dashboard.</div>
 
-</body>
-</html>
+  <div class="tabs">
+    <button id="loginTab" class="tab active" onclick="setMode('login')">Login</button>
+    <button id="registerTab" class="tab" onclick="setMode('register')">Register</button>
+  </div>
+
+  <label>Email</label>
+  <input id="email" type="email" placeholder="client@example.com">
+
+  <label>Password</label>
+  <input id="password" type="password" placeholder="Password">
+
+  <button class="main" id="mainBtn" onclick="submitAuth()">Login</button>
+
+  <div id="msg" class="msg"></div>
+</div>
+
+<script>
+let mode = "login";
+
+function setMode(m){
+  mode = m;
+  document.getElementById("loginTab").classList.remove("active");
+  document.getElementById("registerTab").classList.remove("active");
+
+  if(mode === "login"){
+    document.getElementById("loginTab").classList.add("active");
+    document.getElementById("mainBtn").innerText = "Login";
+  }else{
+    document.getElementById("registerTab").classList.add("active");
+    document.getElementById("mainBtn").innerText = "Create Account";
+  }
+
+  document.getElementById("msg").innerText = "";
+}
+
+async function submitAuth(){
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+  const msg = document.getElementById("msg");
+
+  msg.className = "msg";
+  msg.innerText = "Processing...";
+
+  if(!email || !password){
+    msg.className = "msg error";
+    msg.innerText = "Enter email and password.";
+    return;
+  }
+
+  const endpoint = mode === "login" ? "/login-api" : "/register";
+
+  try{
+    const res = await fetch(endpoint,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email,password})
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      msg.className = "msg error";
+      msg.innerText = data.error || "Error";
+      return;
+    }
+
+    if(mode === "register"){
+      msg.className = "msg success";
+      msg.innerText = "Account created. Now login.";
+      setMode("login");
+      return;
+    }
+
+    localStorage.setItem("ai_flow_email", data.email);
+    localStorage.setItem("ai_flow_role", data.role);
+    localStorage.setItem("ai
