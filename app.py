@@ -1,9 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import (
-    FileResponse,
-    JSONResponse,
-    HTMLResponse,
-)
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from groq import Groq
@@ -231,7 +227,10 @@ async def register(request: Request):
     password = data.get("password", "").strip()
 
     if not email or not password:
-        return JSONResponse({"error": "Missing email or password"}, status_code=400)
+        return JSONResponse(
+            {"error": "Missing email or password"},
+            status_code=400,
+        )
 
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     company_id = email
@@ -240,7 +239,10 @@ async def register(request: Request):
     conn = get_db_connection()
 
     if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
+        return JSONResponse(
+            {"error": "Database error"},
+            status_code=500,
+        )
 
     try:
         with conn.cursor() as cur:
@@ -290,18 +292,109 @@ async def register(request: Request):
 
         conn.commit()
 
-        return JSONResponse({
-            "success": True,
-            "email": email,
-            "companyId": company_id
-        })
+        return JSONResponse(
+            {
+                "success": True,
+                "email": email,
+                "companyId": company_id,
+            }
+        )
 
     except Exception as e:
         print("REGISTER ERROR:", str(e))
-        return JSONResponse({"error": "User already exists"}, status_code=400)
+
+        return JSONResponse(
+            {"error": "User already exists"},
+            status_code=400,
+        )
 
     finally:
         conn.close()
 
 
-@app.post("/
+@app.post("/login-api")
+async def login_api(request: Request):
+    data = await request.json()
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+    conn = get_db_connection()
+
+    if not conn:
+        return JSONResponse(
+            {"error": "Database error"},
+            status_code=500,
+        )
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+            cur.execute(
+                """
+                SELECT *
+                FROM users
+                WHERE email = %s
+                AND password = %s
+                """,
+                (
+                    email,
+                    hashed_password,
+                ),
+            )
+
+            user = cur.fetchone()
+
+            if not user:
+                return JSONResponse(
+                    {"error": "Invalid credentials"},
+                    status_code=401,
+                )
+
+            return JSONResponse(
+                {
+                    "success": True,
+                    "email": user["email"],
+                    "role": user["role"],
+                    "companyId": user["company_id"],
+                }
+            )
+
+    except Exception as e:
+        print("LOGIN ERROR:", str(e))
+
+        return JSONResponse(
+            {"error": "Login failed"},
+            status_code=500,
+        )
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# DASHBOARD DATA
+# =========================================================
+
+@app.get("/dashboard-data")
+def dashboard_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse(
+            {"error": "Missing companyId"},
+            status_code=400,
+        )
+
+    conn = get_db_connection()
+
+    if not conn:
+        return JSONResponse(
+            {"error": "Database error"},
+            status_code=500,
+        )
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+            cur.execute(
