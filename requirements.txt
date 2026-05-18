@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+groq
+gspread
+google-auth
+psycopg2-binary

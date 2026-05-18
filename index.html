@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>AI FLOW — AI Sales Agents for Every Customer Conversation</title>
+  <meta name="description" content="AI FLOW gives businesses AI sales agents for websites, Facebook Messenger, Instagram, WhatsApp, lead capture, bookings, and customer follow-up." />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background: #061923;
+      color: #f7fbff;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input {
+      font-family: inherit;
+    }
+
+    .container {
+      width: min(1180px, 92%);
+      margin: 0 auto;
+    }
+
+    .announcement {
+      background: #eaf7f4;
+      color: #071820;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      font-weight: 700;
+    }
+
+    .announcement-inner {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    .announcement a {
+      text-decoration: underline;
+      font-weight: 900;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(6, 25, 35, 0.9);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .nav {
+      min-height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 26px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: -0.6px;
+      font-size: 22px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: #effff7;
+      color: #061923;
+      font-weight: 950;
+      box-shadow: 0 18px 50px rgba(142, 255, 188, 0.22);
+    }
+
+    .brand-sub {
+      display: block;
+      color: #9fb7c3;
+      font-size: 11px;
+      line-height: 1;
+      letter-spacing: 0;
+      font-weight: 700;
+      margin-top: -2px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      color: #d7e6eb;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .nav-links a:hover {
+      color: #b8ff7a;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-radius: 18px;
+      padding: 15px 23px;
+      font-weight: 900;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: 0.2s ease;
+      white-space: nowrap;
+      font-size: 15px;
+    }
+
+    .btn-primary {
+      background: #effff7;
+      color: #061923;
+      box-shadow: 0 20px 60px rgba(239,255,247,0.18);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 26px 70px rgba(239,255,247,0.28);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #effff7;
+      border-color: rgba(255,255,255,0.22);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.08);
+      transform: translateY(-2px);
+    }
+
+    .btn-lime {
+      background: #b8ff7a;
+      color: #061923;
+      box-shadow: 0 18px 50px rgba(184,255,122,0.22);
+    }
+
+    .btn-lime:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 26px 70px rgba(184,255,122,0.32);
+    }
+
+    .hero {
+      position: relative;
+      padding: 96px 0 90px;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      right: -12%;
+      top: 10%;
+      width: 620px;
+      height: 620px;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle, rgba(184,255,122,0.28), transparent 55%),
+        radial-gradient(circle at 70% 70%, rgba(65,220,255,0.18), transparent 45%);
+      filter: blur(22px);
+      pointer-events: none;
+    }
+
+    .hero-kicker {
+      text-align: center;
+      color: #c8f9ff;
+      font-weight: 900;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      font-size: 14px;
+      margin-bottom: 26px;
+    }
+
+    h1 {
+      text-align: center;
+      max-width: 1050px;
+      margin: 0 auto 30px;
+      font-size: clamp(54px, 8vw, 106px);
+      line-height: 0.95;
+      letter-spacing: -5px;
+      font-weight: 900;
+    }
+
+    .hero-subtitle {
+      max-width: 820px;
+      margin: 0 auto 34px;
+      text-align: center;
+      color: #d3e4ea;
+      font-size: 22px;
+    }
+
+    .hero-form {
+      max-width: 730px;
+      margin: 0 auto 28px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+    }
+
+    .hero-form input {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: #f4fffb;
+      color: #061923;
+      border-radius: 24px;
+      padding: 19px 24px;
+      outline: none;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .hero-form input::placeholder {
+      color: #6c7c82;
+    }
+
+    .hero-proof {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      color: #bad0d8;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .proof-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+
+    .dashboard-wrap {
+      position: relative;
+      margin: 70px auto 0;
+      width: min(1010px, 100%);
+    }
+
+    .dashboard-card {
+      position: relative;
+      border-radius: 38px;
+      background: #f3fffb;
+      color: #071820;
+      padding: 26px;
+      box-shadow:
+        0 50px 120px rgba(0,0,0,0.35),
+        0 0 0 1px rgba(255,255,255,0.18);
+      overflow: hidden;
+    }
+
+    .dashboard-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 82px;
+      background: #072232;
+      border-radius: 34px 0 0 34px;
+    }
+
+    .dash-content {
+      position: relative;
+      padding-left: 96px;
+    }
+
+    .dash-side {
+      position: absolute;
+      left: 23px;
+      top: 26px;
+      bottom: 26px;
+      width: 36px;
+      display: grid;
+      grid-template-rows: 42px repeat(7, 18px) 1fr;
+      gap: 20px;
+      justify-items: center;
+      color: #f3fffb;
+      z-index: 2;
+    }
+
+    .dash-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: #f3fffb;
+      color: #072232;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+    }
+
+    .dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+    }
+
+    .dot.active {
+      background: #b8ff7a;
+      box-shadow: 0 0 20px rgba(184,255,122,0.7);
+    }
+
+    .dash-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 26px;
+    }
+
+    .dash-head h2 {
+      font-size: 36px;
+      letter-spacing: -1.6px;
+      line-height: 1;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 13px;
+      border-radius: 999px;
+      background: #e6fff1;
+      color: #0b7b45;
+      font-weight: 900;
+      font-size: 13px;
+    }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      min-height: 108px;
+      padding: 18px;
+      border-radius: 18px;
+      background: #ebfbf7;
+      border: 1px solid #c7ece6;
+    }
+
+    .metric span {
+      display: block;
+      color: #31505b;
+      font-weight: 900;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 32px;
+      letter-spacing: -1.4px;
+      line-height: 1;
+    }
+
+    .tiny-line {
+      margin-top: 13px;
+      height: 26px;
+      width: 100%;
+    }
+
+    .large-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+    }
+
+    .panel {
+      border-radius: 20px;
+      background: #ebfbf7;
+      border: 1px solid #c7ece6;
+      padding: 22px;
+      min-height: 210px;
+    }
+
+    .panel h3 {
+      font-size: 15px;
+      margin-bottom: 18px;
+      color: #173742;
+    }
+
+    .channel-row,
+    .lead-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(7,24,32,0.08);
+      font-weight: 800;
+      color: #173742;
+    }
+
+    .channel-row:last-child,
+    .lead-row:last-child {
+      border-bottom: 0;
+    }
+
+    .connected {
+      color: #0b7b45;
+      background: #dffff0;
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .pending {
+      color: #9a6a00;
+      background: #fff4d6;
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    section {
+      padding: 92px 0;
+    }
+
+    .section-head {
+      max-width: 860px;
+      margin-bottom: 44px;
+    }
+
+    .section-kicker {
+      color: #b8ff7a;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(36px, 5.4vw, 66px);
+      line-height: 1;
+      letter-spacing: -3px;
+      margin-bottom: 18px;
+      font-weight: 900;
+    }
+
+    .section-subtitle {
+      color: #c7d9df;
+      font-size: 20px;
+      max-width: 780px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      border-radius: 30px;
+      padding: 30px;
+      min-height: 260px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.16);
+    }
+
+    .card-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      background: #f3fffb;
+      color: #061923;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card h3 {
+      font-size: 24px;
+      margin-bottom: 13px;
+      letter-spacing: -0.8px;
+    }
+
+    .card p {
+      color: #c2d4db;
+      font-size: 16px;
+    }
+
+    .light-section {
+      background: #f3fffb;
+      color: #071820;
+      border-radius: 44px 44px 0 0;
+    }
+
+    .light-section .section-kicker {
+      color: #0c7a5a;
+    }
+
+    .light-section .section-subtitle {
+      color: #435d66;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .step {
+      background: #ffffff;
+      border: 1px solid #d8ece8;
+      border-radius: 26px;
+      padding: 26px;
+      min-height: 230px;
+      box-shadow: 0 24px 60px rgba(7,24,32,0.08);
+    }
+
+    .step-num {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: #061923;
+      color: #f3fffb;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      margin-bottom: 20px;
+    }
+
+    .step h3 {
+      font-size: 21px;
+      margin-bottom: 11px;
+      letter-spacing: -0.5px;
+    }
+
+    .step p {
+      color: #4b626b;
+      font-size: 15px;
+    }
+
+    .pricing-note {
+      padding: 26px;
+      border-radius: 28px;
+      background: rgba(184,255,122,0.13);
+      border: 1px solid rgba(184,255,122,0.28);
+      color: #e8f5f7;
+      font-size: 18px;
+      max-width: 980px;
+      margin-bottom: 30px;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .price-card {
+      position: relative;
+      border-radius: 32px;
+      padding: 30px;
+      background: #f3fffb;
+      color: #071820;
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 34px 90px rgba(0,0,0,0.18);
+      overflow: hidden;
+    }
+
+    .price-card.featured {
+      transform: translateY(-10px);
+      background: #ffffff;
+      box-shadow:
+        0 40px 110px rgba(0,0,0,0.24),
+        0 0 0 2px rgba(184,255,122,0.75);
+    }
+
+    .popular {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #b8ff7a;
+      color: #061923;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .price-card h3 {
+      font-size: 27px;
+      letter-spacing: -0.8px;
+      margin-bottom: 10px;
+    }
+
+    .desc {
+      color: #4c626b;
+      min-height: 70px;
+      margin-bottom: 20px;
+    }
+
+    .monthly {
+      font-size: 48px;
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: -2px;
+      margin-bottom: 8px;
+    }
+
+    .monthly span {
+      color: #5b7078;
+      font-size: 16px;
+      letter-spacing: 0;
+      font-weight: 900;
+    }
+
+    .success-fee {
+      color: #0c7a5a;
+      font-weight: 950;
+      margin-bottom: 24px;
+    }
+
+    .price-list {
+      display: grid;
+      gap: 13px;
+      margin: 24px 0 28px;
+      color: #263f49;
+      font-weight: 750;
+      font-size: 15px;
+    }
+
+    .price-list div {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .check {
+      width: 21px;
+      height: 21px;
+      border-radius: 999px;
+      background: #dffff0;
+      color: #0b7b45;
+      display: inline-grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+
+    .pricing-explainer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 30px;
+    }
+
+    .explainer-box {
+      padding: 26px;
+      border-radius: 28px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .explainer-box h3 {
+      font-size: 23px;
+      margin-bottom: 12px;
+    }
+
+    .explainer-box p {
+      color: #c2d4db;
+    }
+
+    .final-cta {
+      border-radius: 38px;
+      padding: 52px;
+      background:
+        radial-gradient(circle at 80% 20%, rgba(184,255,122,0.36), transparent 38%),
+        #f3fffb;
+      color: #061923;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 30px;
+      align-items: center;
+      box-shadow: 0 36px 110px rgba(0,0,0,0.22);
+    }
+
+    .final-cta h2 {
+      font-size: clamp(34px, 4.6vw, 58px);
+      line-height: 0.98;
+      letter-spacing: -2.5px;
+      margin-bottom: 14px;
+    }
+
+    .final-cta p {
+      max-width: 700px;
+      color: #415962;
+      font-size: 19px;
+    }
+
+    .final-price {
+      font-size: 52px;
+      font-weight: 950;
+      letter-spacing: -2.5px;
+      line-height: 1;
+      margin-bottom: 16px;
+      text-align: right;
+    }
+
+    footer {
+      padding: 44px 0;
+      color: #9fb7c3;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a:hover {
+      color: #b8ff7a;
+    }
+
+    .cookie-card {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      width: min(520px, calc(100vw - 48px));
+      z-index: 999996;
+      background: #ffffff;
+      color: #071820;
+      border-radius: 26px;
+      padding: 24px;
+      box-shadow: 0 30px 100px rgba(0,0,0,0.35);
+      display: none;
+    }
+
+    .cookie-card.show {
+      display: block;
+    }
+
+    .cookie-card p {
+      color: #243e48;
+      font-weight: 650;
+      margin-bottom: 20px;
+    }
+
+    .cookie-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .cookie-link {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid #071820;
+      color: #071820;
+      font-weight: 900;
+      padding: 10px 0;
+      cursor: pointer;
+    }
+
+    .cookie-btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 13px 18px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .cookie-btn.reject {
+      background: #eef2f3;
+      color: #071820;
+    }
+
+    .cookie-btn.accept {
+      background: #071820;
+      color: white;
+    }
+
+    .assistant-welcome {
+      position: fixed;
+      right: 24px;
+      bottom: 96px;
+      z-index: 999995;
+      display: grid;
+      gap: 10px;
+      justify-items: end;
+    }
+
+    .assistant-message {
+      position: relative;
+      max-width: 330px;
+      background: #ffffff;
+      color: #071820;
+      border-radius: 24px;
+      padding: 18px 20px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.26);
+      font-weight: 750;
+    }
+
+    .assistant-close {
+      position: absolute;
+      right: -14px;
+      top: -14px;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 0;
+      background: #ffffff;
+      color: #071820;
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+    }
+
+    .quick-buttons {
+      display: grid;
+      gap: 8px;
+      justify-items: end;
+    }
+
+    .quick-buttons a,
+    .quick-buttons button {
+      border: 0;
+      background: #ffffff;
+      color: #173742;
+      border-radius: 999px;
+      padding: 11px 17px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 16px 45px rgba(0,0,0,0.18);
+    }
+
+    .chat-launch {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 999995;
+      width: 58px;
+      height: 58px;
+      border-radius: 999px;
+      border: 0;
+      background: #f3fffb;
+      color: #061923;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+    }
+
+    #translate-float {
+      position: fixed;
+      right: 24px;
+      top: 104px;
+      z-index: 999994;
+    }
+
+    #translate-toggle {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(6,25,35,0.86);
+      color: white;
+      backdrop-filter: blur(14px);
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.26);
+    }
+
+    #translate-panel {
+      display: none;
+      margin-top: 10px;
+      width: 280px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(15,27,35,0.96);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 28px 80px rgba(0,0,0,0.45);
+    }
+
+    .translate-title {
+      font-weight: 900;
+      margin-bottom: 12px;
+      color: white;
+    }
+
+    #google_translate_element select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #111d24;
+      color: white;
+    }
+
+    .goog-te-banner-frame,
+    .goog-te-gadget-icon {
+      display: none !important;
+    }
+
+    body {
+      top: 0 !important;
+    }
+
+    @media (max-width: 980px) {
+      .announcement-inner {
+        font-size: 13px;
+        padding: 10px 0;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero {
+        padding-top: 70px;
+      }
+
+      h1 {
+        letter-spacing: -2.5px;
+      }
+
+      .hero-form {
+        grid-template-columns: 1fr;
+      }
+
+      .dash-content {
+        padding-left: 0;
+      }
+
+      .dashboard-card::before,
+      .dash-side {
+        display: none;
+      }
+
+      .dash-grid,
+      .large-grid,
+      .cards,
+      .steps,
+      .pricing-grid,
+      .pricing-explainer,
+      .final-cta {
+        grid-template-columns: 1fr;
+      }
+
+      .price-card.featured {
+        transform: none;
+      }
+
+      .final-price {
+        text-align: left;
+      }
+
+      .assistant-welcome {
+        right: 16px;
+        bottom: 90px;
+      }
+
+      .assistant-message {
+        max-width: 300px;
+      }
+
+      .cookie-card {
+        left: 16px;
+        bottom: 16px;
+        width: calc(100vw - 32px);
+      }
+
+      #translate-float {
+        display: none;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .nav-actions .btn-secondary {
+        display: none;
+      }
+
+      .dash-head {
+        display: block;
+      }
+
+      .status-chip {
+        margin-top: 14px;
+      }
+
+      .dashboard-card,
+      .final-cta {
+        border-radius: 28px;
+        padding: 22px;
+      }
+
+      .hero-subtitle,
+      .section-subtitle {
+        font-size: 18px;
+      }
+
+      .assistant-message,
+      .quick-buttons {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="announcement">
+    <div class="container announcement-inner">
+      <span>New: AI FLOW is becoming a full AI sales platform for websites, Facebook, Instagram and WhatsApp.</span>
+      <a href="#pricing">See plans</a>
+    </div>
+  </div>
+
+  <header>
+    <div class="container nav">
+      <a class="brand" href="#">
+        <span class="brand-mark">AI</span>
+        <span>
+          AI FLOW
+          <span class="brand-sub">AI Sales Agents</span>
+        </span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="#solutions">Solutions</a>
+        <a href="#platform">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a class="btn btn-secondary" href="#platform">View Platform</a>
+        <a class="btn btn-primary" href="#demo">Request Demo</a>
+      </div>
+    </div>
+  </header>
+
+  <div id="translate-float">
+    <button id="translate-toggle" type="button">🌐 Translate</button>
+    <div id="translate-panel">
+      <div class="translate-title">Choose language</div>
+      <div id="google_translate_element"></div>
+    </div>
+  </div>
+
+  <main>
+    <section class="hero" id="demo">
+      <div class="container">
+        <div class="hero-kicker">AI Sales Platform for Small Business Teams</div>
+
+        <h1>AI Agents for Every Customer Conversation</h1>
+
+        <p class="hero-subtitle">
+          AI FLOW helps businesses reply instantly, qualify leads, book appointments,
+          and turn website, Facebook, Instagram, and WhatsApp messages into sales.
+        </p>
+
+        <form class="hero-form" onsubmit="event.preventDefault(); window.location.href='#pricing';">
+          <input type="email" placeholder="Enter business email*" required />
+          <button class="btn btn-lime" type="submit">Get a Demo</button>
+        </form>
+
+        <div class="hero-proof">
+          <div class="proof-pill">✅ Website AI Bot</div>
+          <div class="proof-pill">✅ Facebook Messenger</div>
+          <div class="proof-pill">✅ Google Sheets</div>
+          <div class="proof-pill">✅ Calendar Booking</div>
+          <div class="proof-pill">⚡ Instagram & WhatsApp for verified businesses</div>
+        </div>
+
+        <div class="dashboard-wrap" id="platform">
+          <div class="dashboard-card">
+            <div class="dash-side">
+              <div class="dash-logo">F</div>
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div></div>
+            </div>
+
+            <div class="dash-content">
+              <div class="dash-head">
+                <h2>AI FLOW Dashboard</h2>
+                <div class="status-chip">● Live AI system</div>
+              </div>
+
+              <div class="dash-grid">
+                <div class="metric">
+                  <span>Total Leads</span>
+                  <strong>247</strong>
+                  <svg class="tiny-line" viewBox="0 0 140 26">
+                    <path d="M2 20 C25 4, 45 22, 66 12 S104 5, 138 9" fill="none" stroke="#36a6b7" stroke-width="4" stroke-linecap="round"/>
+                  </svg>
+                </div>
+
+                <div class="metric">
+                  <span>Booked Calls</span>
+                  <strong>39</strong>
+                  <svg class="tiny-line" viewBox="0 0 140 26">
+                    <path d="M2 18 C22 18, 34 4, 54 10 S94 20, 138 5" fill="none" stroke="#8b5cf6" stroke-width="4" stroke-linecap="round"/>
+                  </svg>
+                </div>
+
+                <div class="metric">
+                  <span>Sales Assisted</span>
+                  <strong>$12.4k</strong>
+                  <svg class="tiny-line" viewBox="0 0 140 26">
+                    <path d="M2 22 C28 15, 38 20, 58 11 S102 0, 138 7" fill="none" stroke="#ff8a73" stroke-width="4" stroke-linecap="round"/>
+                  </svg>
+                </div>
+              </div>
+
+              <div class="large-grid">
+                <div class="panel">
+                  <h3>Connected channels</h3>
+
+                  <div class="channel-row">
+                    <span>Website Widget</span>
+                    <span class="connected">Connected</span>
+                  </div>
+
+                  <div class="channel-row">
+                    <span>Facebook Messenger</span>
+                    <span class="connected">Connected</span>
+                  </div>
+
+                  <div class="channel-row">
+                    <span>Instagram DM</span>
+                    <span class="pending">Verification</span>
+                  </div>
+
+                  <div class="channel-row">
+                    <span>WhatsApp Business</span>
+                    <span class="pending">Verification</span>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <h3>Recent AI-generated leads</h3>
+
+                  <div class="lead-row">
+                    <span>Demo booking request</span>
+                    <span>Website</span>
+                  </div>
+
+                  <div class="lead-row">
+                    <span>Pricing question</span>
+                    <span>Facebook</span>
+                  </div>
+
+                  <div class="lead-row">
+                    <span>Service inquiry</span>
+                    <span>Widget</span>
+                  </div>
+
+                  <div class="lead-row">
+                    <span>Calendar booking</span>
+                    <span>AI</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="solutions">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Solutions</div>
+          <h2 class="section-title">One AI sales team across your customer channels</h2>
+          <p class="section-subtitle">
+            AI FLOW is built for businesses that receive leads through messages and need faster replies,
+            better follow-up, and more booked appointments.
+          </p>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-icon">🌐</div>
+            <h3>Website AI Agent</h3>
+            <p>
+              Add an AI assistant to your website that answers questions, captures contact details,
+              and moves visitors toward booking or purchase.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">💬</div>
+            <h3>Social AI Agent</h3>
+            <p>
+              Reply to Facebook Messenger conversations automatically and prepare for Instagram and WhatsApp
+              production integrations after Meta verification.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">📊</div>
+            <h3>Lead & Booking System</h3>
+            <p>
+              Save leads to Google Sheets, create appointments in Google Calendar, and track what AI does for the business.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="light-section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">How it works</div>
+          <h2 class="section-title">From message to lead, booking, or sale</h2>
+          <p class="section-subtitle">
+            AI FLOW connects customer conversations to real business actions.
+          </p>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h3>Customer writes</h3>
+            <p>A visitor messages your website, Facebook page, Instagram, or WhatsApp.</p>
+          </div>
+
+          <div class="step">
+            <div class="step-num">2</div>
+            <h3>AI replies instantly</h3>
+            <p>The AI answers questions, qualifies intent, and guides the customer to the next step.</p>
+          </div>
+
+          <div class="step">
+            <div class="step-num">3</div>
+            <h3>Lead is captured</h3>
+            <p>Name, phone, email, source, and message are saved automatically.</p>
+          </div>
+
+          <div class="step">
+            <div class="step-num">4</div>
+            <h3>Business grows</h3>
+            <p>The AI books a call, creates a calendar event, follows up, or sends the lead to the owner.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Pricing</div>
+          <h2 class="section-title">Simple plans with growth upside</h2>
+          <p class="section-subtitle">
+            Start with a website AI bot, upgrade to social messaging automation,
+            or work with AI FLOW as a growth partner.
+          </p>
+        </div>
+
+        <div class="pricing-note">
+          <strong>Hybrid model:</strong> businesses pay a simple monthly fee for the AI system.
+          On advanced plans, AI FLOW can also earn a success fee from sales, bookings,
+          appointments, or deals generated by AI.
+        </div>
+
+        <div class="pricing-grid">
+          <div class="price-card">
+            <h3>Website Bot</h3>
+            <p class="desc">
+              For businesses that want an AI chat widget on their website to answer questions and capture leads.
+            </p>
+
+            <div class="monthly">$39 <span>/ month</span></div>
+            <div class="success-fee">Website AI assistant</div>
+
+            <div class="price-list">
+              <div><span class="check">✓</span> AI chat widget for your website</div>
+              <div><span class="check">✓</span> Answers questions 24/7</div>
+              <div><span class="check">✓</span> Captures phone and email</div>
+              <div><span class="check">✓</span> Saves leads to Google Sheets</div>
+              <div><span class="check">✓</span> Books appointments in Google Calendar</div>
+            </div>
+
+            <a class="btn btn-secondary" href="#demo">Start Website Bot</a>
+          </div>
+
+          <div class="price-card featured">
+            <div class="popular">Most popular</div>
+
+            <h3>Social AI</h3>
+            <p class="desc">
+              For businesses that want AI replies across website and social customer messages.
+            </p>
+
+            <div class="monthly">$99 <span>/ month</span></div>
+            <div class="success-fee">Website + Facebook AI</div>
+
+            <div class="price-list">
+              <div><span class="check">✓</span> Everything in Website Bot</div>
+              <div><span class="check">✓</span> Facebook Messenger AI replies</div>
+              <div><span class="check">✓</span> Social lead capture</div>
+              <div><span class="check">✓</span> Calendar booking from conversations</div>
+              <div><span class="check">✓</span> Instagram for verified businesses</div>
+              <div><span class="check">✓</span> WhatsApp for verified businesses</div>
+            </div>
+
+            <a class="btn btn-lime" href="#demo">Start Social AI →</a>
+          </div>
+
+          <div class="price-card">
+            <h3>AI Growth Partner</h3>
+            <p class="desc">
+              For businesses that want AI FLOW to help generate, qualify, follow up, and close more customers.
+            </p>
+
+            <div class="monthly">Custom</div>
+            <div class="success-fee">% from AI-generated sales</div>
+
+            <div class="price-list">
+              <div><span class="check">✓</span> Full AI sales system</div>
+              <div><span class="check">✓</span> Website + social channels</div>
+              <div><span class="check">✓</span> Follow-up automation</div>
+              <div><span class="check">✓</span> Sales funnel optimization</div>
+              <div><span class="check">✓</span> Success fee from closed sales</div>
+              <div><span class="check">✓</span> Custom integrations and setup</div>
+            </div>
+
+            <a class="btn btn-secondary" href="#demo">Talk to Sales</a>
+          </div>
+        </div>
+
+        <div class="pricing-explainer">
+          <div class="explainer-box">
+            <h3>What is the success fee?</h3>
+            <p>
+              A success fee is a percentage from sales, appointments, or deals generated through AI FLOW.
+              If AI does not help create the sale, there is no success fee.
+            </p>
+          </div>
+
+          <div class="explainer-box">
+            <h3>Why this works</h3>
+            <p>
+              Small businesses can start at a low monthly price, while AI FLOW earns more only when
+              the system creates real business results.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="final-cta">
+          <div>
+            <h2>Give your business an AI sales team</h2>
+            <p>
+              Launch an AI agent that replies to customers, captures leads, books appointments,
+              and helps turn conversations into revenue.
+            </p>
+          </div>
+
+          <div>
+            <div class="final-price">From $39/mo</div>
+            <a class="btn btn-lime" href="#pricing">Choose Plan</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div>© 2026 AI FLOW. Built to turn messages into customers.</div>
+      <div class="footer-links">
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/terms.html">Terms</a>
+        <a href="/data-deletion.html">Data Deletion</a>
+      </div>
+    </div>
+  </footer>
+
+  <div class="cookie-card" id="cookieCard">
+    <p>
+      By clicking <strong>"Accept"</strong>, you agree to the storing of cookies on your device
+      to enhance site navigation, analyze site usage, and assist in our marketing efforts.
+      View our <a href="/privacy.html" style="text-decoration: underline; font-weight: 900;">Privacy Policy</a>
+      for more information.
+    </p>
+
+    <div class="cookie-actions">
+      <button class="cookie-link" type="button" id="cookiePrefs">Preferences</button>
+      <button class="cookie-btn reject" type="button" id="cookieReject">Reject</button>
+      <button class="cookie-btn accept" type="button" id="cookieAccept">Accept</button>
+    </div>
+  </div>
+
+  <div class="assistant-welcome" id="assistantWelcome">
+    <div class="assistant-message">
+      <button class="assistant-close" type="button" id="assistantClose">×</button>
+      <strong>Hi there 👋</strong><br />
+      Want to see how AI FLOW can help your business?
+    </div>
+
+    <div class="quick-buttons">
+      <a href="#demo">Request Demo</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#how">How it works</a>
+    </div>
+  </div>
+
+  <button class="chat-launch" type="button" id="chatLaunch">💬</button>
+
+  <script>
+    const translateToggle = document.getElementById("translate-toggle");
+    const translatePanel = document.getElementById("translate-panel");
+
+    if (translateToggle && translatePanel) {
+      translateToggle.addEventListener("click", function () {
+        translatePanel.style.display = translatePanel.style.display === "block" ? "none" : "block";
+      });
+    }
+
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          includedLanguages: "",
+          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+          autoDisplay: false
+        },
+        "google_translate_element"
+      );
+    }
+
+    const cookieCard = document.getElementById("cookieCard");
+    const cookieAccept = document.getElementById("cookieAccept");
+    const cookieReject = document.getElementById("cookieReject");
+    const cookiePrefs = document.getElementById("cookiePrefs");
+
+    function hideCookieCard(value) {
+      localStorage.setItem("ai_flow_cookie_choice", value);
+      cookieCard.classList.remove("show");
+    }
+
+    if (!localStorage.getItem("ai_flow_cookie_choice")) {
+      setTimeout(function () {
+        cookieCard.classList.add("show");
+      }, 700);
+    }
+
+    cookieAccept.addEventListener("click", function () {
+      hideCookieCard("accepted");
+    });
+
+    cookieReject.addEventListener("click", function () {
+      hideCookieCard("rejected");
+    });
+
+    cookiePrefs.addEventListener("click", function () {
+      alert("Cookie preferences will be available soon. For now, you can accept or reject non-essential cookies.");
+    });
+
+    const assistantWelcome = document.getElementById("assistantWelcome");
+    const assistantClose = document.getElementById("assistantClose");
+    const chatLaunch = document.getElementById("chatLaunch");
+
+    assistantClose.addEventListener("click", function () {
+      assistantWelcome.style.display = "none";
+      localStorage.setItem("ai_flow_assistant_bubble_closed", "true");
+    });
+
+    if (localStorage.getItem("ai_flow_assistant_bubble_closed") === "true") {
+      assistantWelcome.style.display = "none";
+    }
+
+    chatLaunch.addEventListener("click", function () {
+      assistantWelcome.style.display = "none";
+
+      const possibleButtons = [
+        document.querySelector("#ai-sales-assistant-button"),
+        document.querySelector(".ai-sales-assistant-button"),
+        document.querySelector("[data-ai-sales-assistant-button]"),
+        document.querySelector("#chat-button"),
+        document.querySelector(".chat-button")
+      ];
+
+      const foundButton = possibleButtons.find(Boolean);
+
+      if (foundButton) {
+        foundButton.click();
+      } else {
+        window.location.href = "#demo";
+      }
+    });
+
+    setTimeout(function () {
+      if (assistantWelcome && localStorage.getItem("ai_flow_assistant_bubble_closed") !== "true") {
+        assistantWelcome.style.display = "grid";
+      }
+    }, 900);
+  </script>
+
+  <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+  <script>
+    window.AISalesAssistantConfig = {
+      companyId: "ai_sales_assistant_main",
+      siteName: "AI FLOW",
+      businessType: "AI sales automation platform",
+      offer: "AI sales agents for websites, Facebook Messenger, Instagram, WhatsApp, Google Sheets, and Google Calendar",
+      price: "From $39/month",
+      paymentLink: "https://buy.stripe.com/test_your_payment_link"
+    };
+  </script>
+
+  <script src="/widget.js"></script>
+</body>
+</html>
