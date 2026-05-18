@@ -7,7 +7,6 @@
 <title>AI FLOW Dashboard</title>
 
 <style>
-
 *{
     margin:0;
     padding:0;
@@ -22,8 +21,6 @@ body{
     height:100vh;
     overflow:hidden;
 }
-
-/* SIDEBAR */
 
 .sidebar{
     width:260px;
@@ -68,14 +65,10 @@ body{
     font-weight:700;
 }
 
-/* MAIN */
-
 .main{
     flex:1;
     overflow-y:auto;
 }
-
-/* TOPBAR */
 
 .topbar{
     height:80px;
@@ -110,7 +103,19 @@ body{
     background:#4ade80;
 }
 
-/* CONTENT */
+.logout-btn{
+    background:#1e293b;
+    color:white;
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:12px;
+    padding:10px 14px;
+    cursor:pointer;
+    font-weight:700;
+}
+
+.logout-btn:hover{
+    background:#334155;
+}
 
 .content{
     padding:40px;
@@ -126,8 +131,6 @@ body{
     color:#94a3b8;
     margin-bottom:40px;
 }
-
-/* CARDS */
 
 .cards{
     display:grid;
@@ -153,9 +156,14 @@ body{
     font-weight:700;
 }
 
-/* TABLE */
+.grid{
+    display:grid;
+    grid-template-columns:1.2fr 0.8fr;
+    gap:24px;
+}
 
-.table-box{
+.table-box,
+.content-box{
     background:#0f172a;
     border-radius:24px;
     padding:24px;
@@ -169,7 +177,8 @@ body{
     margin-bottom:24px;
 }
 
-.table-header h2{
+.table-header h2,
+.content-box h2{
     font-size:24px;
 }
 
@@ -223,15 +232,73 @@ td{
     color:#60a5fa;
 }
 
+.factory-card{
+    margin-top:18px;
+    background:#111936;
+    padding:18px;
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,0.06);
+}
+
+.factory-card h3{
+    margin-bottom:8px;
+}
+
+.factory-card p{
+    color:#94a3b8;
+    font-size:14px;
+    line-height:1.5;
+}
+
+.factory-btn{
+    width:100%;
+    margin-top:16px;
+    background:#4ade80;
+    color:#020617;
+    border:0;
+    padding:13px;
+    border-radius:12px;
+    font-weight:800;
+    cursor:pointer;
+}
+
+@media(max-width:900px){
+    body{
+        display:block;
+        overflow:auto;
+    }
+
+    .sidebar{
+        width:100%;
+        height:auto;
+    }
+
+    .main{
+        overflow:visible;
+    }
+
+    .topbar{
+        height:auto;
+        padding:20px;
+        flex-direction:column;
+        gap:16px;
+        align-items:flex-start;
+    }
+
+    .search{
+        width:100%;
+    }
+
+    .grid{
+        grid-template-columns:1fr;
+    }
+}
 </style>
 </head>
 
 <body>
 
-<!-- SIDEBAR -->
-
 <div class="sidebar">
-
     <div class="logo">
         AI <span>FLOW</span>
     </div>
@@ -247,17 +314,11 @@ td{
         <a href="#">Billing</a>
         <a href="#">Settings</a>
     </div>
-
 </div>
-
-<!-- MAIN -->
 
 <div class="main">
 
-    <!-- TOPBAR -->
-
     <div class="topbar">
-
         <input
             class="search"
             placeholder="Search leads, campaigns, content..."
@@ -265,18 +326,19 @@ td{
 
         <div class="user-box">
             <div>
-                <div style="font-weight:700;">AI FLOW Client</div>
+                <div id="clientEmail" style="font-weight:700;">AI FLOW Client</div>
                 <div style="font-size:13px;color:#94a3b8;">
                     Growth Studio Plan
                 </div>
             </div>
 
             <div class="avatar"></div>
+
+            <button class="logout-btn" onclick="logout()">
+                Logout
+            </button>
         </div>
-
     </div>
-
-    <!-- CONTENT -->
 
     <div class="content">
 
@@ -288,119 +350,140 @@ td{
             Manage leads, AI conversations, content factory and social growth.
         </div>
 
-        <!-- CARDS -->
-
         <div class="cards">
 
             <div class="card">
-                <div class="card-title">
-                    Total Leads
-                </div>
-
-                <div class="card-value">
-                    148
-                </div>
+                <div class="card-title">Total Leads</div>
+                <div class="card-value">148</div>
             </div>
 
             <div class="card">
-                <div class="card-title">
-                    AI Conversations
-                </div>
-
-                <div class="card-value">
-                    932
-                </div>
+                <div class="card-title">AI Conversations</div>
+                <div class="card-value">932</div>
             </div>
 
             <div class="card">
-                <div class="card-title">
-                    Social Posts
-                </div>
-
-                <div class="card-value">
-                    64
-                </div>
+                <div class="card-title">Social Posts</div>
+                <div class="card-value">64</div>
             </div>
 
             <div class="card">
-                <div class="card-title">
-                    Conversion Rate
-                </div>
-
-                <div class="card-value">
-                    21%
-                </div>
+                <div class="card-title">Conversion Rate</div>
+                <div class="card-value">21%</div>
             </div>
 
         </div>
 
-        <!-- TABLE -->
+        <div class="grid">
 
-        <div class="table-box">
+            <div class="table-box">
 
-            <div class="table-header">
-                <h2>Recent Leads</h2>
+                <div class="table-header">
+                    <h2>Recent Leads</h2>
 
-                <button class="new-btn">
-                    New Campaign
-                </button>
+                    <button class="new-btn">
+                        New Campaign
+                    </button>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Source</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <td>Michael Johnson</td>
+                            <td>Instagram</td>
+                            <td>
+                                <span class="status new">New Lead</span>
+                            </td>
+                            <td>Today</td>
+                        </tr>
+
+                        <tr>
+                            <td>Sarah Williams</td>
+                            <td>Website Chat</td>
+                            <td>
+                                <span class="status progress">In Progress</span>
+                            </td>
+                            <td>Today</td>
+                        </tr>
+
+                        <tr>
+                            <td>David Miller</td>
+                            <td>Facebook</td>
+                            <td>
+                                <span class="status done">Converted</span>
+                            </td>
+                            <td>Yesterday</td>
+                        </tr>
+                    </tbody>
+                </table>
+
             </div>
 
-            <table>
+            <div class="content-box">
+                <h2>Content Factory</h2>
 
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Source</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
+                <div class="factory-card">
+                    <h3>7-Day Content Plan</h3>
+                    <p>
+                        Generate posts, captions, reels ideas and campaign content for your business.
+                    </p>
+                    <button class="factory-btn">
+                        Generate Plan
+                    </button>
+                </div>
 
-                <tbody>
+                <div class="factory-card">
+                    <h3>Social Post Generator</h3>
+                    <p>
+                        Create Instagram, Facebook, TikTok and LinkedIn posts in your brand voice.
+                    </p>
+                    <button class="factory-btn">
+                        Create Post
+                    </button>
+                </div>
 
-                    <tr>
-                        <td>Michael Johnson</td>
-                        <td>Instagram</td>
-                        <td>
-                            <span class="status new">
-                                New Lead
-                            </span>
-                        </td>
-                        <td>Today</td>
-                    </tr>
-
-                    <tr>
-                        <td>Sarah Williams</td>
-                        <td>Website Chat</td>
-                        <td>
-                            <span class="status progress">
-                                In Progress
-                            </span>
-                        </td>
-                        <td>Today</td>
-                    </tr>
-
-                    <tr>
-                        <td>David Miller</td>
-                        <td>Facebook</td>
-                        <td>
-                            <span class="status done">
-                                Converted
-                            </span>
-                        </td>
-                        <td>Yesterday</td>
-                    </tr>
-
-                </tbody>
-
-            </table>
+                <div class="factory-card">
+                    <h3>Approval Queue</h3>
+                    <p>
+                        Review content created by AI FLOW or by your admin team before publishing.
+                    </p>
+                    <button class="factory-btn">
+                        View Drafts
+                    </button>
+                </div>
+            </div>
 
         </div>
 
     </div>
 
 </div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+
+if (!email) {
+    window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout() {
+    localStorage.removeItem("ai_flow_email");
+    localStorage.removeItem("ai_flow_role");
+    localStorage.removeItem("ai_flow_company_id");
+    window.location.href = "/login";
+}
+</script>
 
 </body>
 </html>
