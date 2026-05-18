@@ -1,4 +1,4 @@
-Вот полный app.py целиком под замену:
+Полный app.py целиком под замену:
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
@@ -148,3 +148,8 @@ def startup_event():
 @app.get("/")
 def home():
     return FileResponse("index.html")
+@app.get("/login")
+def login_page():
+    return FileResponse("login.html")
+@app.get("/dashboard")
+def
