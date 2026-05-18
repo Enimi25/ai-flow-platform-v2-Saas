@@ -97,7 +97,7 @@ h1{
 
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
   gap:22px;
 }
 
@@ -108,30 +108,24 @@ h1{
   padding:24px;
 }
 
-.platform{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:18px;
-}
-
 .icon{
   width:48px;
   height:48px;
   border-radius:16px;
+  background:#111936;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:#111936;
-  font-size:24px;
+  font-size:22px;
+  margin-bottom:18px;
 }
 
 .card h2{
   font-size:22px;
-  margin-bottom:8px;
+  margin-bottom:10px;
 }
 
-.desc{
+.card p{
   color:#94a3b8;
   line-height:1.5;
   margin-bottom:18px;
@@ -139,8 +133,10 @@ h1{
 
 .status{
   display:inline-block;
-  padding:7px 11px;
+  padding:8px 12px;
   border-radius:999px;
+  background:#422006;
+  color:#facc15;
   font-size:12px;
   font-weight:900;
   margin-bottom:18px;
@@ -151,12 +147,52 @@ h1{
   color:#4ade80;
 }
 
-.not-connected{
-  background:#3f1d1d;
-  color:#f87171;
-}
-
 button{
+  width:100%;
   border:0;
   border-radius:12px;
-  padding:13px
+  padding:13px 18px;
+  font-weight:900;
+  cursor:pointer;
+  background:#4ade80;
+  color:#020617;
+}
+
+.dark{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+.note{
+  margin-top:28px;
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+  color:#cbd5e1;
+  line-height:1.6;
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts" class="active">Social Accounts</a>
+    <a href="/dashboard">AI Replies</a>
+    <a href="/dashboard">Analytics</a>
+    <a href="/dashboard">Calendar</a>
+    <a href="/dashboard">Billing</a>
+    <a href="/dashboard">Settings</a>
