@@ -1,494 +1,386 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-
-from groq import Groq
-
-import os
-import hashlib
-from datetime import datetime
-
-import psycopg2
-from psycopg2.extras import RealDictCursor
-
-
-app = FastAPI()
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# =========================================================
-# DATABASE
-# =========================================================
-
-def get_db_connection():
-    database_url = os.getenv("DATABASE_URL")
-
-    if not database_url:
-        print("DATABASE_URL is missing")
-        return None
-
-    try:
-        return psycopg2.connect(database_url, sslmode="require")
-    except Exception as e:
-        print("DATABASE CONNECTION ERROR:", str(e))
-        return None
-
-
-def init_db():
-    conn = get_db_connection()
-
-    if not conn:
-        return False
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS companies (
-                    company_id TEXT PRIMARY KEY,
-                    company_name TEXT DEFAULT '',
-                    owner_email TEXT DEFAULT '',
-                    plan TEXT DEFAULT 'Growth Studio',
-                    status TEXT DEFAULT 'active',
-                    created_at TEXT DEFAULT ''
-                );
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    role TEXT DEFAULT 'client',
-                    company_id TEXT DEFAULT '',
-                    created_at TEXT DEFAULT ''
-                );
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS v2_leads (
-                    id SERIAL PRIMARY KEY,
-                    company_id TEXT DEFAULT '',
-                    name TEXT DEFAULT '',
-                    email TEXT DEFAULT '',
-                    phone TEXT DEFAULT '',
-                    source TEXT DEFAULT '',
-                    status TEXT DEFAULT 'new',
-                    message TEXT DEFAULT '',
-                    created_at TEXT DEFAULT ''
-                );
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS v2_content_posts (
-                    id SERIAL PRIMARY KEY,
-                    company_id TEXT DEFAULT '',
-                    platform TEXT DEFAULT '',
-                    post_type TEXT DEFAULT '',
-                    title TEXT DEFAULT '',
-                    content TEXT DEFAULT '',
-                    status TEXT DEFAULT 'draft',
-                    created_by TEXT DEFAULT '',
-                    created_at TEXT DEFAULT ''
-                );
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS v2_content_campaigns (
-                    id SERIAL PRIMARY KEY,
-                    company_id TEXT DEFAULT '',
-                    campaign_name TEXT DEFAULT '',
-                    goal TEXT DEFAULT '',
-                    status TEXT DEFAULT 'draft',
-                    created_at TEXT DEFAULT ''
-                );
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS v2_bookings (
-                    id SERIAL PRIMARY KEY,
-                    company_id TEXT DEFAULT '',
-                    client_name TEXT DEFAULT '',
-                    email TEXT DEFAULT '',
-                    phone TEXT DEFAULT '',
-                    meeting_time TEXT DEFAULT '',
-                    meeting_link TEXT DEFAULT '',
-                    status TEXT DEFAULT 'booked',
-                    created_at TEXT DEFAULT ''
-                );
-                """
-            )
-
-        conn.commit()
-        print("DATABASE READY")
-        return True
-
-    except Exception as e:
-        print("DATABASE INIT ERROR:", str(e))
-        return False
-
-    finally:
-        conn.close()
-
-
-@app.on_event("startup")
-def startup_event():
-    init_db()
-
-
-# =========================================================
-# STATIC PAGES
-# =========================================================
-
-@app.get("/")
-def home():
-    return FileResponse("index.html")
-
-
-@app.get("/login")
-def login_page():
-    return FileResponse("login.html")
-
-
-@app.get("/dashboard")
-def dashboard_page():
-    return FileResponse("dashboard.html")
-
-
-@app.get("/leads-page")
-def leads_page():
-    return FileResponse("leads.html")
-
-
-@app.get("/admin")
-def admin_page():
-    return FileResponse("admin.html")
-
-
-@app.get("/widget.js")
-def widget():
-    return FileResponse("widget.js", media_type="application/javascript")
-
-
-@app.get("/privacy.html", response_class=HTMLResponse)
-def privacy_page():
-    if not os.path.exists("privacy.html"):
-        return HTMLResponse("<h1>Privacy Policy not found</h1>", status_code=404)
-
-    with open("privacy.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-
-@app.get("/terms.html", response_class=HTMLResponse)
-def terms_page():
-    if not os.path.exists("terms.html"):
-        return HTMLResponse("<h1>Terms not found</h1>", status_code=404)
-
-    with open("terms.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-
-@app.get("/data-deletion.html", response_class=HTMLResponse)
-def data_deletion_page():
-    if not os.path.exists("data-deletion.html"):
-        return HTMLResponse("<h1>Data Deletion page not found</h1>", status_code=404)
-
-    with open("data-deletion.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-
-# =========================================================
-# AUTH
-# =========================================================
-
-@app.post("/register")
-async def register(request: Request):
-    data = await request.json()
-
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "").strip()
-
-    if not email or not password:
-        return JSONResponse(
-            {"error": "Missing email or password"},
-            status_code=400,
-        )
-
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    company_id = email
-    created_at = datetime.utcnow().isoformat() + "Z"
-
-    conn = get_db_connection()
-
-    if not conn:
-        return JSONResponse(
-            {"error": "Database error"},
-            status_code=500,
-        )
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                INSERT INTO companies (
-                    company_id,
-                    company_name,
-                    owner_email,
-                    plan,
-                    status,
-                    created_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (company_id) DO NOTHING
-                """,
-                (
-                    company_id,
-                    "New Client Company",
-                    email,
-                    "Growth Studio",
-                    "active",
-                    created_at,
-                ),
-            )
-
-            cur.execute(
-                """
-                INSERT INTO users (
-                    email,
-                    password,
-                    role,
-                    company_id,
-                    created_at
-                )
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (
-                    email,
-                    hashed_password,
-                    "client",
-                    company_id,
-                    created_at,
-                ),
-            )
-
-        conn.commit()
-
-        return JSONResponse(
-            {
-                "success": True,
-                "email": email,
-                "companyId": company_id,
-            }
-        )
-
-    except Exception as e:
-        print("REGISTER ERROR:", str(e))
-
-        return JSONResponse(
-            {"error": "User already exists"},
-            status_code=400,
-        )
-
-    finally:
-        conn.close()
-
-
-@app.post("/login-api")
-async def login_api(request: Request):
-    data = await request.json()
-
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "").strip()
-
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-
-    conn = get_db_connection()
-
-    if not conn:
-        return JSONResponse(
-            {"error": "Database error"},
-            status_code=500,
-        )
-
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-
-            cur.execute(
-                """
-                SELECT *
-                FROM users
-                WHERE email = %s
-                AND password = %s
-                """,
-                (
-                    email,
-                    hashed_password,
-                ),
-            )
-
-            user = cur.fetchone()
-
-            if not user:
-                return JSONResponse(
-                    {"error": "Invalid credentials"},
-                    status_code=401,
-                )
-
-            return JSONResponse(
-                {
-                    "success": True,
-                    "email": user["email"],
-                    "role": user["role"],
-                    "companyId": user["company_id"],
-                }
-            )
-
-    except Exception as e:
-        print("LOGIN ERROR:", str(e))
-
-        return JSONResponse(
-            {"error": "Login failed"},
-            status_code=500,
-        )
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# DASHBOARD DATA
-# =========================================================
-
-@app.get("/dashboard-data")
-def dashboard_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse(
-            {"error": "Missing companyId"},
-            status_code=400,
-        )
-
-    conn = get_db_connection()
-
-    if not conn:
-        return JSONResponse(
-            {"error": "Database error"},
-            status_code=500,
-        )
-
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-
-            cur.execute(
-                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s",
-                (companyId,),
-            )
-            total_leads = cur.fetchone()["count"]
-
-            cur.execute(
-                "SELECT COUNT(*) AS count FROM v2_content_posts WHERE company_id = %s",
-                (companyId,),
-            )
-            total_posts = cur.fetchone()["count"]
-
-            cur.execute(
-                "SELECT COUNT(*) AS count FROM v2_bookings WHERE company_id = %s",
-                (companyId,),
-            )
-            total_bookings = cur.fetchone()["count"]
-
-            cur.execute(
-                """
-                SELECT *
-                FROM v2_leads
-                WHERE company_id = %s
-                ORDER BY id DESC
-                LIMIT 50
-                """,
-                (companyId,),
-            )
-            leads = cur.fetchall()
-
-            cur.execute(
-                """
-                SELECT *
-                FROM v2_content_posts
-                WHERE company_id = %s
-                ORDER BY id DESC
-                LIMIT 50
-                """,
-                (companyId,),
-            )
-            posts = cur.fetchall()
-
-        return JSONResponse(
-            {
-                "success": True,
-                "stats": {
-                    "total_leads": total_leads,
-                    "ai_conversations": total_leads,
-                    "social_posts": total_posts,
-                    "bookings": total_bookings,
-                    "conversion_rate": "0%",
-                },
-                "leads": leads,
-                "posts": posts,
-            }
-        )
-
-    except Exception as e:
-        print("DASHBOARD DATA ERROR:", str(e))
-
-        return JSONResponse(
-            {"error": "Dashboard data error"},
-            status_code=500,
-        )
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# CREATE DEMO DATA
-# =========================================================
-
-@app.post("/create-demo-data")
-async def create_demo_data(request: Request):
-    data = await request.json()
-
-    company_id = data.get("companyId", "")
-
-    if not company_id:
-        return JSONResponse(
-            {"error": "Missing companyId"},
-            status_code=400,
-        )
-
-    conn = get_db_connection()
-
-    if not conn:
-        return JSONResponse(
-            {"error": "Database error"},
-            status_code=500,
-        )
-
-    now = datetime.utcnow().isoformat() + "Z"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI FLOW Content Factory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:#050816;
+  color:white;
+  font-family:Arial,sans-serif;
+  display:flex;
+  min-height:100vh;
+}
+
+.sidebar{
+  width:260px;
+  background:#0b1023;
+  border-right:1px solid rgba(255,255,255,.08);
+  padding:30px 20px;
+}
+
+.logo{
+  font-size:28px;
+  font-weight:900;
+  margin-bottom:50px;
+}
+
+.logo span{color:#4ade80}
+
+.menu{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.menu a{
+  text-decoration:none;
+  color:#cbd5e1;
+  padding:14px 18px;
+  border-radius:14px;
+}
+
+.menu a:hover{background:#111936;color:white}
+
+.menu .active{
+  background:#4ade80;
+  color:#020617;
+  font-weight:900;
+}
+
+.main{
+  flex:1;
+  padding:40px;
+}
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:35px;
+}
+
+h1{
+  font-size:36px;
+  margin-bottom:8px;
+}
+
+.sub{
+  color:#94a3b8;
+}
+
+.user{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.logout{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.actions{
+  display:flex;
+  gap:12px;
+  margin-bottom:22px;
+  flex-wrap:wrap;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:12px 16px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.green{
+  background:#4ade80;
+  color:#020617;
+}
+
+.dark{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+}
+
+.card{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+
+.card h2{
+  font-size:24px;
+  margin-bottom:18px;
+}
+
+label{
+  display:block;
+  color:#94a3b8;
+  font-size:14px;
+  margin-bottom:8px;
+}
+
+input, select, textarea{
+  width:100%;
+  background:#020617;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:16px;
+  outline:none;
+}
+
+textarea{
+  min-height:120px;
+  resize:vertical;
+}
+
+.post{
+  background:#111936;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:18px;
+  padding:18px;
+  margin-bottom:14px;
+}
+
+.post h3{
+  margin-bottom:8px;
+}
+
+.post p{
+  color:#cbd5e1;
+  line-height:1.5;
+  font-size:14px;
+}
+
+.meta{
+  margin-top:12px;
+  color:#4ade80;
+  font-size:12px;
+  font-weight:900;
+}
+
+.msg{
+  color:#94a3b8;
+  margin-bottom:16px;
+}
+
+.empty{
+  color:#94a3b8;
+  line-height:1.5;
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory" class="active">Content Factory</a>
+    <a href="/dashboard">Social Accounts</a>
+    <a href="/dashboard">AI Replies</a>
+    <a href="/dashboard">Analytics</a>
+    <a href="/dashboard">Calendar</a>
+    <a href="/dashboard">Billing</a>
+    <a href="/dashboard">Settings</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="top">
+    <div>
+      <h1>Content Factory</h1>
+      <div class="sub">Generate and manage social posts for this client.</div>
+    </div>
+
+    <div class="user">
+      <div id="clientEmail">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="green" onclick="generatePost()">Generate AI Post</button>
+    <button class="dark" onclick="loadPosts()">Refresh Posts</button>
+    <button class="dark" onclick="goDashboard()">Back to Dashboard</button>
+  </div>
+
+  <div id="msg" class="msg">Loading...</div>
+
+  <div class="grid">
+
+    <div class="card">
+      <h2>Create New Post</h2>
+
+      <label>Platform</label>
+      <select id="platform">
+        <option>Instagram</option>
+        <option>Facebook</option>
+        <option>TikTok</option>
+        <option>LinkedIn</option>
+      </select>
+
+      <label>Post Type</label>
+      <select id="postType">
+        <option>caption</option>
+        <option>ad</option>
+        <option>reel idea</option>
+        <option>story</option>
+        <option>carousel</option>
+      </select>
+
+      <label>Topic</label>
+      <textarea id="topic">AI sales automation for small businesses</textarea>
+
+      <button class="green" onclick="generatePost()">Generate Content</button>
+    </div>
+
+    <div class="card">
+      <h2>Saved Posts</h2>
+      <div id="postsBody">
+        <div class="empty">No posts yet.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+function goDashboard(){
+  window.location.href = "/dashboard";
+}
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
+}
+
+async function loadPosts(){
+  setMsg("Loading posts...");
+
+  try{
+    const res = await fetch("/dashboard-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      setMsg(data.error || "Error loading posts.");
+      return;
+    }
+
+    const posts = data.posts || [];
+    const body = document.getElementById("postsBody");
+    body.innerHTML = "";
+
+    if(!posts.length){
+      body.innerHTML = '<div class="empty">No posts yet.</div>';
+      setMsg("No posts yet.");
+      return;
+    }
+
+    posts.forEach(post => {
+      const div = document.createElement("div");
+      div.className = "post";
+
+      div.innerHTML = `
+        <h3>${post.title || "Untitled Post"}</h3>
+        <p>${post.content || ""}</p>
+        <div class="meta">${post.platform || ""} · ${post.post_type || ""} · ${post.status || "draft"}</div>
+      `;
+
+      body.appendChild(div);
+    });
+
+    setMsg("Loaded " + posts.length + " posts.");
+
+  }catch(e){
+    setMsg("Connection error.");
+  }
+}
+
+async function generatePost(){
+  const platform = document.getElementById("platform").value;
+  const postType = document.getElementById("postType").value;
+  const topic = document.getElementById("topic").value.trim();
+
+  setMsg("Generating post...");
+
+  try{
+    const res = await fetch("/create-content-post", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        platform: platform,
+        postType: postType,
+        topic: topic
+      })
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      setMsg(data.error || "Error generating post.");
+      return;
+    }
+
+    setMsg("Post generated.");
+    loadPosts();
+
+  }catch(e){
+    setMsg("Connection error generating post.");
+  }
+}
+
+loadPosts();
+</script>
+
+</body>
+</html>
