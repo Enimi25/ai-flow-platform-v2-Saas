@@ -1,0 +1,156 @@
+Ок. Двигаемся быстрее.
+
+Шаг 1 — создай новый файл
+
+GitHub → Add file → Create new file
+
+Название:
+
+leads.html
+
+Вставь:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI FLOW Leads</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#050816;
+  color:white;
+  font-family:Arial,sans-serif;
+  display:flex;
+  min-height:100vh;
+}
+.sidebar{
+  width:260px;
+  background:#0b1023;
+  border-right:1px solid rgba(255,255,255,.08);
+  padding:30px 20px;
+}
+.logo{
+  font-size:28px;
+  font-weight:900;
+  margin-bottom:50px;
+}
+.logo span{color:#4ade80}
+.menu{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.menu a{
+  text-decoration:none;
+  color:#cbd5e1;
+  padding:14px 18px;
+  border-radius:14px;
+}
+.menu a:hover{background:#111936;color:white}
+.menu .active{
+  background:#4ade80;
+  color:#020617;
+  font-weight:900;
+}
+.main{
+  flex:1;
+  padding:40px;
+}
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:35px;
+}
+h1{
+  font-size:36px;
+  margin-bottom:8px;
+}
+.sub{
+  color:#94a3b8;
+}
+.user{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.logout{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
+}
+.card{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+.actions{
+  display:flex;
+  gap:12px;
+  margin-bottom:20px;
+}
+button{
+  border:0;
+  border-radius:12px;
+  padding:12px 16px;
+  font-weight:900;
+  cursor:pointer;
+}
+.green{
+  background:#4ade80;
+  color:#020617;
+}
+.dark{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th{
+  text-align:left;
+  color:#94a3b8;
+  padding:14px 0;
+  font-size:14px;
+}
+td{
+  padding:16px 0;
+  border-top:1px solid rgba(255,255,255,.06);
+  font-size:14px;
+}
+.status{
+  padding:7px 10px;
+  border-radius:999px;
+  font-weight:900;
+  font-size:12px;
+}
+.new{background:#14532d;color:#4ade80}
+.in_progress{background:#3b0764;color:#c084fc}
+.converted{background:#1e3a8a;color:#60a5fa}
+.msg{
+  color:#94a3b8;
+  margin-bottom:15px;
+}
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page" class="active">Leads</a>
+    <a href="/dashboard">Content Factory</a>
+    <a href="/dashboard">Social Accounts
