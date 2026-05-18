@@ -138,6 +138,21 @@ def init_db():
                 """
             )
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_social_accounts (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    platform TEXT DEFAULT '',
+                    status TEXT DEFAULT 'not_connected',
+                    account_name TEXT DEFAULT '',
+                    account_id TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
         conn.commit()
         print("DATABASE READY")
         return True
@@ -182,6 +197,11 @@ def leads_page():
 @app.get("/content-factory")
 def content_factory_page():
     return FileResponse("content.html")
+
+
+@app.get("/social-accounts")
+def social_accounts_page():
+    return FileResponse("social.html")
 
 
 @app.get("/admin")
@@ -465,6 +485,124 @@ def dashboard_data(companyId: str = ""):
 
         return JSONResponse(
             {"error": "Dashboard data error"},
+            status_code=500,
+        )
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# SOCIAL ACCOUNTS
+# =========================================================
+
+@app.get("/social-data")
+def social_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse(
+            {"error": "Missing companyId"},
+            status_code=400,
+        )
+
+    conn = get_db_connection()
+
+    if not conn:
+        return JSONResponse(
+            {"error": "Database error"},
+            status_code=500,
+        )
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_social_accounts
+                WHERE company_id = %s
+                ORDER BY id DESC
+                """,
+                (companyId,),
+            )
+
+            accounts = cur.fetchall()
+
+        return JSONResponse(
+            {
+                "success": True,
+                "accounts": accounts,
+            }
+        )
+
+    except Exception as e:
+        print("SOCIAL DATA ERROR:", str(e))
+
+        return JSONResponse(
+            {"error": "Social data error"},
+            status_code=500,
+        )
+
+    finally:
+        conn.close()
+
+
+@app.post("/connect-social-demo")
+async def connect_social_demo(request: Request):
+    data = await request.json()
+
+    company_id = data.get("companyId", "")
+    platform = data.get("platform", "")
+
+    if not company_id or not platform:
+        return JSONResponse(
+            {"error": "Missing companyId or platform"},
+            status_code=400,
+        )
+
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+
+    if not conn:
+        return JSONResponse(
+            {"error": "Database error"},
+            status_code=500,
+        )
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_social_accounts (
+                    company_id,
+                    platform,
+                    status,
+                    account_name,
+                    account_id,
+                    created_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    company_id,
+                    platform,
+                    "connected",
+                    platform + " Demo Account",
+                    "demo_" + platform.lower(),
+                    now,
+                    now,
+                ),
+            )
+
+        conn.commit()
+
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("CONNECT SOCIAL DEMO ERROR:", str(e))
+
+        return JSONResponse(
+            {"error": "Connect social demo error"},
             status_code=500,
         )
 
