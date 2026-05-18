@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI FLOW AI Replies</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:#050816;
+  color:white;
+  font-family:Arial,sans-serif;
+  display:flex;
+  min-height:100vh;
+}
+
+.sidebar{
+  width:260px;
+  background:#0b1023;
+  border-right:1px solid rgba(255,255,255,.08);
+  padding:30px 20px;
+}
+
+.logo{
+  font-size:28px;
+  font-weight:900;
+  margin-bottom:50px;
+}
+
+.logo span{color:#4ade80}
+
+.menu{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.menu a{
+  text-decoration:none;
+  color:#cbd5e1;
+  padding:14px 18px;
+  border-radius:14px;
+  font-size:16px;
+}
+
+.menu a:hover{
+  background:#111936;
+  color:white;
+}
+
+.menu .active{
+  background:#4ade80;
+  color:#020617;
+  font-weight:900;
+}
+
+.main{
+  flex:1;
+  padding:40px;
+  overflow-y:auto;
+}
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:34px;
+}
+
+h1{
+  font-size:38px;
+  margin-bottom:10px;
+}
+
+.sub{
+  color:#94a3b8;
+  font-size:16px;
+}
+
+.user{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.logout{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:360px 1fr;
+  gap:24px;
+}
+
+.card{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+
+.thread{
+  background:#111936;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:14px;
+  cursor:pointer;
+}
+
+.thread:hover{
+  border-color:#4ade80;
+}
+
+.thread.active{
+  border-color:#4ade80;
+  background:#13251d;
+}
+
+.thread h3{
+  font-size:16px;
+  margin-bottom:6px;
+}
+
+.thread p{
+  color:#94a3b8;
+  font-size:14px;
+  line-height:1.4;
+}
+
+.badge{
+  display:inline-block;
+  margin-top:10px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#14532d;
+  color:#4ade80;
+  font-size:12px;
+  font-weight:900;
+}
+
+.message-box{
+  background:#111936;
+  border-radius:18px;
+  padding:18px;
+  margin-bottom:16px;
+}
+
+.customer{
+  border-left:4px solid #60a5fa;
+}
+
+.ai{
+  border-left:4px solid #4ade80;
+}
+
+.message-box h4{
+  margin-bottom:8px;
+}
+
+.message-box p{
+  color:#cbd5e1;
+  line-height:1.5;
+}
+
+textarea{
+  width:100%;
+  min-height:120px;
+  background:#020617;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;
+  padding:16px;
+  margin-top:18px;
+  outline:none;
+  resize:vertical;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:13px 18px;
+  font-weight:900;
+  cursor:pointer;
+  margin-top:12px;
+}
+
+.green{
+  background:#4ade80;
+  color:#020617;
+}
+
+.dark{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  margin-left:8px;
+}
+
+.msg{
+  margin-top:14px;
+  color:#94a3b8;
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .main{padding:24px}
+  .grid{grid-template-columns:1fr}
+  .top{flex-direction:column;align-items:flex-start;gap:16px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts">Social Accounts</a>
+    <a href="/ai-replies" class="active">AI Replies</a>
+    <a href="/dashboard">Analytics</a>
+    <a href="/dashboard">Calendar</a>
+    <a href="/dashboard">Billing</a>
+    <a href="/dashboard">Settings</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="top">
+    <div>
+      <h1>AI Replies Inbox</h1>
+      <div class="sub">Review customer messages, AI replies and take over conversations.</div>
+    </div>
+
+    <div class="user">
+      <div id="clientEmail">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <h2 style="margin-bottom:18px;">Conversations</h2>
+
+      <div class="thread active" onclick="openThread(1)">
+        <h3>Michael Johnson</h3>
+        <p>Interested in AI automation for my salon...</p>
+        <span class="badge">Instagram</span>
+      </div>
+
+      <div class="thread" onclick="openThread(2)">
+        <h3>Sarah Williams</h3>
+        <p>Can I see pricing for website chatbot?</p>
+        <span class="badge">Website Chat</span>
+      </div>
+
+      <div class="thread" onclick="openThread(3)">
+        <h3>David Miller</h3>
+        <p>I want to book a demo call...</p>
+        <span class="badge">Facebook</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="threadTitle" style="margin-bottom:18px;">Michael Johnson</h2>
+
+      <div id="messages">
+        <div class="message-box customer">
+          <h4>Customer</h4>
+          <p>Hi, I run a beauty salon. Can AI FLOW answer Instagram messages and book appointments?</p>
+        </div>
+
+        <div class="message-box ai">
+          <h4>AI FLOW</h4>
+          <p>Yes. AI FLOW can reply to Instagram and website messages, capture client details and help book appointments automatically.</p>
+        </div>
+      </div>
+
+      <textarea id="humanReply" placeholder="Write manual reply or edit AI response..."></textarea>
+
+      <button class="green" onclick="sendReply()">Send Reply</button>
+      <button class="dark" onclick="generateAI()">Generate AI Reply</button>
+
+      <div id="msg" class="msg"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+const threads = {
+  1:{
+    name:"Michael Johnson",
+    customer:"Hi, I run a beauty salon. Can AI FLOW answer Instagram messages and book appointments?",
+    ai:"Yes. AI FLOW can reply to Instagram and website messages, capture client details and help book appointments automatically."
+  },
+  2:{
+    name:"Sarah Williams",
+    customer:"Can I see pricing for website chatbot?",
+    ai:"Website Bot starts at $39/month. Social AI with Facebook, Instagram and WhatsApp starts at $99/month."
+  },
+  3:{
+    name:"David Miller",
+    customer:"I want to book a demo call tomorrow.",
+    ai:"Sure. Please send your email or phone number and we will schedule your AI FLOW demo call."
+  }
+};
+
+function openThread(id){
+  document.querySelectorAll(".thread").forEach(el => el.classList.remove("active"));
+  event.currentTarget.classList.add("active");
+
+  const t = threads[id];
+
+  document.getElementById("threadTitle").innerText = t.name;
+
+  document.getElementById("messages").innerHTML = `
+    <div class="message-box customer">
+      <h4>Customer</h4>
+      <p>${t.customer}</p>
+    </div>
+
+    <div class="message-box ai">
+      <h4>AI FLOW</h4>
+      <p>${t.ai}</p>
+    </div>
+  `;
+
+  document.getElementById("humanReply").value = "";
+  document.getElementById("msg").innerText = "";
+}
+
+function sendReply(){
+  const text = document.getElementById("humanReply").value.trim();
+
+  if(!text){
+    document.getElementById("msg").innerText = "Write a reply first.";
+    return;
+  }
+
+  document.getElementById("messages").innerHTML += `
+    <div class="message-box ai">
+      <h4>Human Reply</h4>
+      <p>${text}</p>
+    </div>
+  `;
+
+  document.getElementById("humanReply").value = "";
+  document.getElementById("msg").innerText = "Reply added to conversation.";
+}
+
+async function generateAI(){
+  const currentText = document.getElementById("threadTitle").innerText;
+
+  document.getElementById("msg").innerText = "Generating AI reply...";
+
+  try{
+    const res = await fetch("/chat", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        message:"Write a short sales reply for customer conversation with " + currentText
+      })
+    });
+
+    const data = await res.json();
+
+    document.getElementById("humanReply").value = data.reply || "AI reply error.";
+    document.getElementById("msg").innerText = "AI reply generated.";
+
+  }catch(e){
+    document.getElementById("msg").innerText = "Connection error.";
+  }
+}
+</script>
+
+</body>
+</html>
