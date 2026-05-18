@@ -1,164 +1,581 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
+
 <title>AI FLOW Social Accounts</title>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
+
 *{margin:0;padding:0;box-sizing:border-box}
 
 body{
+
   background:#050816;
+
   color:white;
+
   font-family:Arial,sans-serif;
+
   display:flex;
+
   min-height:100vh;
+
 }
 
 .sidebar{
+
   width:260px;
+
   background:#0b1023;
+
   border-right:1px solid rgba(255,255,255,.08);
+
   padding:30px 20px;
+
 }
 
 .logo{
+
   font-size:28px;
+
   font-weight:900;
+
   margin-bottom:50px;
+
 }
 
 .logo span{color:#4ade80}
 
 .menu{
+
   display:flex;
+
   flex-direction:column;
+
   gap:14px;
+
 }
 
 .menu a{
+
   text-decoration:none;
+
   color:#cbd5e1;
+
   padding:14px 18px;
+
   border-radius:14px;
+
   font-size:16px;
+
 }
 
 .menu a:hover{
+
   background:#111936;
+
   color:white;
+
 }
 
 .menu .active{
+
   background:#4ade80;
+
   color:#020617;
+
   font-weight:900;
+
 }
 
 .main{
+
   flex:1;
+
   padding:40px;
+
   overflow-y:auto;
+
 }
 
 .top{
+
   display:flex;
+
   justify-content:space-between;
+
   align-items:center;
+
   margin-bottom:34px;
+
 }
 
 h1{
+
   font-size:38px;
+
   margin-bottom:10px;
+
 }
 
 .sub{
+
   color:#94a3b8;
+
   font-size:16px;
+
 }
 
 .user{
+
   display:flex;
+
   align-items:center;
+
   gap:14px;
+
 }
 
 .logout{
+
   background:#1e293b;
+
   color:white;
+
   border:1px solid rgba(255,255,255,.1);
+
   border-radius:12px;
+
   padding:10px 14px;
+
   cursor:pointer;
+
   font-weight:800;
+
 }
 
 .grid{
+
   display:grid;
+
   grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+
   gap:22px;
+
 }
 
 .card{
+
   background:#0f172a;
+
   border:1px solid rgba(255,255,255,.06);
+
   border-radius:24px;
+
   padding:24px;
+
 }
 
 .icon{
+
   width:48px;
+
   height:48px;
+
   border-radius:16px;
+
   background:#111936;
+
   display:flex;
+
   align-items:center;
+
   justify-content:center;
+
   font-size:22px;
+
   margin-bottom:18px;
+
 }
 
 .card h2{
+
   font-size:22px;
+
   margin-bottom:10px;
+
 }
 
 .card p{
+
   color:#94a3b8;
+
   line-height:1.5;
+
   margin-bottom:18px;
+
 }
 
 .status{
+
   display:inline-block;
+
   padding:8px 12px;
+
   border-radius:999px;
+
   background:#422006;
+
   color:#facc15;
+
   font-size:12px;
+
   font-weight:900;
+
   margin-bottom:18px;
+
 }
 
 .connected{
+
   background:#14532d;
+
   color:#4ade80;
+
 }
 
 button{
+
   width:100%;
+
   border:0;
+
   border-radius:12px;
+
   padding:13px 18px;
+
   font-weight:900;
+
   cursor:pointer;
+
   background:#4ade80;
+
   color:#020617;
+
 }
 
 .note{
+
   margin-top:28px;
+
   background:#0f172a;
-  border:1px solid rgba(
+
+  border:1px solid rgba(255,255,255,.06);
+
+  border-radius:24px;
+
+  padding:24px;
+
+  color:#cbd5e1;
+
+  line-height:1.6;
+
+}
+
+@media(max-width:900px){
+
+  body{display:block}
+
+  .sidebar{width:100%}
+
+  .main{padding:24px}
+
+  .top{
+
+    flex-direction:column;
+
+    align-items:flex-start;
+
+    gap:16px;
+
+  }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+
+    <a href="/dashboard">Dashboard</a>
+
+    <a href="/leads-page">Leads</a>
+
+    <a href="/content-factory">Content Factory</a>
+
+    <a href="/social-accounts" class="active">Social Accounts</a>
+
+    <a href="/dashboard">AI Replies</a>
+
+    <a href="/dashboard">Analytics</a>
+
+    <a href="/dashboard">Calendar</a>
+
+    <a href="/dashboard">Billing</a>
+
+    <a href="/dashboard">Settings</a>
+
+  </div>
+
+</div>
+
+<div class="main">
+
+  <div class="top">
+
+    <div>
+
+      <h1>Social Accounts</h1>
+
+      <div class="sub">Connect Instagram, Facebook, WhatsApp and website chat channels.</div>
+
+    </div>
+
+    <div class="user">
+
+      <div id="clientEmail">Client</div>
+
+      <button class="logout" onclick="logout()">Logout</button>
+
+    </div>
+
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+
+      <div class="icon">🌐</div>
+
+      <h2>Website Widget</h2>
+
+      <p>Install AI FLOW chat widget on the client website.</p>
+
+      <div class="status connected">Connected</div>
+
+      <button onclick="copyWidget()">Copy Widget Code</button>
+
+    </div>
+
+    <div class="card">
+
+      <div class="icon">📘</div>
+
+      <h2>Facebook Page</h2>
+
+      <p>Connect Facebook Messenger to receive and answer leads automatically.</p>
+
+      <div id="facebookStatus" class="status">Not Connected</div>
+
+      <button onclick="connectSocial('Facebook')">Connect Facebook</button>
+
+    </div>
+
+    <div class="card">
+
+      <div class="icon">📸</div>
+
+      <h2>Instagram</h2>
+
+      <p>Connect Instagram messages and comments into AI FLOW.</p>
+
+      <div id="instagramStatus" class="status">Not Connected</div>
+
+      <button onclick="connectSocial('Instagram')">Connect Instagram</button>
+
+    </div>
+
+    <div class="card">
+
+      <div class="icon">💬</div>
+
+      <h2>WhatsApp</h2>
+
+      <p>Connect WhatsApp Business for automated lead replies.</p>
+
+      <div id="whatsappStatus" class="status">Not Connected</div>
+
+      <button onclick="connectSocial('WhatsApp')">Connect WhatsApp</button>
+
+    </div>
+
+  </div>
+
+  <div class="note" id="msg">
+
+    Loading social accounts...
+
+  </div>
+
+</div>
+
+<script>
+
+const email = localStorage.getItem("ai_flow_email");
+
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+
+  window.location.href = "/login";
+
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout(){
+
+  localStorage.removeItem("ai_flow_email");
+
+  localStorage.removeItem("ai_flow_role");
+
+  localStorage.removeItem("ai_flow_company_id");
+
+  window.location.href = "/login";
+
+}
+
+function setMsg(text){
+
+  document.getElementById("msg").innerText = text;
+
+}
+
+function copyWidget(){
+
+  const code = '<script src="https://ai-flow-platform-v2-saas.onrender.com/widget.js" data-company-id="' + companyId + '"><\\/script>';
+
+  navigator.clipboard.writeText(code);
+
+  setMsg("Widget code copied.");
+
+}
+
+function markConnected(platform){
+
+  const key = platform.toLowerCase();
+
+  const el = document.getElementById(key + "Status");
+
+  if (!el) return;
+
+  el.innerText = "Connected";
+
+  el.classList.add("connected");
+
+}
+
+async function loadSocialData(){
+
+  setMsg("Loading social accounts...");
+
+  try{
+
+    const res = await fetch("/social-data?companyId=" + encodeURIComponent(companyId));
+
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+
+      setMsg(data.error || "Social data error.");
+
+      return;
+
+    }
+
+    const accounts = data.accounts || [];
+
+    accounts.forEach(account => {
+
+      if(account.status === "connected"){
+
+        markConnected(account.platform);
+
+      }
+
+    });
+
+    setMsg("Social accounts loaded.");
+
+  }catch(e){
+
+    setMsg("Connection error loading social accounts.");
+
+  }
+
+}
+
+async function connectSocial(platform){
+
+  setMsg("Connecting " + platform + "...");
+
+  try{
+
+    const res = await fetch("/connect-social-demo", {
+
+      method:"POST",
+
+      headers:{"Content-Type":"application/json"},
+
+      body:JSON.stringify({
+
+        companyId: companyId,
+
+        platform: platform
+
+      })
+
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+
+      setMsg(data.error || "Connect error.");
+
+      return;
+
+    }
+
+    markConnected(platform);
+
+    setMsg(platform + " connected and saved to PostgreSQL.");
+
+  }catch(e){
+
+    setMsg("Connection error connecting " + platform + ".");
+
+  }
+
+}
+
+loadSocialData();
+
+</script>
+
+</body>
+
+</html>
