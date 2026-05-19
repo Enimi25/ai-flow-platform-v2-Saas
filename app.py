@@ -1727,6 +1727,22 @@ async def create_demo_data(request: Request):
 
     try:
         with conn.cursor() as cur:
+            demo_lead_emails = [
+                "michael@example.com",
+                "sarah@example.com",
+                "david@example.com",
+            ]
+
+            cur.execute(
+                """
+                SELECT email
+                FROM v2_leads
+                WHERE company_id = %s
+                AND email = ANY(%s)
+                """,
+                (company_id, demo_lead_emails),
+            )
+            existing_emails = {row[0] for row in cur.fetchall() if row and row[0]}
 
             demo_leads = [
                 (
@@ -1762,6 +1778,8 @@ async def create_demo_data(request: Request):
             ]
 
             for lead in demo_leads:
+                if lead[2] in existing_emails:
+                    continue
                 cur.execute(
                     """
                     INSERT INTO v2_leads (
@@ -1778,6 +1796,23 @@ async def create_demo_data(request: Request):
                     """,
                     lead,
                 )
+
+            demo_post_titles = [
+                "AI automation post",
+                "Lead generation ad",
+                "Business automation insight",
+            ]
+
+            cur.execute(
+                """
+                SELECT title
+                FROM v2_content_posts
+                WHERE company_id = %s
+                AND title = ANY(%s)
+                """,
+                (company_id, demo_post_titles),
+            )
+            existing_titles = {row[0] for row in cur.fetchall() if row and row[0]}
 
             demo_posts = [
                 (
@@ -1813,6 +1848,8 @@ async def create_demo_data(request: Request):
             ]
 
             for post in demo_posts:
+                if post[3] in existing_titles:
+                    continue
                 cur.execute(
                     """
                     INSERT INTO v2_content_posts (
