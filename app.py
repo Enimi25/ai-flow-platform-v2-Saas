@@ -198,6 +198,9 @@ def leads_page():
 def content_factory_page():
     return FileResponse("content.html")
 
+@app.get("/settings")
+def settings_page():
+    return FileResponse("settings.html")
 
 @app.get("/social-accounts")
 def social_accounts_page():
