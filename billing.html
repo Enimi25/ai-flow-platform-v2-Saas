@@ -445,7 +445,7 @@ async function selectPlan(plan){
     });
     const data = await res.json();
     if(!res.ok || data.error){
-      setMsg(data.error || "Plan update error.");
+      setMsg((data && data.error) ? data.error : "Plan update error.");
       return;
     }
 

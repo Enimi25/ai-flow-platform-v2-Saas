@@ -66,6 +66,13 @@ def init_db():
                 """
             )
 
+            # Backward-compatible migrations for older DBs (CREATE TABLE IF NOT EXISTS won't add columns).
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_name TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS owner_email TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'Growth Studio'")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
@@ -1623,11 +1630,27 @@ async def update_plan(request: Request):
                 (plan, company_id),
             )
 
+            # If company row doesn't exist yet, create it (minimal MVP upsert).
+            if cur.rowcount == 0:
+                cur.execute(
+                    """
+                    INSERT INTO companies (company_id, plan, status, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (company_id, plan, "active", datetime.utcnow().isoformat() + "Z"),
+                )
+
         conn.commit()
         return JSONResponse({"success": True})
 
     except Exception as e:
         print("UPDATE PLAN ERROR:", str(e))
+        msg = str(e)
+        if "column" in msg and "plan" in msg and "does not exist" in msg:
+            return JSONResponse(
+                {"error": "Database schema missing companies.plan. Redeploy to run migrations."},
+                status_code=500,
+            )
         return JSONResponse({"error": "Update plan error"}, status_code=500)
 
     finally:
