@@ -147,7 +147,19 @@ async function loginUser(){
     localStorage.setItem("ai_flow_role", result.role);
     localStorage.setItem("ai_flow_company_id", result.companyId);
 
-    window.location.href = result.role === "admin" ? "/admin" : "/dashboard";
+    if(result.role === "admin"){
+      window.location.href = "/admin";
+      return;
+    }
+
+    try{
+      const sRes = await fetch("/settings-data?companyId=" + encodeURIComponent(result.companyId));
+      const sData = await sRes.json();
+      const isComplete = sData && sData.isComplete === true;
+      window.location.href = isComplete ? "/dashboard" : "/onboarding";
+    }catch(e){
+      window.location.href = "/dashboard";
+    }
   }catch(e){
     msg.className = "msg error";
     msg.innerText = "Connection error.";

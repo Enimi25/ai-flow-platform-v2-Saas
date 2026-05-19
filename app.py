@@ -286,6 +286,10 @@ def calendar_page():
 def admin_page():
     return page_response("admin.html")
 
+@app.get("/onboarding")
+def onboarding_page():
+    return page_response("onboarding.html")
+
 @app.get("/admin-data")
 def admin_data():
     conn = get_db_connection()
@@ -1375,7 +1379,19 @@ def settings_data(companyId: str = ""):
             settings["weeklyReports"] = settings_row.get("weekly_reports") or settings["weeklyReports"]
             settings["updatedAt"] = settings_row.get("updated_at") or ""
 
-        return JSONResponse({"success": True, "company": company, "settings": settings})
+        company_name = (company.get("company_name") or "").strip()
+        settings_exists = bool(settings_row)
+        is_complete = bool(company_name) and company_name != "New Client Company"
+
+        return JSONResponse(
+            {
+                "success": True,
+                "company": company,
+                "settings": settings,
+                "settingsExists": settings_exists,
+                "isComplete": is_complete,
+            }
+        )
 
     except Exception as e:
         print("SETTINGS DATA ERROR:", str(e))

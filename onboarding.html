@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI FLOW Onboarding</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#050816;
+      --bg2:#070b1d;
+      --panel:#0f172a;
+      --text:#ffffff;
+      --muted:#94a3b8;
+      --border:rgba(255,255,255,.08);
+      --accent:#4ade80;
+      --accent2:#22c55e;
+      --shadow:0 14px 40px rgba(0,0,0,.35);
+      --shadowSm:0 8px 22px rgba(0,0,0,.28);
+    }
+    body{
+      background:
+        radial-gradient(1200px 800px at 18% -10%, rgba(74,222,128,.12), transparent 55%),
+        radial-gradient(900px 700px at 110% 10%, rgba(96,165,250,.10), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:26px 18px;
+    }
+    .wrap{
+      width:100%;
+      max-width:920px;
+      background:linear-gradient(180deg, rgba(15,23,42,.96) 0%, rgba(15,23,42,.86) 100%);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .head{
+      padding:22px 22px 18px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:16px;
+    }
+    .logo{
+      font-size:26px;
+      font-weight:950;
+      letter-spacing:.2px;
+    }
+    .logo span{color:var(--accent)}
+    h1{
+      font-size:22px;
+      margin-top:8px;
+      letter-spacing:-.2px;
+    }
+    .sub{color:var(--muted);margin-top:6px;line-height:1.5}
+    .pill{
+      display:inline-block;
+      padding:7px 10px;
+      border-radius:999px;
+      background:rgba(30,41,59,.75);
+      border:1px solid rgba(255,255,255,.10);
+      color:#cbd5e1;
+      font-size:12px;
+      font-weight:900;
+    }
+    .body{
+      padding:22px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:18px;
+    }
+    .card{
+      background:rgba(2,6,23,.35);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:18px;
+      padding:18px;
+    }
+    .card h2{
+      font-size:16px;
+      margin-bottom:14px;
+    }
+    label{
+      display:block;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:800;
+      margin-bottom:8px;
+    }
+    input, textarea, select{
+      width:100%;
+      background:rgba(2,6,23,.92);
+      color:white;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:13px 14px;
+      outline:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+      transition:border-color .15s ease, box-shadow .15s ease;
+      margin-bottom:14px;
+    }
+    input:focus, textarea:focus, select:focus{
+      border-color:rgba(74,222,128,.35);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(74,222,128,.12);
+    }
+    textarea{min-height:110px;resize:vertical}
+    .code{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      font-size:12px;
+      line-height:1.55;
+      background:rgba(2,6,23,.92);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:14px;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .actions{
+      grid-column:1/-1;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      padding-top:4px;
+    }
+    .btn{
+      border:0;
+      border-radius:12px;
+      padding:13px 16px;
+      font-weight:950;
+      cursor:pointer;
+      transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+      white-space:nowrap;
+    }
+    .green{
+      background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
+      color:#03140a;
+      box-shadow:0 10px 24px rgba(34,197,94,.18);
+    }
+    .dark{
+      background:rgba(30,41,59,.72);
+      color:white;
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:none;
+    }
+    .btn:hover{transform:translateY(-1px);box-shadow:var(--shadowSm)}
+    .green:hover{box-shadow:0 14px 34px rgba(34,197,94,.22)}
+    .btn:active{transform:translateY(0)}
+    .msg{color:var(--muted)}
+    @media(max-width:900px){
+      .body{grid-template-columns:1fr}
+      .actions{flex-direction:column;align-items:stretch}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <div class="logo">AI <span>FLOW</span></div>
+        <h1>Workspace Onboarding</h1>
+        <div class="sub">Finish setup to personalize your widget and dashboard experience.</div>
+      </div>
+      <div class="pill" id="companyPill">Company</div>
+    </div>
+
+    <div class="body">
+      <div class="card">
+        <h2>Company</h2>
+        <label>Company Name</label>
+        <input id="companyName" placeholder="My Business">
+
+        <label>Industry</label>
+        <select id="industry">
+          <option>Beauty / Salon</option>
+          <option>Real Estate</option>
+          <option>Restaurant</option>
+          <option>Fitness</option>
+          <option>Medical / Clinic</option>
+          <option>Agency</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <h2>Assistant</h2>
+        <label>Assistant Name</label>
+        <input id="assistantName" placeholder="AI FLOW Assistant">
+
+        <label>Welcome Message</label>
+        <textarea id="welcomeMessage" placeholder="Hi! How can I help you today?"></textarea>
+
+        <label>Lead Question</label>
+        <input id="leadQuestion" placeholder="What is the best phone number or email to contact you?">
+      </div>
+
+      <div class="card" style="grid-column:1/-1;">
+        <h2>Website Widget Code</h2>
+        <div id="widgetCode" class="code"></div>
+        <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
+          <button class="btn dark" type="button" onclick="copyWidget()">Copy Widget Code</button>
+          <div class="msg" id="copyMsg"></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <div class="msg" id="msg"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;">
+          <button class="btn dark" type="button" onclick="skipToDashboard()">Skip for Now</button>
+          <button class="btn green" type="button" onclick="finish()">Finish Setup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  const email = localStorage.getItem("ai_flow_email");
+  const companyId = localStorage.getItem("ai_flow_company_id");
+  if(!email || !companyId){
+    window.location.href = "/login";
+  }
+
+  function setMsg(t){document.getElementById("msg").innerText = t;}
+  function setCopy(t){document.getElementById("copyMsg").innerText = t;}
+
+  function widgetSnippet(){
+    const src = window.location.origin + "/widget.js";
+    return '<script src="' + src + '" data-company-id="' + companyId + '"></' + 'script>';
+  }
+
+  function renderWidgetCode(){
+    document.getElementById("widgetCode").innerText = widgetSnippet();
+  }
+
+  async function copyWidget(){
+    try{
+      await navigator.clipboard.writeText(widgetSnippet());
+      setCopy("Copied.");
+      setTimeout(function(){setCopy("");}, 1200);
+    }catch(e){
+      setCopy("Copy not available in this browser.");
+    }
+  }
+
+  async function load(){
+    renderWidgetCode();
+    document.getElementById("companyPill").innerText = "Company: " + companyId;
+
+    setMsg("Loading settings...");
+    try{
+      const res = await fetch("/settings-data?companyId=" + encodeURIComponent(companyId));
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Settings load error.");
+        return;
+      }
+
+      const company = data.company || {};
+      const s = data.settings || {};
+
+      document.getElementById("companyName").value = company.company_name || "";
+      document.getElementById("industry").value = s.industry || "Beauty / Salon";
+      document.getElementById("assistantName").value = s.assistantName || "AI FLOW Assistant";
+      document.getElementById("welcomeMessage").value = s.welcomeMessage || "Hi! How can I help you today?";
+      document.getElementById("leadQuestion").value = s.leadQuestion || "What is the best phone number or email to contact you?";
+
+      setMsg("");
+    }catch(e){
+      setMsg("Connection error loading settings.");
+    }
+  }
+
+  async function finish(){
+    const companyName = document.getElementById("companyName").value.trim();
+    const industry = document.getElementById("industry").value;
+    const assistantName = document.getElementById("assistantName").value.trim();
+    const welcomeMessage = document.getElementById("welcomeMessage").value.trim();
+    const leadQuestion = document.getElementById("leadQuestion").value.trim();
+
+    if(!companyName){
+      setMsg("Enter Company Name to finish setup.");
+      return;
+    }
+
+    setMsg("Saving settings...");
+    try{
+      const res = await fetch("/save-settings", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          companyId: companyId,
+          companyName: companyName,
+          industry: industry,
+          assistantName: assistantName,
+          welcomeMessage: welcomeMessage,
+          leadQuestion: leadQuestion,
+          // Keep existing fields default-safe
+          aiTone: "Friendly",
+          aiGoal: "Capture leads",
+          businessDescription: "",
+          website: "",
+          phone: "",
+          emailNotifications: "Enabled",
+          leadAlerts: "Enabled",
+          weeklyReports: "Enabled"
+        })
+      });
+
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Save error.");
+        return;
+      }
+
+      window.location.href = "/dashboard";
+    }catch(e){
+      setMsg("Connection error saving settings.");
+    }
+  }
+
+  function skipToDashboard(){
+    window.location.href = "/dashboard";
+  }
+
+  load();
+  </script>
+</body>
+</html>
