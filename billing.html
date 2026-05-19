@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI FLOW Billing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:#050816;
+  color:white;
+  font-family:Arial,sans-serif;
+  display:flex;
+  min-height:100vh;
+}
+
+.sidebar{
+  width:260px;
+  background:#0b1023;
+  border-right:1px solid rgba(255,255,255,.08);
+  padding:30px 20px;
+}
+
+.logo{
+  font-size:28px;
+  font-weight:900;
+  margin-bottom:50px;
+}
+
+.logo span{color:#4ade80}
+
+.menu{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.menu a{
+  text-decoration:none;
+  color:#cbd5e1;
+  padding:14px 18px;
+  border-radius:14px;
+  font-size:16px;
+}
+
+.menu a:hover{
+  background:#111936;
+  color:white;
+}
+
+.menu .active{
+  background:#4ade80;
+  color:#020617;
+  font-weight:900;
+}
+
+.main{
+  flex:1;
+  padding:40px;
+  overflow-y:auto;
+}
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:34px;
+}
+
+h1{
+  font-size:38px;
+  margin-bottom:10px;
+}
+
+.sub{
+  color:#94a3b8;
+  font-size:16px;
+}
+
+.user{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.logout{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:24px;
+  margin-bottom:28px;
+}
+
+.plan{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+
+.plan.active{
+  border-color:#4ade80;
+  box-shadow:0 0 0 1px rgba(74,222,128,.35);
+}
+
+.badge{
+  display:inline-block;
+  background:#14532d;
+  color:#4ade80;
+  padding:7px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  margin-bottom:18px;
+}
+
+.plan h2{
+  font-size:24px;
+  margin-bottom:12px;
+}
+
+.price{
+  font-size:38px;
+  font-weight:900;
+  margin-bottom:10px;
+}
+
+.price span{
+  font-size:15px;
+  color:#94a3b8;
+  font-weight:500;
+}
+
+.desc{
+  color:#94a3b8;
+  line-height:1.5;
+  margin-bottom:22px;
+}
+
+.features{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin-bottom:24px;
+}
+
+.feature{
+  color:#cbd5e1;
+  font-size:14px;
+}
+
+button{
+  width:100%;
+  border:0;
+  border-radius:12px;
+  padding:13px 18px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.green{
+  background:#4ade80;
+  color:#020617;
+}
+
+.dark{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+.box{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+  margin-bottom:24px;
+}
+
+.box h2{
+  margin-bottom:18px;
+}
+
+.row{
+  display:flex;
+  justify-content:space-between;
+  padding:14px 0;
+  border-top:1px solid rgba(255,255,255,.06);
+  color:#cbd5e1;
+}
+
+.row strong{
+  color:white;
+}
+
+.msg{
+  color:#94a3b8;
+  margin-top:14px;
+}
+
+@media(max-width:1000px){
+  .grid{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .main{padding:24px}
+  .top{flex-direction:column;align-items:flex-start;gap:16px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts">Social Accounts</a>
+    <a href="/ai-replies">AI Replies</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/billing" class="active">Billing</a>
+    <a href="/dashboard">Settings</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="top">
+    <div>
+      <h1>Billing</h1>
+      <div class="sub">Manage subscription plan, invoices and AI FLOW billing status.</div>
+    </div>
+
+    <div class="user">
+      <div id="clientEmail">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>Current Subscription</h2>
+
+    <div class="row">
+      <span>Current Plan</span>
+      <strong id="currentPlan">Growth Studio</strong>
+    </div>
+
+    <div class="row">
+      <span>Status</span>
+      <strong style="color:#4ade80;">Active</strong>
+    </div>
+
+    <div class="row">
+      <span>Next Billing Date</span>
+      <strong>2026-06-01</strong>
+    </div>
+
+    <div class="row">
+      <span>Payment Method</span>
+      <strong>Demo Card ending 4242</strong>
+    </div>
+
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <div class="grid">
+
+    <div class="plan">
+      <span class="badge">Starter</span>
+      <h2>AI Website Bot</h2>
+      <div class="price">$39 <span>/month</span></div>
+      <div class="desc">For small businesses that need a simple AI chat widget on their website.</div>
+
+      <div class="features">
+        <div class="feature">✓ Website AI chat widget</div>
+        <div class="feature">✓ Lead capture</div>
+        <div class="feature">✓ Basic CRM dashboard</div>
+        <div class="feature">✓ Email support</div>
+      </div>
+
+      <button class="dark" onclick="selectPlan('AI Website Bot')">Select Plan</button>
+    </div>
+
+    <div class="plan active">
+      <span class="badge">Current Plan</span>
+      <h2>Growth Studio</h2>
+      <div class="price">$99 <span>/month</span></div>
+      <div class="desc">For businesses that want leads, AI replies, content and social automation.</div>
+
+      <div class="features">
+        <div class="feature">✓ Everything in Starter</div>
+        <div class="feature">✓ Content Factory</div>
+        <div class="feature">✓ Social accounts dashboard</div>
+        <div class="feature">✓ AI Replies inbox</div>
+        <div class="feature">✓ Calendar bookings</div>
+      </div>
+
+      <button class="green" onclick="selectPlan('Growth Studio')">Current Plan</button>
+    </div>
+
+    <div class="plan">
+      <span class="badge">Scale</span>
+      <h2>Agency Pro</h2>
+      <div class="price">$299 <span>/month</span></div>
+      <div class="desc">For agencies and teams managing multiple clients and automation workflows.</div>
+
+      <div class="features">
+        <div class="feature">✓ Multiple client workspaces</div>
+        <div class="feature">✓ Advanced analytics</div>
+        <div class="feature">✓ Priority AI generation</div>
+        <div class="feature">✓ Team access</div>
+        <div class="feature">✓ Priority support</div>
+      </div>
+
+      <button class="dark" onclick="selectPlan('Agency Pro')">Select Plan</button>
+    </div>
+
+  </div>
+
+  <div class="box">
+    <h2>Invoices</h2>
+
+    <div class="row">
+      <span>Invoice #1003 — Growth Studio</span>
+      <strong>$99 paid</strong>
+    </div>
+
+    <div class="row">
+      <span>Invoice #1002 — Growth Studio</span>
+      <strong>$99 paid</strong>
+    </div>
+
+    <div class="row">
+      <span>Invoice #1001 — AI Website Bot</span>
+      <strong>$39 paid</strong>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+function selectPlan(plan){
+  localStorage.setItem("ai_flow_plan_" + companyId, plan);
+  document.getElementById("currentPlan").innerText = plan;
+  document.getElementById("msg").innerText = "Plan changed to " + plan + " in demo mode.";
+}
+
+function loadPlan(){
+  const savedPlan = localStorage.getItem("ai_flow_plan_" + companyId);
+
+  if(savedPlan){
+    document.getElementById("currentPlan").innerText = savedPlan;
+  }
+}
+
+loadPlan();
+</script>
+
+</body>
+</html>
