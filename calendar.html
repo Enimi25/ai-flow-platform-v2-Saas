@@ -317,4 +317,76 @@ function createLocalBooking(){
   document.getElementById("clientName").value = "";
   document.getElementById("bookingEmail").value = "";
   document.getElementById("bookingPhone").value = "";
-  document.getElement
+  document.getElementById("bookingDate").value = "";
+  document.getElementById("bookingTime").value = "";
+
+  setMsg("Booking created.");
+}
+
+function loadDemoBookings(){
+  bookings = [
+    {
+      clientName:"Michael Johnson",
+      email:"michael@example.com",
+      phone:"+155500001",
+      date:"2026-06-01",
+      time:"10:00",
+      meetingType:"AI FLOW Demo Call",
+      status:"booked"
+    },
+    {
+      clientName:"Sarah Williams",
+      email:"sarah@example.com",
+      phone:"+155500002",
+      date:"2026-06-02",
+      time:"14:30",
+      meetingType:"Sales Consultation",
+      status:"booked"
+    },
+    {
+      clientName:"David Miller",
+      email:"david@example.com",
+      phone:"+155500003",
+      date:"2026-06-03",
+      time:"16:00",
+      meetingType:"Client Onboarding",
+      status:"booked"
+    }
+  ];
+
+  saveBookings();
+  renderBookings();
+  setMsg("Demo bookings loaded.");
+}
+
+function renderBookings(){
+  const body = document.getElementById("bookingsBody");
+  body.innerHTML = "";
+
+  if(!bookings.length){
+    body.innerHTML = '<div class="empty">No bookings yet. Create a booking or load demo bookings.</div>';
+    return;
+  }
+
+  bookings.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "booking";
+
+    div.innerHTML = `
+      <h3>${item.clientName}</h3>
+      <p>${item.meetingType}</p>
+      <p>Email: ${item.email || "—"}</p>
+      <p>Phone: ${item.phone || "—"}</p>
+      <div class="meta">${item.date} · ${item.time}</div>
+      <div class="status">${item.status}</div>
+    `;
+
+    body.appendChild(div);
+  });
+}
+
+loadBookings();
+</script>
+
+</body>
+</html>
