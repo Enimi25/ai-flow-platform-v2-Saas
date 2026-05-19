@@ -1651,7 +1651,14 @@ async def update_plan(request: Request):
                 {"error": "Database schema missing companies.plan. Redeploy to run migrations."},
                 status_code=500,
             )
-        return JSONResponse({"error": "Update plan error"}, status_code=500)
+        if "relation" in msg and "companies" in msg and "does not exist" in msg:
+            return JSONResponse(
+                {"error": "Database schema missing companies table. Redeploy to run migrations."},
+                status_code=500,
+            )
+        # Surface a short DB detail so the UI can show something actionable.
+        detail = msg[:200]
+        return JSONResponse({"error": "Update plan error", "detail": detail}, status_code=500)
 
     finally:
         conn.close()
