@@ -155,6 +155,21 @@ def init_db():
                 """
             )
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_ai_replies (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    customer_name TEXT DEFAULT '',
+                    customer_message TEXT DEFAULT '',
+                    ai_reply TEXT DEFAULT '',
+                    status TEXT DEFAULT 'draft',
+                    source TEXT DEFAULT 'Website',
+                    created_at TEXT DEFAULT ''
+                );
+                """
+            )
+
         conn.commit()
         print("DATABASE READY")
         return True
@@ -1320,6 +1335,241 @@ Rules:
 # =========================================================
 # CHAT API
 # =========================================================
+
+@app.get("/replies-data")
+def replies_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_ai_replies
+                WHERE company_id = %s
+                ORDER BY id DESC
+                """,
+                (companyId,),
+            )
+            replies = cur.fetchall()
+
+        return JSONResponse({"success": True, "replies": replies})
+
+    except Exception as e:
+        print("REPLIES DATA ERROR:", str(e))
+        return JSONResponse({"error": "Replies data error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/create-ai-reply")
+async def create_ai_reply(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    customer_name = (data.get("customerName") or "").strip()
+    customer_message = (data.get("customerMessage") or "").strip()
+    source = (data.get("source") or "Website").strip() or "Website"
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not customer_message:
+        return JSONResponse({"error": "Missing customerMessage"}, status_code=400)
+
+    fallback = (
+        "Thanks for reaching out. We can help with that. What is the best phone number or email to contact you?"
+    )
+
+    ai_reply = fallback
+    api_key = os.getenv("GROQ_API_KEY")
+
+    if api_key:
+        try:
+            client = Groq(api_key=api_key.strip())
+            prompt = f"""
+You are AI FLOW sales assistant. Write a short, helpful reply.
+
+Context:
+- Source: {source}
+- Customer name: {customer_name or "Customer"}
+
+Customer message:
+{customer_message}
+
+Rules:
+- write in English
+- 2-4 short sentences
+- be helpful and sales-oriented
+- ask one follow-up question (contact info or next step)
+"""
+
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.3,
+                max_tokens=180,
+            )
+            ai_reply = (completion.choices[0].message.content or "").strip() or fallback
+        except Exception as e:
+            print("CREATE AI REPLY GROQ ERROR:", str(e))
+            ai_reply = fallback
+
+    status = "draft"
+    created_at = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_ai_replies (
+                    company_id,
+                    customer_name,
+                    customer_message,
+                    ai_reply,
+                    status,
+                    source,
+                    created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    company_id,
+                    customer_name,
+                    customer_message,
+                    ai_reply,
+                    status,
+                    source,
+                    created_at,
+                ),
+            )
+            reply_id = cur.fetchone()[0]
+
+        conn.commit()
+        return JSONResponse({"success": True, "id": reply_id})
+
+    except Exception as e:
+        print("CREATE AI REPLY ERROR:", str(e))
+        return JSONResponse({"error": "Create ai reply error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/update-ai-reply")
+async def update_ai_reply(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    reply_id = data.get("id")
+    status = data.get("status")
+    ai_reply = data.get("aiReply")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    try:
+        reply_id_int = int(reply_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    set_clauses = []
+    params = []
+
+    if status is not None:
+        status_value = (str(status) or "").strip()
+        if not status_value:
+            return JSONResponse({"error": "Invalid status"}, status_code=400)
+        set_clauses.append("status = %s")
+        params.append(status_value)
+
+    if ai_reply is not None:
+        set_clauses.append("ai_reply = %s")
+        params.append(str(ai_reply))
+
+    if not set_clauses:
+        return JSONResponse({"error": "Nothing to update"}, status_code=400)
+
+    params.extend([company_id, reply_id_int])
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE v2_ai_replies
+                SET {", ".join(set_clauses)}
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                tuple(params),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("UPDATE AI REPLY ERROR:", str(e))
+        return JSONResponse({"error": "Update ai reply error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/delete-ai-reply")
+async def delete_ai_reply(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    reply_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        reply_id_int = int(reply_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM v2_ai_replies
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (company_id, reply_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("DELETE AI REPLY ERROR:", str(e))
+        return JSONResponse({"error": "Delete ai reply error"}, status_code=500)
+
+    finally:
+        conn.close()
+
 
 @app.post("/chat")
 async def chat(request: Request):

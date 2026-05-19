@@ -154,6 +154,53 @@ h1{
   box-shadow:var(--shadow);
 }
 
+.section-title{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:18px;
+}
+.section-title h2{
+  margin:0;
+}
+
+.input{
+  width:100%;
+  background:rgba(2,6,23,.92);
+  color:white;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:14px;
+  padding:12px 14px;
+  outline:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.input:focus{
+  border-color:rgba(74,222,128,.35);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(74,222,128,.12);
+}
+.label{
+  display:block;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  margin:12px 0 8px;
+}
+.small{
+  min-height:90px;
+}
+
+.split-actions{
+  display:flex;
+  gap:10px;
+  margin-top:12px;
+}
+.split-actions button{
+  flex:1;
+  margin-top:0;
+}
+
 .thread{
   background:rgba(17,25,54,.70);
   border:1px solid rgba(255,255,255,.06);
@@ -195,6 +242,24 @@ h1{
   color:#4ade80;
   font-size:12px;
   font-weight:900;
+}
+
+.badge-muted{
+  background:rgba(30,41,59,.85);
+  color:#cbd5e1;
+  border:1px solid rgba(255,255,255,.10);
+}
+
+.thread-meta{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.empty{
+  color:var(--muted);
+  line-height:1.5;
+  padding:10px 0;
 }
 
 .message-box{
@@ -264,6 +329,26 @@ button{
   margin-left:8px;
 }
 
+.danger{
+  background:rgba(127,29,29,.45);
+  color:#fecaca;
+  border:1px solid rgba(255,255,255,.10);
+}
+
+.danger:hover{
+  border-color:rgba(248,113,113,.30);
+}
+
+.row-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.row-actions button{
+  margin-top:0;
+}
+
 .msg{
   margin-top:14px;
   color:var(--muted);
@@ -278,9 +363,14 @@ button{
   transform:translateY(-1px);
   box-shadow:0 14px 34px rgba(34,197,94,.22);
 }
+.danger:hover{
+  transform:translateY(-1px);
+  box-shadow:var(--shadowSm);
+}
 .logout:active,.dark:active,.green:active{
   transform:translateY(0);
 }
+.danger:active{transform:translateY(0)}
 
 @media(max-width:900px){
   body{display:block}
@@ -328,46 +418,51 @@ button{
   <div class="grid">
 
     <div class="card">
-      <h2 style="margin-bottom:18px;">Conversations</h2>
-
-      <div class="thread active" onclick="openThread(1)">
-        <h3>Michael Johnson</h3>
-        <p>Interested in AI automation for my salon...</p>
-        <span class="badge">Instagram</span>
+      <div class="section-title">
+        <h2>Conversations</h2>
       </div>
 
-      <div class="thread" onclick="openThread(2)">
-        <h3>Sarah Williams</h3>
-        <p>Can I see pricing for website chatbot?</p>
-        <span class="badge">Website Chat</span>
+      <div style="margin-bottom:16px;">
+        <div class="label">Customer Name</div>
+        <input id="newCustomerName" class="input" placeholder="John Smith">
+        <div class="label">Source</div>
+        <select id="newSource" class="input">
+          <option>Website</option>
+          <option>Instagram</option>
+          <option>Facebook</option>
+          <option>WhatsApp</option>
+        </select>
+        <div class="label">Customer Message</div>
+        <textarea id="newCustomerMessage" class="input small" placeholder="Type a customer message to generate an AI reply..."></textarea>
+        <div class="split-actions">
+          <button class="green" onclick="createInbound()">Create + Generate</button>
+          <button class="dark" onclick="loadDemoConversations()">Load Demo</button>
+        </div>
       </div>
 
-      <div class="thread" onclick="openThread(3)">
-        <h3>David Miller</h3>
-        <p>I want to book a demo call...</p>
-        <span class="badge">Facebook</span>
+      <div id="threadsBody">
+        <div class="empty">No conversations yet. Create a demo conversation or add one above.</div>
       </div>
     </div>
 
     <div class="card">
-      <h2 id="threadTitle" style="margin-bottom:18px;">Michael Johnson</h2>
+      <div class="section-title">
+        <h2 id="threadTitle">Select a conversation</h2>
+        <div id="threadBadge"></div>
+      </div>
 
       <div id="messages">
-        <div class="message-box customer">
-          <h4>Customer</h4>
-          <p>Hi, I run a beauty salon. Can AI FLOW answer Instagram messages and book appointments?</p>
-        </div>
-
-        <div class="message-box ai">
-          <h4>AI FLOW</h4>
-          <p>Yes. AI FLOW can reply to Instagram and website messages, capture client details and help book appointments automatically.</p>
-        </div>
+        <div class="empty">Choose a conversation from the left panel.</div>
       </div>
 
       <textarea id="humanReply" placeholder="Write manual reply or edit AI response..."></textarea>
 
-      <button class="green" onclick="sendReply()">Send Reply</button>
-      <button class="dark" onclick="generateAI()">Generate AI Reply</button>
+      <div class="row-actions">
+        <button class="green" onclick="sendReply()">Send Reply</button>
+        <button class="dark" onclick="generateAI()">Generate AI Reply</button>
+        <button class="dark" onclick="saveDraft()">Save Draft</button>
+        <button class="danger" onclick="deleteCurrent()">Delete</button>
+      </div>
 
       <div id="msg" class="msg"></div>
     </div>
@@ -393,90 +488,348 @@ function logout(){
   window.location.href = "/login";
 }
 
-const threads = {
-  1:{
-    name:"Michael Johnson",
-    customer:"Hi, I run a beauty salon. Can AI FLOW answer Instagram messages and book appointments?",
-    ai:"Yes. AI FLOW can reply to Instagram and website messages, capture client details and help book appointments automatically."
-  },
-  2:{
-    name:"Sarah Williams",
-    customer:"Can I see pricing for website chatbot?",
-    ai:"Website Bot starts at $39/month. Social AI with Facebook, Instagram and WhatsApp starts at $99/month."
-  },
-  3:{
-    name:"David Miller",
-    customer:"I want to book a demo call tomorrow.",
-    ai:"Sure. Please send your email or phone number and we will schedule your AI FLOW demo call."
+let replies = [];
+let activeId = null;
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
+}
+
+function escapeHtml(str){
+  return String(str || "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll("\"","&quot;")
+    .replaceAll("'","&#039;");
+}
+
+async function loadReplies(){
+  setMsg("Loading inbox...");
+
+  try{
+    const res = await fetch("/replies-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      setMsg(data.error || "Replies error.");
+      return;
+    }
+
+    replies = data.replies || [];
+    renderThreads();
+
+    if(activeId){
+      const exists = replies.find(r => String(r.id) === String(activeId));
+      if(exists){
+        openThread(activeId);
+      }else{
+        clearThread();
+      }
+    }else if(replies.length){
+      openThread(replies[0].id);
+    }else{
+      clearThread();
+    }
+
+    setMsg("Inbox updated.");
+  }catch(e){
+    setMsg("Connection error loading replies.");
   }
-};
+}
 
-function openThread(id){
-  document.querySelectorAll(".thread").forEach(el => el.classList.remove("active"));
-  event.currentTarget.classList.add("active");
+function clearThread(){
+  activeId = null;
+  document.getElementById("threadTitle").innerText = "Select a conversation";
+  document.getElementById("threadBadge").innerHTML = "";
+  document.getElementById("messages").innerHTML = '<div class="empty">Choose a conversation from the left panel.</div>';
+  document.getElementById("humanReply").value = "";
+}
 
-  const t = threads[id];
+function renderThreads(){
+  const body = document.getElementById("threadsBody");
+  body.innerHTML = "";
 
-  document.getElementById("threadTitle").innerText = t.name;
+  if(!replies.length){
+    body.innerHTML = '<div class="empty">No conversations yet. Create a demo conversation or add one above.</div>';
+    return;
+  }
+
+  replies.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "thread" + (String(item.id) === String(activeId) ? " active" : "");
+    div.onclick = () => openThread(item.id, div);
+
+    const name = item.customer_name || "Customer";
+    const snippet = (item.customer_message || "").slice(0, 64) + ((item.customer_message || "").length > 64 ? "..." : "");
+    const source = item.source || "Website";
+    const status = item.status || "draft";
+
+    div.innerHTML = `
+      <h3>${escapeHtml(name)}</h3>
+      <p>${escapeHtml(snippet || "—")}</p>
+      <div class="thread-meta">
+        <span class="badge">${escapeHtml(source)}</span>
+        <span class="badge badge-muted">${escapeHtml(status)}</span>
+      </div>
+    `;
+
+    body.appendChild(div);
+  });
+}
+
+function openThread(id, el){
+  activeId = id;
+  document.querySelectorAll(".thread").forEach(node => node.classList.remove("active"));
+  if(el) el.classList.add("active");
+
+  const t = replies.find(r => String(r.id) === String(id));
+  if(!t){
+    clearThread();
+    return;
+  }
+
+  document.getElementById("threadTitle").innerText = t.customer_name || "Customer";
+  document.getElementById("threadBadge").innerHTML = `<span class="badge">${escapeHtml(t.source || "Website")}</span> <span class="badge badge-muted">${escapeHtml(t.status || "draft")}</span>`;
 
   document.getElementById("messages").innerHTML = `
     <div class="message-box customer">
       <h4>Customer</h4>
-      <p>${t.customer}</p>
+      <p>${escapeHtml(t.customer_message || "")}</p>
     </div>
-
     <div class="message-box ai">
       <h4>AI FLOW</h4>
-      <p>${t.ai}</p>
+      <p>${escapeHtml(t.ai_reply || "")}</p>
     </div>
   `;
 
-  document.getElementById("humanReply").value = "";
+  document.getElementById("humanReply").value = t.ai_reply || "";
   document.getElementById("msg").innerText = "";
 }
 
-function sendReply(){
-  const text = document.getElementById("humanReply").value.trim();
+async function createInbound(){
+  const name = document.getElementById("newCustomerName").value.trim();
+  const source = document.getElementById("newSource").value;
+  const message = document.getElementById("newCustomerMessage").value.trim();
 
-  if(!text){
-    document.getElementById("msg").innerText = "Write a reply first.";
+  if(!message){
+    setMsg("Enter a customer message first.");
     return;
   }
 
-  document.getElementById("messages").innerHTML += `
-    <div class="message-box ai">
-      <h4>Human Reply</h4>
-      <p>${text}</p>
-    </div>
-  `;
+  setMsg("Creating conversation...");
 
-  document.getElementById("humanReply").value = "";
-  document.getElementById("msg").innerText = "Reply added to conversation.";
+  try{
+    const res = await fetch("/create-ai-reply", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        customerName: name,
+        customerMessage: message,
+        source: source
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Create reply error.");
+      return;
+    }
+
+    document.getElementById("newCustomerName").value = "";
+    document.getElementById("newCustomerMessage").value = "";
+
+    setMsg("Conversation created.");
+    activeId = data.id;
+    await loadReplies();
+  }catch(e){
+    setMsg("Connection error creating conversation.");
+  }
+}
+
+async function loadDemoConversations(){
+  setMsg("Creating demo conversations...");
+  const demos = [
+    {
+      customerName:"Michael Johnson",
+      source:"Instagram",
+      customerMessage:"Hi, I run a beauty salon. Can AI FLOW answer Instagram messages and book appointments?"
+    },
+    {
+      customerName:"Sarah Williams",
+      source:"Website",
+      customerMessage:"Can I see pricing for website chatbot?"
+    },
+    {
+      customerName:"David Miller",
+      source:"Facebook",
+      customerMessage:"I want to book a demo call tomorrow."
+    }
+  ];
+
+  try{
+    for(const item of demos){
+      const res = await fetch("/create-ai-reply", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          companyId: companyId,
+          customerName: item.customerName,
+          customerMessage: item.customerMessage,
+          source: item.source
+        })
+      });
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Demo create error.");
+        return;
+      }
+      activeId = data.id;
+    }
+
+    setMsg("Demo conversations created.");
+    await loadReplies();
+  }catch(e){
+    setMsg("Connection error creating demo conversations.");
+  }
+}
+
+async function saveDraft(){
+  if(!activeId){
+    setMsg("Select a conversation first.");
+    return;
+  }
+
+  const text = document.getElementById("humanReply").value;
+  setMsg("Saving draft...");
+
+  try{
+    const res = await fetch("/update-ai-reply", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: activeId,
+        aiReply: text,
+        status: "draft"
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Save draft error.");
+      return;
+    }
+
+    setMsg("Draft saved.");
+    await loadReplies();
+  }catch(e){
+    setMsg("Connection error saving draft.");
+  }
+}
+
+async function sendReply(){
+  if(!activeId){
+    setMsg("Select a conversation first.");
+    return;
+  }
+
+  const text = document.getElementById("humanReply").value.trim();
+  if(!text){
+    setMsg("Write a reply first.");
+    return;
+  }
+
+  setMsg("Sending reply...");
+
+  try{
+    const res = await fetch("/update-ai-reply", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: activeId,
+        aiReply: text,
+        status: "sent"
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Send reply error.");
+      return;
+    }
+
+    setMsg("Reply sent.");
+    await loadReplies();
+  }catch(e){
+    setMsg("Connection error sending reply.");
+  }
+}
+
+async function deleteCurrent(){
+  if(!activeId){
+    setMsg("Select a conversation first.");
+    return;
+  }
+  if(!confirm("Delete this conversation?")) return;
+
+  setMsg("Deleting conversation...");
+
+  try{
+    const res = await fetch("/delete-ai-reply", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: activeId
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Delete error.");
+      return;
+    }
+
+    setMsg("Conversation deleted.");
+    activeId = null;
+    await loadReplies();
+  }catch(e){
+    setMsg("Connection error deleting conversation.");
+  }
 }
 
 async function generateAI(){
-  const currentText = document.getElementById("threadTitle").innerText;
+  if(!activeId){
+    setMsg("Select a conversation first.");
+    return;
+  }
 
-  document.getElementById("msg").innerText = "Generating AI reply...";
+  const t = replies.find(r => String(r.id) === String(activeId));
+  if(!t){
+    setMsg("Conversation not found.");
+    return;
+  }
+
+  setMsg("Generating AI reply...");
 
   try{
     const res = await fetch("/chat", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
-        message:"Write a short sales reply for customer conversation with " + currentText
+        message:"Write a short sales reply for this customer message: " + (t.customer_message || "")
       })
     });
-
     const data = await res.json();
 
-    document.getElementById("humanReply").value = data.reply || "AI reply error.";
-    document.getElementById("msg").innerText = "AI reply generated.";
-
+    document.getElementById("humanReply").value = data.reply || "";
+    setMsg("AI reply generated. Save or send it.");
   }catch(e){
-    document.getElementById("msg").innerText = "Connection error.";
+    setMsg("Connection error generating AI reply.");
   }
 }
+
+loadReplies();
 </script>
 
 </body>
