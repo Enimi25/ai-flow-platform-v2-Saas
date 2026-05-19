@@ -104,4 +104,311 @@ h1{
 
 .card{
   background:#0f172a;
-  border:1px solid rgba(255,
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+
+.card-title{
+  color:#94a3b8;
+  margin-bottom:12px;
+}
+
+.card-value{
+  font-size:34px;
+  font-weight:900;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+}
+
+.box{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+
+.box h2{
+  margin-bottom:20px;
+}
+
+.bar-row{
+  margin-bottom:18px;
+}
+
+.bar-label{
+  display:flex;
+  justify-content:space-between;
+  color:#cbd5e1;
+  margin-bottom:8px;
+  font-size:14px;
+}
+
+.bar-bg{
+  height:12px;
+  background:#020617;
+  border-radius:999px;
+  overflow:hidden;
+}
+
+.bar{
+  height:100%;
+  background:#4ade80;
+  border-radius:999px;
+}
+
+.source{
+  display:flex;
+  justify-content:space-between;
+  padding:14px 0;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+
+.source span:first-child{
+  color:#cbd5e1;
+}
+
+.source span:last-child{
+  font-weight:900;
+}
+
+.msg{
+  color:#94a3b8;
+  margin-bottom:20px;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:13px 18px;
+  font-weight:900;
+  cursor:pointer;
+  background:#4ade80;
+  color:#020617;
+  margin-bottom:20px;
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .main{padding:24px}
+  .grid{grid-template-columns:1fr}
+  .top{flex-direction:column;align-items:flex-start;gap:16px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts">Social Accounts</a>
+    <a href="/ai-replies">AI Replies</a>
+    <a href="/analytics" class="active">Analytics</a>
+    <a href="/dashboard">Calendar</a>
+    <a href="/dashboard">Billing</a>
+    <a href="/dashboard">Settings</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="top">
+    <div>
+      <h1>Analytics</h1>
+      <div class="sub">Track leads, AI conversations, social posts and conversion performance.</div>
+    </div>
+
+    <div class="user">
+      <div id="clientEmail">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <button onclick="loadAnalytics()">Refresh Analytics</button>
+  <div id="msg" class="msg">Loading analytics...</div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">Total Leads</div>
+      <div class="card-value" id="totalLeads">0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AI Conversations</div>
+      <div class="card-value" id="aiConversations">0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Social Posts</div>
+      <div class="card-value" id="socialPosts">0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Conversion Rate</div>
+      <div class="card-value" id="conversionRate">0%</div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <div class="box">
+      <h2>Funnel</h2>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>AI Conversations</span>
+          <span id="conversationPercent">0%</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="conversationBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Leads Captured</span>
+          <span id="leadPercent">0%</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="leadBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Converted</span>
+          <span id="convertedPercent">0%</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="convertedBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Lead Sources</h2>
+
+      <div id="sourcesBox">
+        <div class="source">
+          <span>No data yet</span>
+          <span>0</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
+}
+
+function setBar(id, percent){
+  document.getElementById(id).style.width = percent + "%";
+}
+
+function renderSources(leads){
+  const box = document.getElementById("sourcesBox");
+  box.innerHTML = "";
+
+  if(!leads.length){
+    box.innerHTML = '<div class="source"><span>No data yet</span><span>0</span></div>';
+    return;
+  }
+
+  const map = {};
+
+  leads.forEach(lead => {
+    const source = lead.source || "Unknown";
+    map[source] = (map[source] || 0) + 1;
+  });
+
+  Object.keys(map).forEach(source => {
+    const row = document.createElement("div");
+    row.className = "source";
+    row.innerHTML = `<span>${source}</span><span>${map[source]}</span>`;
+    box.appendChild(row);
+  });
+}
+
+async function loadAnalytics(){
+  setMsg("Loading analytics...");
+
+  try{
+    const res = await fetch("/dashboard-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      setMsg(data.error || "Analytics error.");
+      return;
+    }
+
+    const leads = data.leads || [];
+    const stats = data.stats || {};
+
+    const totalLeads = Number(stats.total_leads || 0);
+    const aiConversations = Number(stats.ai_conversations || 0);
+    const socialPosts = Number(stats.social_posts || 0);
+
+    const converted = leads.filter(l => l.status === "converted").length;
+    const conversion = totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0;
+
+    document.getElementById("totalLeads").innerText = totalLeads;
+    document.getElementById("aiConversations").innerText = aiConversations;
+    document.getElementById("socialPosts").innerText = socialPosts;
+    document.getElementById("conversionRate").innerText = conversion + "%";
+
+    const conversationPercent = Math.min(100, aiConversations * 10);
+    const leadPercent = Math.min(100, totalLeads * 10);
+    const convertedPercent = conversion;
+
+    document.getElementById("conversationPercent").innerText = conversationPercent + "%";
+    document.getElementById("leadPercent").innerText = leadPercent + "%";
+    document.getElementById("convertedPercent").innerText = convertedPercent + "%";
+
+    setBar("conversationBar", conversationPercent);
+    setBar("leadBar", leadPercent);
+    setBar("convertedBar", convertedPercent);
+
+    renderSources(leads);
+
+    setMsg("Analytics updated.");
+
+  }catch(e){
+    setMsg("Connection error loading analytics.");
+  }
+}
+
+loadAnalytics();
+</script>
+
+</body>
+</html>
