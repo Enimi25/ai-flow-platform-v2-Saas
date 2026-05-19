@@ -484,21 +484,15 @@
     maybeCaptureLead(cleanText);
 
     try {
+      const payload = { message: cleanText };
+      if (companyId) payload.companyId = companyId;
+
       const res = await fetch(API, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-       body: JSON.stringify({
-  message: cleanText,
-  companyId: companyId,
-  siteName: siteName,
-  businessType: businessType,
-  offer: offer,
-  price: price,
-  paymentLink: paymentLink,
-  source: "website widget"
-})
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();

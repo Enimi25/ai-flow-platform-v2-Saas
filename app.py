@@ -2402,6 +2402,7 @@ async def chat(request: Request):
     data = await request.json()
 
     message = data.get("message", "")
+    company_id = (data.get("companyId") or "").strip()
     api_key = os.getenv("GROQ_API_KEY")
 
     if not api_key:
@@ -2414,12 +2415,68 @@ async def chat(request: Request):
     try:
         client = Groq(api_key=api_key.strip())
 
+        system_prompt = "You are AI FLOW sales assistant. Reply short and helpful."
+
+        if company_id:
+            conn = get_db_connection()
+            if conn:
+                try:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute(
+                            """
+                            SELECT company_name
+                            FROM companies
+                            WHERE company_id = %s
+                            """,
+                            (company_id,),
+                        )
+                        c = cur.fetchone() or {}
+
+                        cur.execute(
+                            """
+                            SELECT assistant_name, ai_tone, ai_goal, business_description, lead_question
+                            FROM v2_company_settings
+                            WHERE company_id = %s
+                            """,
+                            (company_id,),
+                        )
+                        s = cur.fetchone() or {}
+
+                    assistant_name = (s.get("assistant_name") or "AI FLOW Assistant").strip()
+                    company_name = (c.get("company_name") or "").strip() or "this business"
+                    ai_tone = (s.get("ai_tone") or "Friendly").strip()
+                    ai_goal = (s.get("ai_goal") or "Capture leads").strip()
+                    business_description = (s.get("business_description") or "").strip()
+                    lead_question = (s.get("lead_question") or "").strip() or (
+                        "What is the best phone number or email to contact you?"
+                    )
+
+                    # Keep prompt short and safe.
+                    if len(business_description) > 600:
+                        business_description = business_description[:600].rstrip() + "..."
+
+                    system_prompt = (
+                        f"You are {assistant_name}, AI sales assistant for {company_name}.\n"
+                        f"Tone: {ai_tone}.\n"
+                        f"Goal: {ai_goal}.\n"
+                        f"Business info: {business_description or 'N/A'}.\n"
+                        f"If user seems interested, ask for contact info using: {lead_question}\n"
+                        "Keep replies short and helpful."
+                    )
+                except Exception as e:
+                    print("CHAT SETTINGS ERROR:", str(e))
+                finally:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are AI FLOW sales assistant. Reply short and helpful.",
+                    "content": system_prompt,
                 },
                 {
                     "role": "user",
