@@ -222,6 +222,30 @@ button:hover{
   font-weight:900;
   margin-top:10px;
 }
+
+.booking-actions{
+  margin-top:12px;
+  display:flex;
+  justify-content:flex-end;
+}
+.mini{
+  padding:8px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:950;
+  box-shadow:none;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(127,29,29,.45);
+  color:#fecaca;
+  cursor:pointer;
+  transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.mini:hover{
+  transform:translateY(-1px);
+  box-shadow:var(--shadowSm);
+  border-color:rgba(248,113,113,.30);
+}
+.mini:active{transform:translateY(0)}
 .msg{
   margin-top:14px;
   color:var(--muted);
@@ -323,29 +347,28 @@ function setMsg(text){
   document.getElementById("msg").innerText = text;
 }
 
-function getStorageKey(){
-  return "ai_flow_bookings_" + companyId;
-}
+async function loadBookings(){
+  setMsg("Loading bookings...");
 
-function saveBookings(){
-  localStorage.setItem(getStorageKey(), JSON.stringify(bookings));
-}
+  try{
+    const res = await fetch("/bookings-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
 
-function loadBookings(){
-  const saved = localStorage.getItem(getStorageKey());
-
-  if(saved){
-    try{
-      bookings = JSON.parse(saved);
-    }catch(e){
-      bookings = [];
+    if(!res.ok || data.error){
+      setMsg(data.error || "Bookings error.");
+      return;
     }
-  }
 
-  renderBookings();
+    bookings = data.bookings || [];
+    renderBookings();
+    setMsg("Bookings updated.");
+
+  }catch(e){
+    setMsg("Connection error loading bookings.");
+  }
 }
 
-function createLocalBooking(){
+async function createLocalBooking(){
   const clientName = document.getElementById("clientName").value.trim();
   const emailValue = document.getElementById("bookingEmail").value.trim();
   const phoneValue = document.getElementById("bookingPhone").value.trim();
@@ -358,38 +381,54 @@ function createLocalBooking(){
     return;
   }
 
-  bookings.unshift({
-    clientName: clientName,
-    email: emailValue,
-    phone: phoneValue,
-    date: dateValue,
-    time: timeValue,
-    meetingType: meetingType,
-    status: "booked"
-  });
+  setMsg("Creating booking...");
 
-  saveBookings();
-  renderBookings();
+  try{
+    const res = await fetch("/create-booking", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        clientName: clientName,
+        email: emailValue,
+        phone: phoneValue,
+        date: dateValue,
+        time: timeValue,
+        meetingType: meetingType
+      })
+    });
 
-  document.getElementById("clientName").value = "";
-  document.getElementById("bookingEmail").value = "";
-  document.getElementById("bookingPhone").value = "";
-  document.getElementById("bookingDate").value = "";
-  document.getElementById("bookingTime").value = "";
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Create booking error.");
+      return;
+    }
 
-  setMsg("Booking created.");
+    document.getElementById("clientName").value = "";
+    document.getElementById("bookingEmail").value = "";
+    document.getElementById("bookingPhone").value = "";
+    document.getElementById("bookingDate").value = "";
+    document.getElementById("bookingTime").value = "";
+
+    setMsg("Booking created.");
+    loadBookings();
+
+  }catch(e){
+    setMsg("Connection error creating booking.");
+  }
 }
 
-function loadDemoBookings(){
-  bookings = [
+async function loadDemoBookings(){
+  setMsg("Creating demo bookings...");
+
+  const demos = [
     {
       clientName:"Michael Johnson",
       email:"michael@example.com",
       phone:"+155500001",
       date:"2026-06-01",
       time:"10:00",
-      meetingType:"AI FLOW Demo Call",
-      status:"booked"
+      meetingType:"AI FLOW Demo Call"
     },
     {
       clientName:"Sarah Williams",
@@ -397,8 +436,7 @@ function loadDemoBookings(){
       phone:"+155500002",
       date:"2026-06-02",
       time:"14:30",
-      meetingType:"Sales Consultation",
-      status:"booked"
+      meetingType:"Sales Consultation"
     },
     {
       clientName:"David Miller",
@@ -406,14 +444,67 @@ function loadDemoBookings(){
       phone:"+155500003",
       date:"2026-06-03",
       time:"16:00",
-      meetingType:"Client Onboarding",
-      status:"booked"
+      meetingType:"Client Onboarding"
     }
   ];
 
-  saveBookings();
-  renderBookings();
-  setMsg("Demo bookings loaded.");
+  try{
+    for(const item of demos){
+      const res = await fetch("/create-booking", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          companyId: companyId,
+          clientName: item.clientName,
+          email: item.email,
+          phone: item.phone,
+          date: item.date,
+          time: item.time,
+          meetingType: item.meetingType
+        })
+      });
+
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Demo booking error.");
+        return;
+      }
+    }
+
+    setMsg("Demo bookings created.");
+    loadBookings();
+
+  }catch(e){
+    setMsg("Connection error creating demo bookings.");
+  }
+}
+
+async function deleteBooking(id){
+  if(!confirm("Delete this booking?")) return;
+  setMsg("Deleting booking...");
+
+  try{
+    const res = await fetch("/delete-booking", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: id
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Delete booking error.");
+      return;
+    }
+
+    setMsg("Booking deleted.");
+    loadBookings();
+
+  }catch(e){
+    setMsg("Connection error deleting booking.");
+  }
 }
 
 function renderBookings(){
@@ -429,13 +520,22 @@ function renderBookings(){
     const div = document.createElement("div");
     div.className = "booking";
 
+    const meetingTime = (item.meeting_time || "").trim();
+    const parts = meetingTime.split(" ");
+    const dateValue = parts[0] || "";
+    const timeValue = parts.slice(1).join(" ") || "";
+    const meetingType = item.meeting_link || "Meeting";
+
     div.innerHTML = `
-      <h3>${item.clientName}</h3>
-      <p>${item.meetingType}</p>
+      <h3>${item.client_name || "Client"}</h3>
+      <p>${meetingType}</p>
       <p>Email: ${item.email || "—"}</p>
       <p>Phone: ${item.phone || "—"}</p>
-      <div class="meta">${item.date} · ${item.time}</div>
-      <div class="status">${item.status}</div>
+      <div class="meta">${dateValue} ${timeValue ? ("· " + timeValue) : ""}</div>
+      <div class="status">${item.status || "booked"}</div>
+      <div class="booking-actions">
+        <button class="mini" onclick="deleteBooking(${item.id})">Delete</button>
+      </div>
     `;
 
     body.appendChild(div);

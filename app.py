@@ -785,6 +785,150 @@ async def delete_content_post(request: Request):
 # SOCIAL ACCOUNTS
 # =========================================================
 
+
+# =========================================================
+# BOOKINGS / CALENDAR
+# =========================================================
+
+@app.get("/bookings-data")
+def bookings_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_bookings
+                WHERE company_id = %s
+                ORDER BY id DESC
+                """,
+                (companyId,),
+            )
+            bookings = cur.fetchall()
+
+        return JSONResponse({"success": True, "bookings": bookings})
+
+    except Exception as e:
+        print("BOOKINGS DATA ERROR:", str(e))
+        return JSONResponse({"error": "Bookings data error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/create-booking")
+async def create_booking(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    client_name = (data.get("clientName") or "").strip()
+    email = (data.get("email") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    date_value = (data.get("date") or "").strip()
+    time_value = (data.get("time") or "").strip()
+    meeting_type = (data.get("meetingType") or "").strip()
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not client_name or not date_value or not time_value:
+        return JSONResponse({"error": "Missing clientName, date, or time"}, status_code=400)
+
+    meeting_time = f"{date_value} {time_value}"
+    meeting_link = meeting_type or ""
+    status = "booked"
+    created_at = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_bookings (
+                    company_id,
+                    client_name,
+                    email,
+                    phone,
+                    meeting_time,
+                    meeting_link,
+                    status,
+                    created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    company_id,
+                    client_name,
+                    email,
+                    phone,
+                    meeting_time,
+                    meeting_link,
+                    status,
+                    created_at,
+                ),
+            )
+            booking_id = cur.fetchone()[0]
+
+        conn.commit()
+        return JSONResponse({"success": True, "id": booking_id})
+
+    except Exception as e:
+        print("CREATE BOOKING ERROR:", str(e))
+        return JSONResponse({"error": "Create booking error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/delete-booking")
+async def delete_booking(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    booking_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        booking_id_int = int(booking_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM v2_bookings
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (company_id, booking_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("DELETE BOOKING ERROR:", str(e))
+        return JSONResponse({"error": "Delete booking error"}, status_code=500)
+
+    finally:
+        conn.close()
+
 @app.get("/social-data")
 def social_data(companyId: str = ""):
     if not companyId:
