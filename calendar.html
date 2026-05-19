@@ -168,16 +168,13 @@ button{
   color:#94a3b8;
   line-height:1.5;
 }
-Да, брат, ты прав. Давай дописываем с места, где у тебя остановилось.
 
-У тебя файл закончился здесь:
 
 .empty{
   color:#94a3b8;
   line-height:1.5;
 }
 
-Сразу после этого вставь вот этот остаток файла:
 
 @media(max-width:900px){
   body{display:block}
@@ -248,4 +245,76 @@ button{
 </div>
 <script>
 const email = localStorage.getItem("ai_flow_email");
-const companyId = localStorage
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+let bookings = [];
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
+}
+
+function getStorageKey(){
+  return "ai_flow_bookings_" + companyId;
+}
+
+function saveBookings(){
+  localStorage.setItem(getStorageKey(), JSON.stringify(bookings));
+}
+
+function loadBookings(){
+  const saved = localStorage.getItem(getStorageKey());
+
+  if(saved){
+    try{
+      bookings = JSON.parse(saved);
+    }catch(e){
+      bookings = [];
+    }
+  }
+
+  renderBookings();
+}
+
+function createLocalBooking(){
+  const clientName = document.getElementById("clientName").value.trim();
+  const emailValue = document.getElementById("bookingEmail").value.trim();
+  const phoneValue = document.getElementById("bookingPhone").value.trim();
+  const dateValue = document.getElementById("bookingDate").value;
+  const timeValue = document.getElementById("bookingTime").value;
+  const meetingType = document.getElementById("meetingType").value;
+
+  if(!clientName || !dateValue || !timeValue){
+    setMsg("Enter client name, date and time.");
+    return;
+  }
+
+  bookings.unshift({
+    clientName: clientName,
+    email: emailValue,
+    phone: phoneValue,
+    date: dateValue,
+    time: timeValue,
+    meetingType: meetingType,
+    status: "booked"
+  });
+
+  saveBookings();
+  renderBookings();
+
+  document.getElementById("clientName").value = "";
+  document.getElementById("bookingEmail").value = "";
+  document.getElementById("bookingPhone").value = "";
+  document.getElement
