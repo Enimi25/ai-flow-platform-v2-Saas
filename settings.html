@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI FLOW Settings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:#050816;
+  color:white;
+  font-family:Arial,sans-serif;
+  display:flex;
+  min-height:100vh;
+}
+
+.sidebar{
+  width:260px;
+  background:#0b1023;
+  border-right:1px solid rgba(255,255,255,.08);
+  padding:30px 20px;
+}
+
+.logo{
+  font-size:28px;
+  font-weight:900;
+  margin-bottom:50px;
+}
+
+.logo span{color:#4ade80}
+
+.menu{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.menu a{
+  text-decoration:none;
+  color:#cbd5e1;
+  padding:14px 18px;
+  border-radius:14px;
+  font-size:16px;
+}
+
+.menu a:hover{
+  background:#111936;
+  color:white;
+}
+
+.menu .active{
+  background:#4ade80;
+  color:#020617;
+  font-weight:900;
+}
+
+.main{
+  flex:1;
+  padding:40px;
+  overflow-y:auto;
+}
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:34px;
+}
+
+h1{
+  font-size:38px;
+  margin-bottom:10px;
+}
+
+.sub{
+  color:#94a3b8;
+  font-size:16px;
+}
+
+.user{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.logout{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+}
+
+.card{
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:24px;
+  padding:24px;
+}
+
+.card h2{
+  margin-bottom:18px;
+}
+
+label{
+  display:block;
+  color:#94a3b8;
+  font-size:14px;
+  margin-bottom:8px;
+}
+
+input, textarea, select{
+  width:100%;
+  background:#020617;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+    border-radius:14px;
+  padding:14px;
+  margin-bottom:16px;
+  outline:none;
+}
+
+textarea{
+  min-height:120px;
+  resize:vertical;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:13px 18px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.green{
+  background:#4ade80;
+  color:#020617;
+}
+
+.dark{
+  background:#1e293b;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+.row{
+  display:flex;
+  justify-content:space-between;
+  padding:14px 0;
+  border-top:1px solid rgba(255,255,255,.06);
+  color:#cbd5e1;
+}
+
+.row strong{
+  color:white;
+}
+
+.msg{
+  color:#94a3b8;
+  margin-top:14px;
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .main{padding:24px}
+  .grid{grid-template-columns:1fr}
+  .top{flex-direction:column;align-items:flex-start;gap:16px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts">Social Accounts</a>
+    <a href="/ai-replies">AI Replies</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/billing">Billing</a>
+    <a href="/settings" class="active">Settings</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="top">
+    <div>
+      <h1>Settings</h1>
+      <div class="sub">Manage company profile, AI behavior and notification preferences.</div>
+    </div>
+
+    <div class="user">
+      <div id="clientEmail">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <h2>Company Profile</h2>
+
+      <label>Company Name</label>
+      <input id="companyName" placeholder="My Business">
+
+      <label>Industry</label>
+      <select id="industry">
+        <option>Beauty / Salon</option>
+        <option>Real Estate</option>
+        <option>Restaurant</option>
+        <option>Fitness</option>
+        <option>Medical / Clinic</option>
+        <option>Agency</option>
+        <option>Other</option>
+      </select>
+
+      <label>Website</label>
+      <input id="website" placeholder="https://example.com">
+
+      <label>Business Phone</label>
+      <input id="businessPhone" placeholder="+1 555 000 000">
+
+      <button class="green" onclick="saveSettings()">Save Profile</button>
+
+      <div id="profileMsg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>AI Assistant Settings</h2>
+
+      <label>AI Tone</label>
+      <select id="aiTone">
+        <option>Friendly</option>
+        <option>Professional</option>
+        <option>Direct Sales</option>
+        <option>Luxury Brand</option>
+        <option>Casual</option>
+      </select>
+
+      <label>AI Goal</label>
+      <select id="aiGoal">
+        <option>Capture leads</option>
+        <option>Book appointments</option>
+        <option>Answer questions</option>
+        <option>Sell services</option>
+        <option>Qualify prospects</option>
+      </select>
+
+      <label>Business Description</label>
+      <textarea id="businessDescription" placeholder="Describe what the business does, services, prices and ideal customer..."></textarea>
+
+      <button class="green" onclick="saveSettings()">Save AI Settings</button>
+
+      <div id="aiMsg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Notifications</h2>
+
+      <label>Email Notifications</label>
+      <select id="emailNotifications">
+        <option>Enabled</option>
+        <option>Disabled</option>
+      </select>
+
+      <label>New Lead Alerts</label>
+      <select id="leadAlerts">
+        <option>Enabled</option>
+        <option>Disabled</option>
+      </select>
+
+      <label>Weekly Reports</label>
+      <select id="weeklyReports">
+        <option>Enabled</option>
+        <option>Disabled</option>
+      </select>
+
+      <button class="green" onclick="saveSettings()">Save Notifications</button>
+
+      <div id="notifyMsg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Workspace Info</h2>
+
+      <div class="row">
+        <span>Email</span>
+        <strong id="workspaceEmail">—</strong>
+      </div>
+
+      <div class="row">
+        <span>Company ID</span>
+        <strong id="workspaceCompany">—</strong>
+      </div>
+
+      <div class="row">
+        <span>Plan</span>
+        <strong>Growth Studio</strong>
+      </div>
+
+      <div class="row">
+        <span>Status</span>
+        <strong style="color:#4ade80;">Active</strong>
+      </div>
+
+      <button class="dark" onclick="resetSettings()" style="margin-top:18px;">Reset Demo Settings</button>
+
+      <div id="workspaceMsg" class="msg"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+document.getElementById("workspaceEmail").innerText = email;
+document.getElementById("workspaceCompany").innerText = companyId;
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+function settingsKey(){
+  return "ai_flow_settings_" + companyId;
+}
+
+function saveSettings(){
+  const data = {
+    companyName: document.getElementById("companyName").value,
+    industry: document.getElementById("industry").value,
+    website: document.getElementById("website").value,
+    businessPhone: document.getElementById("businessPhone").value,
+    aiTone: document.getElementById("aiTone").value,
+    aiGoal: document.getElementById("aiGoal").value,
+    businessDescription: document.getElementById("businessDescription").value,
+    emailNotifications: document.getElementById("emailNotifications").value,
+    leadAlerts: document.getElementById("leadAlerts").value,
+    weeklyReports: document.getElementById("weeklyReports").value
+  };
+
+  localStorage.setItem(settingsKey(), JSON.stringify(data));
+
+  document.getElementById("profileMsg").innerText = "Profile saved.";
+  document.getElementById("aiMsg").innerText = "AI settings saved.";
+  document.getElementById("notifyMsg").innerText = "Notifications saved.";
+}
+
+function loadSettings(){
+  const raw = localStorage.getItem(settingsKey());
+
+  if(!raw){
+    return;
+  }
+
+  try{
+    const data = JSON.parse(raw);
+
+    document.getElementById("companyName").value = data.companyName || "";
+    document.getElementById("industry").value = data.industry || "Beauty / Salon";
+    document.getElementById("website").value = data.website || "";
+    document.getElementById("businessPhone").value = data.businessPhone || "";
+    document.getElementById("aiTone").value = data.aiTone || "Friendly";
+    document.getElementById("aiGoal").value = data.aiGoal || "Capture leads";
+    document.getElementById("businessDescription").value = data.businessDescription || "";
+    document.getElementById("emailNotifications").value = data.emailNotifications || "Enabled";
+    document.getElementById("leadAlerts").value = data.leadAlerts || "Enabled";
+    document.getElementById("weeklyReports").value = data.weeklyReports || "Enabled";
+
+  }catch(e){}
+}
+
+function resetSettings(){
+  localStorage.removeItem(settingsKey());
+
+  document.getElementById("companyName").value = "";
+  document.getElementById("industry").value = "Beauty / Salon";
+  document.getElementById("website").value = "";
+  document.getElementById("businessPhone").value = "";
+  document.getElementById("aiTone").value = "Friendly";
+  document.getElementById("aiGoal").value = "Capture leads";
+  document.getElementById("businessDescription").value = "";
+  document.getElementById("emailNotifications").value = "Enabled";
+  document.getElementById("leadAlerts").value = "Enabled";
+  document.getElementById("weeklyReports").value = "Enabled";
+
+  document.getElementById("workspaceMsg").innerText = "Demo settings reset.";
+}
+
+loadSettings();
+</script>
+
+</body>
+</html>
