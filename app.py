@@ -6,6 +6,7 @@ from groq import Groq
 
 import os
 import hashlib
+from pathlib import Path
 from datetime import datetime
 
 import psycopg2
@@ -13,6 +14,7 @@ from psycopg2.extras import RealDictCursor
 
 
 app = FastAPI()
+BASE_DIR = Path(__file__).resolve().parent
 
 
 app.add_middleware(
@@ -174,92 +176,96 @@ def startup_event():
 # STATIC PAGES
 # =========================================================
 
+def page_response(filename: str, media_type: str | None = None):
+    return FileResponse(BASE_DIR / filename, media_type=media_type)
+
+
 @app.get("/")
 def home():
-    return FileResponse("index.html")
+    return page_response("index.html")
 
 
 @app.get("/login")
 def login_page():
-    return FileResponse("login.html")
+    return page_response("login.html")
 
 
 @app.get("/dashboard")
 def dashboard_page():
-    return FileResponse("dashboard.html")
+    return page_response("dashboard.html")
 
 
 @app.get("/leads-page")
 def leads_page():
-    return FileResponse("leads.html")
+    return page_response("leads.html")
 
 
 @app.get("/content-factory")
 def content_factory_page():
-    return FileResponse("content.html")
+    return page_response("content.html")
 
 @app.get("/settings")
 def settings_page():
-    return FileResponse("settings.html")
+    return page_response("settings.html")
 
 @app.get("/social-accounts")
 def social_accounts_page():
-    return FileResponse("social.html")
+    return page_response("social.html")
 
 
 @app.get("/ai-replies")
 def ai_replies_page():
-    return FileResponse("replies.html")
+    return page_response("replies.html")
 
 @app.get("/billing")
 def billing_page():
-    return FileResponse("billing.html")
+    return page_response("billing.html")
 
 @app.get("/analytics")
 def analytics_page():
-    return FileResponse("analytics.html")
+    return page_response("analytics.html")
 
 
 @app.get("/calendar")
 def calendar_page():
-    return FileResponse("calendar.html")
+    return page_response("calendar.html")
 
 
 @app.get("/admin")
 def admin_page():
-    return FileResponse("admin.html")
+    return page_response("admin.html")
 
 
 @app.get("/widget.js")
 def widget():
-    return FileResponse("widget.js", media_type="application/javascript")
+    return page_response("widget.js", media_type="application/javascript")
 
 
 @app.get("/privacy.html", response_class=HTMLResponse)
 def privacy_page():
-    if not os.path.exists("privacy.html"):
+    path = BASE_DIR / "privacy.html"
+    if not path.exists():
         return HTMLResponse("<h1>Privacy Policy not found</h1>", status_code=404)
 
-    with open("privacy.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return path.read_text(encoding="utf-8")
 
 
 @app.get("/terms.html", response_class=HTMLResponse)
 def terms_page():
-    if not os.path.exists("terms.html"):
+    path = BASE_DIR / "terms.html"
+    if not path.exists():
         return HTMLResponse("<h1>Terms not found</h1>", status_code=404)
 
-    with open("terms.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return path.read_text(encoding="utf-8")
 
 
 @app.get("/data-deletion.html", response_class=HTMLResponse)
 def data_deletion_page():
-    if not os.path.exists("data-deletion.html"):
+    path = BASE_DIR / "data-deletion.html"
+    if not path.exists():
         return HTMLResponse("<h1>Data Deletion page not found</h1>", status_code=404)
 
-    with open("data-deletion.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return path.read_text(encoding="utf-8")
 
 
 # =========================================================
