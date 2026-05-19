@@ -203,17 +203,20 @@ def content_factory_page():
 def social_accounts_page():
     return FileResponse("social.html")
 
-@app.get("/analytics")
-def analytics_page():
-    return FileResponse("analytics.html")
-
-@app.get("/calendar")
-def calendar_page():
-    return FileResponse("calendar.html")
 
 @app.get("/ai-replies")
 def ai_replies_page():
     return FileResponse("replies.html")
+
+
+@app.get("/analytics")
+def analytics_page():
+    return FileResponse("analytics.html")
+
+
+@app.get("/calendar")
+def calendar_page():
+    return FileResponse("calendar.html")
 
 
 @app.get("/admin")
