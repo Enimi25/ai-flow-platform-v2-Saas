@@ -194,4 +194,225 @@ td{
 
 .empty{
   color:#94a3b8;
-  padding:
+    padding:18px 0;
+}
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .main{padding:24px}
+  .top{flex-direction:column;align-items:flex-start;gap:16px}
+  table{font-size:13px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page" class="active">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts">Social Accounts</a>
+    <a href="/ai-replies">AI Replies</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/billing">Billing</a>
+    <a href="/settings">Settings</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="top">
+    <div>
+      <h1>Leads</h1>
+      <div class="sub">View and manage customer leads captured by AI FLOW.</div>
+    </div>
+
+    <div class="user">
+      <div id="clientEmail" class="user-email">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="green" onclick="loadLeads()">Refresh Leads</button>
+    <button class="dark" onclick="createDemoData()">Load Demo Leads</button>
+  </div>
+
+  <div id="msg" class="msg">Loading leads...</div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-title">Total Leads</div>
+      <div class="stat-value" id="totalLeads">0</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-title">New</div>
+      <div class="stat-value" id="newLeads">0</div>
+    </div>
+
+    <div class="stat">
+  <div class="stat-title">In Progress</div>
+  <div class="stat-value" id="progressLeads">0</div>
+  </div>
+
+    <div class="stat">
+      <div class="stat-title">Converted</div>
+      <div class="stat-value" id="convertedLeads">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Source</th>
+          <th>Status</th>
+          <th>Message</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+
+      <tbody id="leadsBody">
+        <tr>
+          <td colspan="7" class="empty">No leads yet.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage.getItem("ai_flow_company_id");
+
+if (!email || !companyId) {
+  window.location.href = "/login";
+}
+
+document.getElementById("clientEmail").innerText = email;
+
+function logout(){
+  localStorage.removeItem("ai_flow_email");
+  localStorage.removeItem("ai_flow_role");
+  localStorage.removeItem("ai_flow_company_id");
+  window.location.href = "/login";
+}
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
+}
+
+function statusClass(status){
+  if(status === "in_progress") return "in_progress";
+  if(status === "converted") return "converted";
+  return "new";
+}
+
+function shortDate(value){
+  if(!value) return "";
+  return value.split("T")[0];
+}
+
+function updateStats(leads){
+  const total = leads.length;
+  const fresh = leads.filter(l => l.status === "new").length;
+  const progress = leads.filter(l => l.status === "in_progress").length;
+  const converted = leads.filter(l => l.status === "converted").length;
+
+  document.getElementById("totalLeads").innerText = total;
+  document.getElementById("newLeads").innerText = fresh;
+  document.getElementById("progressLeads").innerText = progress;
+  document.getElementById("convertedLeads").innerText = converted;
+}
+
+function renderLeads(leads){
+  const body = document.getElementById("leadsBody");
+  body.innerHTML = "";
+
+  if(!leads.length){
+    body.innerHTML = '<tr><td colspan="7" class="empty">No leads yet. Click Load Demo Leads.</td></tr>';
+    updateStats([]);
+    return;
+  }
+
+  leads.forEach(lead => {
+    const status = lead.status || "new";
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+            <td>${lead.name || "Unknown"}</td>
+      <td>${lead.email || ""}</td>
+      <td>${lead.phone || ""}</td>
+      <td>${lead.source || ""}</td>
+      <td><span class="status ${statusClass(status)}">${status}</span></td>
+      <td>${lead.message || ""}</td>
+      <td>${shortDate(lead.created_at)}</td>
+    `;
+
+    body.appendChild(tr);
+  });
+
+  updateStats(leads);
+}
+
+async function loadLeads(){
+  setMsg("Loading leads...");
+
+  try{
+    const res = await fetch("/dashboard-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      setMsg(data.error || "Leads error.");
+      return;
+    }
+
+    renderLeads(data.leads || []);
+    setMsg("Leads updated.");
+
+  }catch(e){
+    setMsg("Connection error loading leads.");
+  }
+}
+
+async function createDemoData(){
+  setMsg("Creating demo leads...");
+
+  try{
+    const res = await fetch("/create-demo-data", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId:companyId})
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      setMsg(data.error || "Demo data error.");
+      return;
+    }
+
+    setMsg("Demo leads created.");
+    loadLeads();
+
+  }catch(e){
+    setMsg("Connection error creating demo leads.");
+  }
+}
+
+loadLeads();
+</script>
+
+</body>
+</html>
