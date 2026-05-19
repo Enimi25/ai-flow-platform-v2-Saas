@@ -1,10 +1,201 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Admin</title>
+  <meta charset="UTF-8">
+  <title>AI FLOW Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#050816;
+      --bg2:#070b1d;
+      --panel:#0f172a;
+      --panel2:#111936;
+      --text:#ffffff;
+      --muted:#94a3b8;
+      --border:rgba(255,255,255,.08);
+      --border2:rgba(255,255,255,.06);
+      --accent:#4ade80;
+      --accent2:#22c55e;
+      --shadow:0 14px 40px rgba(0,0,0,.35);
+      --shadowSm:0 8px 22px rgba(0,0,0,.28);
+    }
+    body{
+      background:
+        radial-gradient(1200px 800px at 18% -10%, rgba(74,222,128,.12), transparent 55%),
+        radial-gradient(900px 700px at 110% 10%, rgba(96,165,250,.10), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
+      min-height:100vh;
+      padding:28px 22px;
+    }
+    .wrap{max-width:1120px;margin:0 auto}
+    .top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:16px;
+      margin-bottom:22px;
+    }
+    h1{font-size:34px;letter-spacing:-.2px}
+    .sub{color:var(--muted);margin-top:6px}
+    .btn{
+      border:0;
+      border-radius:12px;
+      padding:12px 14px;
+      font-weight:950;
+      cursor:pointer;
+      background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
+      color:#03140a;
+      box-shadow:0 10px 24px rgba(34,197,94,.18);
+      transition:transform .12s ease, box-shadow .2s ease;
+      white-space:nowrap;
+    }
+    .btn:hover{transform:translateY(-1px);box-shadow:0 14px 34px rgba(34,197,94,.22)}
+    .btn:active{transform:translateY(0)}
+    .msg{color:var(--muted);margin:12px 0 18px}
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+      gap:18px;
+      margin-bottom:22px;
+    }
+    .card{
+      background:linear-gradient(180deg, rgba(15,23,42,.96) 0%, rgba(15,23,42,.88) 100%);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:20px;
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+    .card-title{color:var(--muted);font-weight:800;margin-bottom:10px}
+    .card-value{font-size:30px;font-weight:950}
+    .box{
+      background:linear-gradient(180deg, rgba(15,23,42,.96) 0%, rgba(15,23,42,.88) 100%);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:20px;
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+    .box h2{margin-bottom:14px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+    th{color:#cbd5e1;font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+    td{color:#e2e8f0}
+    .empty{color:var(--muted);padding:12px 0}
+    .pill{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(30,41,59,.75);
+      border:1px solid rgba(255,255,255,.10);
+      color:#cbd5e1;
+      font-size:12px;
+      font-weight:900;
+    }
+  </style>
 </head>
-<body style="background:#000;color:#00ff88;font-family:Arial;padding:40px;">
-    <h1>ADMIN PANEL</h1>
-    <p>Admin works ✅</p>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <div class="sub">Platform-wide metrics from PostgreSQL.</div>
+      </div>
+      <button class="btn" onclick="loadAdmin()">Refresh</button>
+    </div>
+
+    <div id="msg" class="msg">Loading admin metrics...</div>
+
+    <div class="cards">
+      <div class="card"><div class="card-title">Total Companies</div><div class="card-value" id="totalCompanies">0</div></div>
+      <div class="card"><div class="card-title">Total Users</div><div class="card-value" id="totalUsers">0</div></div>
+      <div class="card"><div class="card-title">Total Leads</div><div class="card-value" id="totalLeads">0</div></div>
+      <div class="card"><div class="card-title">Total Posts</div><div class="card-value" id="totalPosts">0</div></div>
+      <div class="card"><div class="card-title">Total Bookings</div><div class="card-value" id="totalBookings">0</div></div>
+      <div class="card"><div class="card-title">Total AI Replies</div><div class="card-value" id="totalReplies">0</div></div>
+      <div class="card"><div class="card-title">Total Social Accounts</div><div class="card-value" id="totalSocial">0</div></div>
+    </div>
+
+    <div class="box">
+      <h2>Recent Companies</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Company ID</th>
+            <th>Name</th>
+            <th>Owner Email</th>
+            <th>Plan</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="companiesBody">
+          <tr><td colspan="5" class="empty">No data.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+  function setMsg(text){document.getElementById("msg").innerText = text;}
+  function setText(id,val){document.getElementById(id).innerText = String(val);}
+  function esc(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll("\"","&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function renderCompanies(items){
+    const body = document.getElementById("companiesBody");
+    body.innerHTML = "";
+    if(!items || !items.length){
+      body.innerHTML = '<tr><td colspan="5" class="empty">No companies yet.</td></tr>';
+      return;
+    }
+
+    items.forEach(c => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${esc(c.company_id)}</td>
+        <td>${esc(c.company_name || "")}</td>
+        <td>${esc(c.owner_email || "")}</td>
+        <td><span class="pill">${esc(c.plan || "")}</span></td>
+        <td>${esc(c.status || "")}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  async function loadAdmin(){
+    setMsg("Loading admin metrics...");
+    try{
+      const res = await fetch("/admin-data");
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Admin data error.");
+        return;
+      }
+
+      const m = data.metrics || {};
+      setText("totalCompanies", m.total_companies || 0);
+      setText("totalUsers", m.total_users || 0);
+      setText("totalLeads", m.total_leads || 0);
+      setText("totalPosts", m.total_posts || 0);
+      setText("totalBookings", m.total_bookings || 0);
+      setText("totalReplies", m.total_ai_replies || 0);
+      setText("totalSocial", m.total_social_accounts || 0);
+
+      renderCompanies(data.recent_companies || []);
+      setMsg("Admin metrics updated.");
+    }catch(e){
+      setMsg("Connection error loading admin metrics.");
+    }
+  }
+
+  loadAdmin();
+  </script>
 </body>
 </html>

@@ -279,6 +279,68 @@ def calendar_page():
 def admin_page():
     return page_response("admin.html")
 
+@app.get("/admin-data")
+def admin_data():
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT COUNT(*) AS count FROM companies")
+            total_companies = cur.fetchone()["count"]
+
+            cur.execute("SELECT COUNT(*) AS count FROM users")
+            total_users = cur.fetchone()["count"]
+
+            cur.execute("SELECT COUNT(*) AS count FROM v2_leads")
+            total_leads = cur.fetchone()["count"]
+
+            cur.execute("SELECT COUNT(*) AS count FROM v2_content_posts")
+            total_posts = cur.fetchone()["count"]
+
+            cur.execute("SELECT COUNT(*) AS count FROM v2_bookings")
+            total_bookings = cur.fetchone()["count"]
+
+            cur.execute("SELECT COUNT(*) AS count FROM v2_ai_replies")
+            total_ai_replies = cur.fetchone()["count"]
+
+            cur.execute("SELECT COUNT(*) AS count FROM v2_social_accounts")
+            total_social_accounts = cur.fetchone()["count"]
+
+            cur.execute(
+                """
+                SELECT *
+                FROM companies
+                ORDER BY created_at DESC NULLS LAST
+                LIMIT 20
+                """
+            )
+            recent_companies = cur.fetchall()
+
+        return JSONResponse(
+            {
+                "success": True,
+                "metrics": {
+                    "total_companies": total_companies,
+                    "total_users": total_users,
+                    "total_leads": total_leads,
+                    "total_posts": total_posts,
+                    "total_bookings": total_bookings,
+                    "total_ai_replies": total_ai_replies,
+                    "total_social_accounts": total_social_accounts,
+                },
+                "recent_companies": recent_companies,
+            }
+        )
+
+    except Exception as e:
+        print("ADMIN DATA ERROR:", str(e))
+        return JSONResponse({"error": "Admin data error"}, status_code=500)
+
+    finally:
+        conn.close()
+
 
 @app.get("/widget.js")
 def widget():
@@ -1489,6 +1551,84 @@ def widget_settings(companyId: str = ""):
     except Exception as e:
         print("WIDGET SETTINGS ERROR:", str(e))
         return JSONResponse({"success": True, "settings": defaults})
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# BILLING
+# =========================================================
+
+@app.get("/billing-data")
+def billing_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT company_id, plan
+                FROM companies
+                WHERE company_id = %s
+                """,
+                (companyId,),
+            )
+            row = cur.fetchone()
+
+        plan = (row or {}).get("plan") or "Growth Studio"
+        return JSONResponse({"success": True, "plan": plan})
+
+    except Exception as e:
+        print("BILLING DATA ERROR:", str(e))
+        return JSONResponse({"error": "Billing data error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/update-plan")
+async def update_plan(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    plan = (data.get("plan") or "").strip()
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not plan:
+        return JSONResponse({"error": "Missing plan"}, status_code=400)
+
+    allowed = {"AI Website Bot", "Growth Studio", "Agency Pro"}
+    if plan not in allowed:
+        return JSONResponse({"error": "Invalid plan"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE companies
+                SET plan = %s
+                WHERE company_id = %s
+                """,
+                (plan, company_id),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("UPDATE PLAN ERROR:", str(e))
+        return JSONResponse({"error": "Update plan error"}, status_code=500)
 
     finally:
         conn.close()

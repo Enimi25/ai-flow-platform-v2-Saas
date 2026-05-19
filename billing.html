@@ -430,17 +430,48 @@ function logout(){
   window.location.href = "/login";
 }
 
-function selectPlan(plan){
-  localStorage.setItem("ai_flow_plan_" + companyId, plan);
-  document.getElementById("currentPlan").innerText = plan;
-  document.getElementById("msg").innerText = "Plan changed to " + plan + " in demo mode.";
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
 }
 
-function loadPlan(){
-  const savedPlan = localStorage.getItem("ai_flow_plan_" + companyId);
+async function selectPlan(plan){
+  setMsg("Updating plan...");
 
-  if(savedPlan){
-    document.getElementById("currentPlan").innerText = savedPlan;
+  try{
+    const res = await fetch("/update-plan", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId: companyId, plan: plan})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Plan update error.");
+      return;
+    }
+
+    setMsg("Plan updated.");
+    loadPlan();
+  }catch(e){
+    setMsg("Connection error updating plan.");
+  }
+}
+
+async function loadPlan(){
+  setMsg("Loading billing...");
+
+  try{
+    const res = await fetch("/billing-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Billing load error.");
+      return;
+    }
+
+    const plan = data.plan || "Growth Studio";
+    document.getElementById("currentPlan").innerText = plan;
+    setMsg("Billing loaded.");
+  }catch(e){
+    setMsg("Connection error loading billing.");
   }
 }
 
