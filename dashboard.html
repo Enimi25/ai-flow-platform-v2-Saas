@@ -396,13 +396,18 @@ td{
       </div>
 
       <div class="card">
-        <div class="card-title">AI Conversations</div>
-        <div class="card-value" id="aiConversations">0</div>
+        <div class="card-title">AI Replies</div>
+        <div class="card-value" id="aiReplies">0</div>
       </div>
 
       <div class="card">
         <div class="card-title">Social Posts</div>
         <div class="card-value" id="socialPosts">0</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Bookings</div>
+        <div class="card-value" id="bookings">0</div>
       </div>
 
       <div class="card">
@@ -505,16 +510,23 @@ async function loadDashboardData() {
     }
 
     const totalLeads = Number(data.stats.total_leads || 0);
-    const aiConversations = Number(data.stats.ai_conversations || 0);
     const socialPosts = Number(data.stats.social_posts || 0);
+    const bookings = Number(data.stats.bookings || data.stats.total_bookings || 0);
+    const aiReplies = Number(data.stats.total_ai_replies || data.stats.ai_replies || data.stats.ai_conversations || 0);
     const leads = data.leads || [];
 
-    const converted = leads.filter(lead => lead.status === "converted").length;
-    const conversionRate = totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0;
+    const conversionRate =
+      (data.stats && typeof data.stats.conversion_rate === "number")
+        ? Number(data.stats.conversion_rate || 0)
+        : (function(){
+            const converted = leads.filter(lead => lead.status === "converted").length;
+            return totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0;
+          })();
 
     document.getElementById("totalLeads").innerText = totalLeads;
-    document.getElementById("aiConversations").innerText = aiConversations;
     document.getElementById("socialPosts").innerText = socialPosts;
+    document.getElementById("bookings").innerText = bookings;
+    document.getElementById("aiReplies").innerText = aiReplies;
     document.getElementById("conversionRate").innerText = conversionRate + "%";
 
     renderLeads(leads);

@@ -501,6 +501,24 @@ def dashboard_data(companyId: str = ""):
             total_leads = cur.fetchone()["count"]
 
             cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s AND status = %s",
+                (companyId, "new"),
+            )
+            new_leads = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s AND status = %s",
+                (companyId, "in_progress"),
+            )
+            in_progress_leads = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s AND status = %s",
+                (companyId, "converted"),
+            )
+            converted_leads = cur.fetchone()["count"]
+
+            cur.execute(
                 "SELECT COUNT(*) AS count FROM v2_content_posts WHERE company_id = %s",
                 (companyId,),
             )
@@ -517,6 +535,10 @@ def dashboard_data(companyId: str = ""):
                 (companyId,),
             )
             total_ai_replies = cur.fetchone()["count"]
+
+            conversion_rate = 0
+            if total_leads and int(total_leads) > 0:
+                conversion_rate = int(round((converted_leads / total_leads) * 100))
 
             cur.execute(
                 """
@@ -542,19 +564,57 @@ def dashboard_data(companyId: str = ""):
             )
             posts = cur.fetchall()
 
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_bookings
+                WHERE company_id = %s
+                ORDER BY id DESC
+                LIMIT 20
+                """,
+                (companyId,),
+            )
+            recent_bookings = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_ai_replies
+                WHERE company_id = %s
+                ORDER BY id DESC
+                LIMIT 20
+                """,
+                (companyId,),
+            )
+            recent_replies = cur.fetchall()
+
         return JSONResponse(
             {
                 "success": True,
                 "stats": {
                     "total_leads": total_leads,
-                    "ai_conversations": total_leads,
+                    "new_leads": new_leads,
+                    "in_progress_leads": in_progress_leads,
+                    "converted_leads": converted_leads,
+                    "total_ai_replies": total_ai_replies,
+                    # Back-compat key used by existing dashboard.html
+                    "ai_conversations": total_ai_replies,
+                    "total_posts": total_posts,
                     "social_posts": total_posts,
+                    "total_bookings": total_bookings,
                     "bookings": total_bookings,
+                    # Prefer numeric conversion_rate; keep text key for older callers
+                    "conversion_rate": conversion_rate,
+                    "conversion_rate_text": f"{conversion_rate}%",
+                    # Back-compat: older callers may expect ai_replies
                     "ai_replies": total_ai_replies,
-                    "conversion_rate": "0%",
                 },
                 "leads": leads,
                 "posts": posts,
+                "recent_leads": leads[:5],
+                "recent_posts": posts[:5],
+                "recent_bookings": recent_bookings,
+                "recent_replies": recent_replies,
             }
         )
 
