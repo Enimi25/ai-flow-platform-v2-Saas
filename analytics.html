@@ -210,21 +210,6 @@ h1{
   border-radius:999px;
 }
 
-.source{
-  display:flex;
-  justify-content:space-between;
-  padding:14px 0;
-  border-top:1px solid rgba(255,255,255,.06);
-}
-
-.source span:first-child{
-  color:#cbd5e1;
-}
-
-.source span:last-child{
-  font-weight:900;
-}
-
 .msg{
   color:var(--muted);
   margin-bottom:20px;
@@ -288,7 +273,7 @@ button:active{transform:translateY(0)}
   <div class="top">
     <div>
       <h1>Analytics</h1>
-      <div class="sub">Track leads, AI conversations, social posts and conversion performance.</div>
+      <div class="sub">Real metrics from your AI FLOW workspace (PostgreSQL-backed).</div>
     </div>
 
     <div class="user">
@@ -307,13 +292,28 @@ button:active{transform:translateY(0)}
     </div>
 
     <div class="card">
-      <div class="card-title">AI Conversations</div>
-      <div class="card-value" id="aiConversations">0</div>
+      <div class="card-title">Converted Leads</div>
+      <div class="card-value" id="convertedLeads">0</div>
     </div>
 
     <div class="card">
       <div class="card-title">Social Posts</div>
       <div class="card-value" id="socialPosts">0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Bookings</div>
+      <div class="card-value" id="bookings">0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AI Replies</div>
+      <div class="card-value" id="aiReplies">0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Connected Social Accounts</div>
+      <div class="card-value" id="connectedSocial">0</div>
     </div>
 
     <div class="card">
@@ -325,46 +325,103 @@ button:active{transform:translateY(0)}
   <div class="grid">
 
     <div class="box">
-      <h2>Funnel</h2>
+      <h2>Lead Status Breakdown</h2>
 
       <div class="bar-row">
         <div class="bar-label">
-          <span>AI Conversations</span>
-          <span id="conversationPercent">0%</span>
+          <span>New</span>
+          <span id="leadNewLabel">0</span>
         </div>
         <div class="bar-bg">
-          <div class="bar" id="conversationBar" style="width:0%"></div>
+          <div class="bar" id="leadNewBar" style="width:0%"></div>
         </div>
       </div>
 
       <div class="bar-row">
         <div class="bar-label">
-          <span>Leads Captured</span>
-          <span id="leadPercent">0%</span>
+          <span>In Progress</span>
+          <span id="leadProgressLabel">0</span>
         </div>
         <div class="bar-bg">
-          <div class="bar" id="leadBar" style="width:0%"></div>
+          <div class="bar" id="leadProgressBar" style="width:0%"></div>
         </div>
       </div>
 
       <div class="bar-row">
         <div class="bar-label">
           <span>Converted</span>
-          <span id="convertedPercent">0%</span>
+          <span id="leadConvertedLabel">0</span>
         </div>
         <div class="bar-bg">
-          <div class="bar" id="convertedBar" style="width:0%"></div>
+          <div class="bar" id="leadConvertedBar" style="width:0%"></div>
         </div>
       </div>
     </div>
 
     <div class="box">
-      <h2>Lead Sources</h2>
+      <h2>Content Status Breakdown</h2>
 
-      <div id="sourcesBox">
-        <div class="source">
-          <span>No data yet</span>
-          <span>0</span>
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Draft</span>
+          <span id="postDraftLabel">0</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="postDraftBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Approved</span>
+          <span id="postApprovedLabel">0</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="postApprovedBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Published</span>
+          <span id="postPublishedLabel">0</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="postPublishedBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box" style="grid-column:1/-1;">
+      <h2>Reply Status Breakdown</h2>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Draft</span>
+          <span id="replyDraftLabel">0</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="replyDraftBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="bar-row">
+        <div class="bar-label">
+          <span>Sent</span>
+          <span id="replySentLabel">0</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="replySentBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="bar-row" style="margin-bottom:0;">
+        <div class="bar-label">
+          <span>Archived</span>
+          <span id="replyArchivedLabel">0</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar" id="replyArchivedBar" style="width:0%"></div>
         </div>
       </div>
     </div>
@@ -398,35 +455,20 @@ function setBar(id, percent){
   document.getElementById(id).style.width = percent + "%";
 }
 
-function renderSources(leads){
-  const box = document.getElementById("sourcesBox");
-  box.innerHTML = "";
+function setText(id, value){
+  document.getElementById(id).innerText = String(value);
+}
 
-  if(!leads.length){
-    box.innerHTML = '<div class="source"><span>No data yet</span><span>0</span></div>';
-    return;
-  }
-
-  const map = {};
-
-  leads.forEach(lead => {
-    const source = lead.source || "Unknown";
-    map[source] = (map[source] || 0) + 1;
-  });
-
-  Object.keys(map).forEach(source => {
-    const row = document.createElement("div");
-    row.className = "source";
-    row.innerHTML = `<span>${source}</span><span>${map[source]}</span>`;
-    box.appendChild(row);
-  });
+function percent(part, total){
+  if(!total) return 0;
+  return Math.round((Number(part || 0) / Number(total || 0)) * 100);
 }
 
 async function loadAnalytics(){
   setMsg("Loading analytics...");
 
   try{
-    const res = await fetch("/dashboard-data?companyId=" + encodeURIComponent(companyId));
+    const res = await fetch("/analytics-data?companyId=" + encodeURIComponent(companyId));
     const data = await res.json();
 
     if(!res.ok || data.error){
@@ -434,34 +476,55 @@ async function loadAnalytics(){
       return;
     }
 
-    const leads = data.leads || [];
-    const stats = data.stats || {};
+    const m = data.metrics || {};
 
-    const totalLeads = Number(stats.total_leads || 0);
-    const aiConversations = Number(stats.ai_conversations || 0);
-    const socialPosts = Number(stats.social_posts || 0);
+    const totalLeads = Number(m.total_leads || 0);
+    const newLeads = Number(m.new_leads || 0);
+    const progressLeads = Number(m.in_progress_leads || 0);
+    const convertedLeads = Number(m.converted_leads || 0);
 
-    const converted = leads.filter(l => l.status === "converted").length;
-    const conversion = totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0;
+    const totalPosts = Number(m.total_posts || 0);
+    const draftPosts = Number(m.draft_posts || 0);
+    const approvedPosts = Number(m.approved_posts || 0);
+    const publishedPosts = Number(m.published_posts || 0);
 
-    document.getElementById("totalLeads").innerText = totalLeads;
-    document.getElementById("aiConversations").innerText = aiConversations;
-    document.getElementById("socialPosts").innerText = socialPosts;
-    document.getElementById("conversionRate").innerText = conversion + "%";
+    const bookings = Number(m.total_bookings || 0);
+    const aiReplies = Number(m.total_ai_replies || 0);
+    const connectedSocial = Number(m.connected_social_accounts || 0);
+    const conversionRate = Number(m.conversion_rate || 0);
 
-    const conversationPercent = Math.min(100, aiConversations * 10);
-    const leadPercent = Math.min(100, totalLeads * 10);
-    const convertedPercent = conversion;
+    setText("totalLeads", totalLeads);
+    setText("convertedLeads", convertedLeads);
+    setText("socialPosts", totalPosts);
+    setText("bookings", bookings);
+    setText("aiReplies", aiReplies);
+    setText("connectedSocial", connectedSocial);
+    setText("conversionRate", conversionRate + "%");
 
-    document.getElementById("conversationPercent").innerText = conversationPercent + "%";
-    document.getElementById("leadPercent").innerText = leadPercent + "%";
-    document.getElementById("convertedPercent").innerText = convertedPercent + "%";
+    setText("leadNewLabel", newLeads + " (" + percent(newLeads, totalLeads) + "%)");
+    setText("leadProgressLabel", progressLeads + " (" + percent(progressLeads, totalLeads) + "%)");
+    setText("leadConvertedLabel", convertedLeads + " (" + percent(convertedLeads, totalLeads) + "%)");
+    setBar("leadNewBar", percent(newLeads, totalLeads));
+    setBar("leadProgressBar", percent(progressLeads, totalLeads));
+    setBar("leadConvertedBar", percent(convertedLeads, totalLeads));
 
-    setBar("conversationBar", conversationPercent);
-    setBar("leadBar", leadPercent);
-    setBar("convertedBar", convertedPercent);
+    setText("postDraftLabel", draftPosts + " (" + percent(draftPosts, totalPosts) + "%)");
+    setText("postApprovedLabel", approvedPosts + " (" + percent(approvedPosts, totalPosts) + "%)");
+    setText("postPublishedLabel", publishedPosts + " (" + percent(publishedPosts, totalPosts) + "%)");
+    setBar("postDraftBar", percent(draftPosts, totalPosts));
+    setBar("postApprovedBar", percent(approvedPosts, totalPosts));
+    setBar("postPublishedBar", percent(publishedPosts, totalPosts));
 
-    renderSources(leads);
+    const draftReplies = Number(m.draft_replies || 0);
+    const sentReplies = Number(m.sent_replies || 0);
+    const archivedReplies = Number(m.archived_replies || 0);
+
+    setText("replyDraftLabel", draftReplies + " (" + percent(draftReplies, aiReplies) + "%)");
+    setText("replySentLabel", sentReplies + " (" + percent(sentReplies, aiReplies) + "%)");
+    setText("replyArchivedLabel", archivedReplies + " (" + percent(archivedReplies, aiReplies) + "%)");
+    setBar("replyDraftBar", percent(draftReplies, aiReplies));
+    setBar("replySentBar", percent(sentReplies, aiReplies));
+    setBar("replyArchivedBar", percent(archivedReplies, aiReplies));
 
     setMsg("Analytics updated.");
 

@@ -484,6 +484,12 @@ def dashboard_data(companyId: str = ""):
             total_bookings = cur.fetchone()["count"]
 
             cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_ai_replies WHERE company_id = %s",
+                (companyId,),
+            )
+            total_ai_replies = cur.fetchone()["count"]
+
+            cur.execute(
                 """
                 SELECT *
                 FROM v2_leads
@@ -515,6 +521,7 @@ def dashboard_data(companyId: str = ""):
                     "ai_conversations": total_leads,
                     "social_posts": total_posts,
                     "bookings": total_bookings,
+                    "ai_replies": total_ai_replies,
                     "conversion_rate": "0%",
                 },
                 "leads": leads,
@@ -988,6 +995,145 @@ def social_data(companyId: str = ""):
             {"error": "Social data error"},
             status_code=500,
         )
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# ANALYTICS
+# =========================================================
+
+@app.get("/analytics-data")
+def analytics_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Leads
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s",
+                (companyId,),
+            )
+            total_leads = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s AND status = %s",
+                (companyId, "new"),
+            )
+            new_leads = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s AND status = %s",
+                (companyId, "in_progress"),
+            )
+            in_progress_leads = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_leads WHERE company_id = %s AND status = %s",
+                (companyId, "converted"),
+            )
+            converted_leads = cur.fetchone()["count"]
+
+            # Content posts
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_content_posts WHERE company_id = %s",
+                (companyId,),
+            )
+            total_posts = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_content_posts WHERE company_id = %s AND status = %s",
+                (companyId, "draft"),
+            )
+            draft_posts = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_content_posts WHERE company_id = %s AND status = %s",
+                (companyId, "approved"),
+            )
+            approved_posts = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_content_posts WHERE company_id = %s AND status = %s",
+                (companyId, "published"),
+            )
+            published_posts = cur.fetchone()["count"]
+
+            # Bookings
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_bookings WHERE company_id = %s",
+                (companyId,),
+            )
+            total_bookings = cur.fetchone()["count"]
+
+            # AI replies
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_ai_replies WHERE company_id = %s",
+                (companyId,),
+            )
+            total_ai_replies = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_ai_replies WHERE company_id = %s AND status = %s",
+                (companyId, "draft"),
+            )
+            draft_replies = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_ai_replies WHERE company_id = %s AND status = %s",
+                (companyId, "sent"),
+            )
+            sent_replies = cur.fetchone()["count"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_ai_replies WHERE company_id = %s AND status = %s",
+                (companyId, "archived"),
+            )
+            archived_replies = cur.fetchone()["count"]
+
+            # Social accounts
+            cur.execute(
+                "SELECT COUNT(*) AS count FROM v2_social_accounts WHERE company_id = %s AND status = %s",
+                (companyId, "connected"),
+            )
+            connected_social_accounts = cur.fetchone()["count"]
+
+        conversion_rate = 0
+        if total_leads and int(total_leads) > 0:
+            conversion_rate = int(round((converted_leads / total_leads) * 100))
+
+        return JSONResponse(
+            {
+                "success": True,
+                "metrics": {
+                    "total_leads": total_leads,
+                    "new_leads": new_leads,
+                    "in_progress_leads": in_progress_leads,
+                    "converted_leads": converted_leads,
+                    "total_posts": total_posts,
+                    "draft_posts": draft_posts,
+                    "approved_posts": approved_posts,
+                    "published_posts": published_posts,
+                    "total_bookings": total_bookings,
+                    "total_ai_replies": total_ai_replies,
+                    "draft_replies": draft_replies,
+                    "sent_replies": sent_replies,
+                    "archived_replies": archived_replies,
+                    "connected_social_accounts": connected_social_accounts,
+                    "conversion_rate": conversion_rate,
+                },
+            }
+        )
+
+    except Exception as e:
+        print("ANALYTICS DATA ERROR:", str(e))
+        return JSONResponse({"error": "Analytics data error"}, status_code=500)
 
     finally:
         conn.close()
