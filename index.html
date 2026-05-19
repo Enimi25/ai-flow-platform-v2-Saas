@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>AI FLOW — AI Sales Agents for Every Customer Conversation</title>
-  <meta name="description" content="AI FLOW gives businesses AI sales agents for websites, Facebook Messenger, Instagram, WhatsApp, lead capture, bookings, and customer follow-up." />
+  <title>AI FLOW — AI Sales Assistant for Small Businesses</title>
+  <meta name="description" content="AI FLOW is a premium AI sales assistant for small businesses: capture leads, reply faster, book appointments, and generate content across your channels." />
 
   <style>
     * {
@@ -249,6 +249,29 @@
 
     .hero-form input::placeholder {
       color: #6c7c82;
+    }
+
+    .hero-actions {
+      max-width: 730px;
+      margin: 0 auto 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .hero-actions .btn {
+      min-width: 180px;
+    }
+
+    .hero-actions .hero-hint {
+      width: 100%;
+      text-align: center;
+      color: #9fb7c3;
+      font-weight: 800;
+      font-size: 14px;
+      margin-top: 6px;
     }
 
     .hero-proof {
@@ -713,6 +736,99 @@
       color: #c2d4db;
     }
 
+    .widget-preview {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: stretch;
+      margin-top: 26px;
+    }
+
+    .widget-mock {
+      border-radius: 30px;
+      padding: 26px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.16);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .widget-mock-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .widget-mock-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 950;
+      letter-spacing: -0.6px;
+    }
+
+    .widget-mock-title .widget-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 99px;
+      background: #b8ff7a;
+      box-shadow: 0 0 0 6px rgba(184,255,122,0.12);
+    }
+
+    .widget-messages {
+      display: grid;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .bubble {
+      max-width: 90%;
+      border-radius: 18px;
+      padding: 12px 14px;
+      font-weight: 750;
+      font-size: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .bubble.ai {
+      background: rgba(255,255,255,0.06);
+      color: #f7fbff;
+      justify-self: start;
+    }
+
+    .bubble.user {
+      background: rgba(184,255,122,0.12);
+      border-color: rgba(184,255,122,0.2);
+      color: #eaf7f4;
+      justify-self: end;
+    }
+
+    .widget-code {
+      border-radius: 30px;
+      padding: 26px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.16);
+    }
+
+    .widget-code pre {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(3, 10, 14, 0.6);
+      overflow: auto;
+      font-size: 13px;
+      color: #d7e6eb;
+    }
+
+    .widget-code code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
     .final-cta {
       border-radius: 38px;
       padding: 52px;
@@ -980,6 +1096,10 @@
         grid-template-columns: 1fr;
       }
 
+      .hero-actions .btn {
+        width: 100%;
+      }
+
       .dash-content {
         padding-left: 0;
       }
@@ -995,6 +1115,7 @@
       .steps,
       .pricing-grid,
       .pricing-explainer,
+      .widget-preview,
       .final-cta {
         grid-template-columns: 1fr;
       }
@@ -1078,15 +1199,15 @@
       </a>
 
       <nav class="nav-links">
-        <a href="#solutions">Solutions</a>
-        <a href="#platform">Platform</a>
+        <a href="#solutions">Benefits</a>
+        <a href="#features">Features</a>
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
       </nav>
 
       <div class="nav-actions">
-        <a class="btn btn-secondary" href="#platform">View Platform</a>
-        <a class="btn btn-primary" href="#demo">Request Demo</a>
+        <a class="btn btn-secondary" href="#pricing">Pricing</a>
+        <a class="btn btn-primary" href="/login">Start Free</a>
       </div>
     </div>
   </header>
@@ -1102,26 +1223,27 @@
   <main>
     <section class="hero" id="demo">
       <div class="container">
-        <div class="hero-kicker">AI Sales Platform for Small Business Teams</div>
+        <div class="hero-kicker">AI Sales Assistant for Small Businesses</div>
 
-        <h1>AI Agents for Every Customer Conversation</h1>
+        <h1>Turn Messages Into Leads, Bookings, and Sales</h1>
 
         <p class="hero-subtitle">
-          AI FLOW helps businesses reply instantly, qualify leads, book appointments,
-          and turn website, Facebook, Instagram, and WhatsApp messages into sales.
+          AI FLOW is a premium sales assistant that replies fast, captures lead details,
+          books appointments, and keeps your pipeline moving in one dashboard.
         </p>
 
-        <form class="hero-form" onsubmit="event.preventDefault(); window.location.href='#pricing';">
-          <input type="email" placeholder="Enter business email*" required />
-          <button class="btn btn-lime" type="submit">Get a Demo</button>
-        </form>
+        <div class="hero-actions">
+          <a class="btn btn-lime" href="/login">Start Free</a>
+          <a class="btn btn-secondary" href="/login">Login</a>
+          <div class="hero-hint">No installs. Connect the widget in minutes.</div>
+        </div>
 
         <div class="hero-proof">
-          <div class="proof-pill">✅ Website AI Bot</div>
-          <div class="proof-pill">✅ Facebook Messenger</div>
-          <div class="proof-pill">✅ Google Sheets</div>
+          <div class="proof-pill">✅ Website Widget</div>
+          <div class="proof-pill">✅ Leads CRM</div>
+          <div class="proof-pill">✅ Content Factory</div>
           <div class="proof-pill">✅ Calendar Booking</div>
-          <div class="proof-pill">⚡ Instagram & WhatsApp for verified businesses</div>
+          <div class="proof-pill">✅ Analytics</div>
         </div>
 
         <div class="dashboard-wrap" id="platform">
@@ -1228,39 +1350,121 @@
     <section id="solutions">
       <div class="container">
         <div class="section-head">
-          <div class="section-kicker">Solutions</div>
-          <h2 class="section-title">One AI sales team across your customer channels</h2>
+          <div class="section-kicker">Benefits</div>
+          <h2 class="section-title">A premium sales workflow, powered by AI</h2>
           <p class="section-subtitle">
-            AI FLOW is built for businesses that receive leads through messages and need faster replies,
-            better follow-up, and more booked appointments.
+            Reply faster, capture more leads, and keep everything organized in one dark, premium dashboard.
           </p>
         </div>
 
         <div class="cards">
           <div class="card">
             <div class="card-icon">🌐</div>
-            <h3>Website AI Agent</h3>
+            <h3>Capture leads automatically</h3>
             <p>
-              Add an AI assistant to your website that answers questions, captures contact details,
-              and moves visitors toward booking or purchase.
+              The widget detects email and phone, saves the full message, and creates a lead in your CRM.
             </p>
           </div>
 
           <div class="card">
             <div class="card-icon">💬</div>
-            <h3>Social AI Agent</h3>
+            <h3>Reply instantly, stay consistent</h3>
             <p>
-              Reply to Facebook Messenger conversations automatically and prepare for Instagram and WhatsApp
-              production integrations after Meta verification.
+              Personalized AI replies use your company settings: tone, goal, welcome message, and lead question.
             </p>
           </div>
 
           <div class="card">
             <div class="card-icon">📊</div>
-            <h3>Lead & Booking System</h3>
+            <h3>Book appointments from chat</h3>
             <p>
-              Save leads to Google Sheets, create appointments in Google Calendar, and track what AI does for the business.
+              Convert intent into bookings, track upcoming calls, and keep your pipeline moving.
             </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">⚡</div>
+            <h3>Generate content in minutes</h3>
+            <p>
+              Use Content Factory to create posts, approve them, publish, and measure what works.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Features</div>
+          <h2 class="section-title">Everything you need to run AI sales</h2>
+          <p class="section-subtitle">
+            A single SaaS platform for small businesses: lead capture, replies, content, analytics, and bookings.
+          </p>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-icon">🧩</div>
+            <h3>Website Widget</h3>
+            <p>
+              Embed AI FLOW on your site to answer questions, qualify visitors, and capture leads.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">🗂️</div>
+            <h3>Leads CRM</h3>
+            <p>
+              Create, update, and manage lead status: new, in progress, converted.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">📝</div>
+            <h3>Content Factory</h3>
+            <p>
+              Generate posts with AI and manage approvals: draft, approved, published.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">🤖</div>
+            <h3>AI Replies Inbox</h3>
+            <p>
+              Save customer messages and AI replies in PostgreSQL and track draft/sent/archived.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">📈</div>
+            <h3>Analytics</h3>
+            <p>
+              Monitor leads, content, bookings, AI replies, and conversion rate with real metrics.
+            </p>
+          </div>
+        </div>
+
+        <div class="widget-preview" aria-label="Widget preview">
+          <div class="widget-mock">
+            <div class="widget-mock-head">
+              <div class="widget-mock-title"><span class="widget-dot"></span>AI FLOW Widget</div>
+              <div class="status-chip">● Ready to install</div>
+            </div>
+            <div class="widget-messages">
+              <div class="bubble ai">Hi! How can I help you today?</div>
+              <div class="bubble user">Can I book a demo call?</div>
+              <div class="bubble ai">Absolutely. What day and time works best, and what is the best email or phone to reach you?</div>
+            </div>
+          </div>
+
+          <div class="widget-code">
+            <h3>Install in 1 line</h3>
+            <p class="section-subtitle" style="font-size: 16px; max-width: none; margin-top: 8px;">
+              Add this to your website to enable AI chat and lead capture.
+            </p>
+            <pre><code>&lt;script src="https://YOUR-RENDER-DOMAIN/widget.js" data-company-id="YOUR_COMPANY_ID"&gt;&lt;/script&gt;</code></pre>
+            <a class="btn btn-secondary" href="/login" style="margin-top: 14px;">Get Widget Code</a>
           </div>
         </div>
       </div>
@@ -1308,99 +1512,89 @@
       <div class="container">
         <div class="section-head">
           <div class="section-kicker">Pricing</div>
-          <h2 class="section-title">Simple plans with growth upside</h2>
+          <h2 class="section-title">Simple plans for real business results</h2>
           <p class="section-subtitle">
-            Start with a website AI bot, upgrade to social messaging automation,
-            or work with AI FLOW as a growth partner.
+            Choose a plan and start capturing leads from your website today.
           </p>
         </div>
 
         <div class="pricing-note">
-          <strong>Hybrid model:</strong> businesses pay a simple monthly fee for the AI system.
-          On advanced plans, AI FLOW can also earn a success fee from sales, bookings,
-          appointments, or deals generated by AI.
+          <strong>Upgrade anytime:</strong> plans are designed for small teams that want a premium AI sales system without complexity.
         </div>
 
         <div class="pricing-grid">
           <div class="price-card">
-            <h3>Website Bot</h3>
+            <h3>AI Website Bot</h3>
             <p class="desc">
-              For businesses that want an AI chat widget on their website to answer questions and capture leads.
+              For businesses that want an AI widget on their website to reply instantly and capture leads.
             </p>
 
             <div class="monthly">$39 <span>/ month</span></div>
-            <div class="success-fee">Website AI assistant</div>
+            <div class="success-fee">Best for lead capture</div>
 
             <div class="price-list">
-              <div><span class="check">✓</span> AI chat widget for your website</div>
-              <div><span class="check">✓</span> Answers questions 24/7</div>
-              <div><span class="check">✓</span> Captures phone and email</div>
-              <div><span class="check">✓</span> Saves leads to Google Sheets</div>
-              <div><span class="check">✓</span> Books appointments in Google Calendar</div>
+              <div><span class="check">✓</span> Website widget + lead capture</div>
+              <div><span class="check">✓</span> Leads CRM pipeline</div>
+              <div><span class="check">✓</span> Calendar bookings</div>
+              <div><span class="check">✓</span> AI reply personalization (settings)</div>
             </div>
 
-            <a class="btn btn-secondary" href="#demo">Start Website Bot</a>
+            <a class="btn btn-secondary" href="/login">Start AI Website Bot</a>
           </div>
 
           <div class="price-card featured">
             <div class="popular">Most popular</div>
 
-            <h3>Social AI</h3>
+            <h3>Growth Studio</h3>
             <p class="desc">
-              For businesses that want AI replies across website and social customer messages.
+              For businesses that want lead capture plus content generation to stay visible every day.
             </p>
 
             <div class="monthly">$99 <span>/ month</span></div>
-            <div class="success-fee">Website + Facebook AI</div>
+            <div class="success-fee">Best for consistent growth</div>
 
             <div class="price-list">
-              <div><span class="check">✓</span> Everything in Website Bot</div>
-              <div><span class="check">✓</span> Facebook Messenger AI replies</div>
-              <div><span class="check">✓</span> Social lead capture</div>
-              <div><span class="check">✓</span> Calendar booking from conversations</div>
-              <div><span class="check">✓</span> Instagram for verified businesses</div>
-              <div><span class="check">✓</span> WhatsApp for verified businesses</div>
+              <div><span class="check">✓</span> Everything in AI Website Bot</div>
+              <div><span class="check">✓</span> Content Factory (draft/approve/publish)</div>
+              <div><span class="check">✓</span> Analytics metrics dashboard</div>
+              <div><span class="check">✓</span> AI Replies inbox</div>
             </div>
 
-            <a class="btn btn-lime" href="#demo">Start Social AI →</a>
+            <a class="btn btn-lime" href="/login">Start Growth Studio →</a>
           </div>
 
           <div class="price-card">
-            <h3>AI Growth Partner</h3>
+            <h3>Agency Pro</h3>
             <p class="desc">
-              For businesses that want AI FLOW to help generate, qualify, follow up, and close more customers.
+              For agencies and multi-location teams that need a premium AI sales system for multiple clients.
             </p>
 
-            <div class="monthly">Custom</div>
-            <div class="success-fee">% from AI-generated sales</div>
+            <div class="monthly">$299 <span>/ month</span></div>
+            <div class="success-fee">Best for teams and agencies</div>
 
             <div class="price-list">
-              <div><span class="check">✓</span> Full AI sales system</div>
-              <div><span class="check">✓</span> Website + social channels</div>
-              <div><span class="check">✓</span> Follow-up automation</div>
-              <div><span class="check">✓</span> Sales funnel optimization</div>
-              <div><span class="check">✓</span> Success fee from closed sales</div>
-              <div><span class="check">✓</span> Custom integrations and setup</div>
+              <div><span class="check">✓</span> Everything in Growth Studio</div>
+              <div><span class="check">✓</span> Advanced reporting and workflow</div>
+              <div><span class="check">✓</span> Priority support</div>
+              <div><span class="check">✓</span> Built for multiple pipelines</div>
             </div>
 
-            <a class="btn btn-secondary" href="#demo">Talk to Sales</a>
+            <a class="btn btn-secondary" href="/login">Start Agency Pro</a>
           </div>
         </div>
 
         <div class="pricing-explainer">
           <div class="explainer-box">
-            <h3>What is the success fee?</h3>
+            <h3>What do I need to start?</h3>
             <p>
-              A success fee is a percentage from sales, appointments, or deals generated through AI FLOW.
-              If AI does not help create the sale, there is no success fee.
+              Create an account, set your company settings, and copy the widget snippet into your website.
             </p>
           </div>
 
           <div class="explainer-box">
-            <h3>Why this works</h3>
+            <h3>Can I upgrade later?</h3>
             <p>
-              Small businesses can start at a low monthly price, while AI FLOW earns more only when
-              the system creates real business results.
+              Yes. Choose a plan now and you can switch plans anytime from the Billing page.
             </p>
           </div>
         </div>
@@ -1420,7 +1614,7 @@
 
           <div>
             <div class="final-price">From $39/mo</div>
-            <a class="btn btn-lime" href="#pricing">Choose Plan</a>
+            <a class="btn btn-lime" href="/login">Start Free</a>
           </div>
         </div>
       </div>
@@ -1461,7 +1655,7 @@
     </div>
 
     <div class="quick-buttons">
-      <a href="#demo">Request Demo</a>
+      <a href="/login">Start Free</a>
       <a href="#pricing">Pricing</a>
       <a href="#how">How it works</a>
     </div>
