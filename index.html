@@ -1561,17 +1561,18 @@
 
   <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-  <script>
-    window.AISalesAssistantConfig = {
-      companyId: "ai_sales_assistant_main",
-      siteName: "AI FLOW",
-      businessType: "AI sales automation platform",
-      offer: "AI sales agents for websites, Facebook Messenger, Instagram, WhatsApp, Google Sheets, and Google Calendar",
-      price: "From $39/month",
-      paymentLink: "https://buy.stripe.com/test_your_payment_link"
-    };
-  </script>
-
-  <script src="/widget.js"></script>
-</body>
-</html>
+	  <script>
+	  (function(){
+	    try{
+	      const companyId = localStorage.getItem("ai_flow_company_id");
+	      if(!companyId) return;
+	      if(document.querySelector('script[src="/widget.js"], script[src$="/widget.js"], script[src*="widget.js"]')) return;
+	      const script = document.createElement("script");
+	      script.src = "/widget.js";
+	      script.setAttribute("data-company-id", companyId);
+	      document.body.appendChild(script);
+	    }catch(e){}
+	  })();
+	  </script>
+	</body>
+	</html>

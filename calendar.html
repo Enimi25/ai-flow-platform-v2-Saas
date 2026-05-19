@@ -545,5 +545,19 @@ function renderBookings(){
 loadBookings();
 </script>
 
+<script>
+(function(){
+  try{
+    const companyId = localStorage.getItem("ai_flow_company_id");
+    if(!companyId) return;
+    if(document.querySelector('script[src="/widget.js"], script[src$="/widget.js"], script[src*="widget.js"]')) return;
+    const script = document.createElement("script");
+    script.src = "/widget.js";
+    script.setAttribute("data-company-id", companyId);
+    document.body.appendChild(script);
+  }catch(e){}
+})();
+</script>
+
 </body>
 </html>

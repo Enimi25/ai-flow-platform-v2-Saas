@@ -1,4 +1,9 @@
 (function () {
+  if (window.__AI_FLOW_WIDGET_LOADED__) {
+    return;
+  }
+  window.__AI_FLOW_WIDGET_LOADED__ = true;
+
   function resolveWidgetScriptEl() {
     try {
       if (document.currentScript && document.currentScript.tagName === "SCRIPT") {
