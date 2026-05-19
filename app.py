@@ -1458,11 +1458,113 @@ Rules:
             reply_id = cur.fetchone()[0]
 
         conn.commit()
-        return JSONResponse({"success": True, "id": reply_id})
+        return JSONResponse(
+            {
+                "success": True,
+                "reply": {
+                    "id": reply_id,
+                    "company_id": company_id,
+                    "customer_name": customer_name,
+                    "customer_message": customer_message,
+                    "ai_reply": ai_reply,
+                    "status": status,
+                    "source": source,
+                    "created_at": created_at,
+                },
+            }
+        )
 
     except Exception as e:
         print("CREATE AI REPLY ERROR:", str(e))
         return JSONResponse({"error": "Create ai reply error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/update-reply-status")
+async def update_reply_status(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    reply_id = data.get("id")
+    status = (data.get("status") or "").strip()
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        reply_id_int = int(reply_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    allowed = {"draft", "sent", "archived"}
+    if status not in allowed:
+        return JSONResponse({"error": "Invalid status"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE v2_ai_replies
+                SET status = %s
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (status, company_id, reply_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("UPDATE REPLY STATUS ERROR:", str(e))
+        return JSONResponse({"error": "Update reply status error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/delete-reply")
+async def delete_reply(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    reply_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        reply_id_int = int(reply_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM v2_ai_replies
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (company_id, reply_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("DELETE REPLY ERROR:", str(e))
+        return JSONResponse({"error": "Delete reply error"}, status_code=500)
 
     finally:
         conn.close()

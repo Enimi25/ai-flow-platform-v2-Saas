@@ -13,21 +13,14 @@
   --sidebarA:#0b1023;
   --panel:#0f172a;
   --panel2:#111936;
-  --input:#020617;
   --text:#ffffff;
   --muted:#94a3b8;
   --border:rgba(255,255,255,.08);
-  --border2:rgba(255,255,255,.06);
   --accent:#4ade80;
   --accent2:#22c55e;
-  --r12:12px;
-  --r14:14px;
-  --r16:16px;
-  --r20:20px;
   --shadow:0 14px 40px rgba(0,0,0,.35);
   --shadowSm:0 8px 22px rgba(0,0,0,.28);
 }
-
 body{
   background:
     radial-gradient(1200px 800px at 18% -10%, rgba(74,222,128,.12), transparent 55%),
@@ -39,7 +32,6 @@ body{
   display:flex;
   min-height:100vh;
 }
-
 .sidebar{
   width:260px;
   background:linear-gradient(180deg, var(--sidebarA) 0%, var(--bg2) 100%);
@@ -50,23 +42,19 @@ body{
   top:0;
   overflow:auto;
 }
-
 .logo{
   font-size:26px;
   font-weight:950;
   margin-bottom:22px;
   letter-spacing:.2px;
 }
-
 .logo span{color:var(--accent)}
-
 .menu{
   display:flex;
   flex-direction:column;
   gap:8px;
   padding-top:6px;
 }
-
 .menu a{
   text-decoration:none;
   color:#cbd5e1;
@@ -77,13 +65,11 @@ body{
   border:1px solid transparent;
   transition:background .15s ease,color .15s ease,border-color .15s ease,transform .12s ease;
 }
-
 .menu a:hover{
   background:rgba(255,255,255,.06);
   border-color:rgba(255,255,255,.08);
   color:white;
 }
-
 .menu .active{
   background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
   color:#03140a;
@@ -91,7 +77,6 @@ body{
   border-color:rgba(0,0,0,.12);
   box-shadow:0 10px 24px rgba(34,197,94,.18);
 }
-
 .main{
   flex:1;
   padding:32px 28px;
@@ -100,35 +85,29 @@ body{
   flex-direction:column;
   align-items:center;
 }
-
 .main > *{
   width:100%;
   max-width:1160px;
 }
-
 .top{
   display:flex;
   justify-content:space-between;
   align-items:center;
   margin-bottom:34px;
 }
-
 h1{
   font-size:38px;
   margin-bottom:10px;
 }
-
 .sub{
   color:var(--muted);
   font-size:16px;
 }
-
 .user{
   display:flex;
   align-items:center;
   gap:14px;
 }
-
 .logout{
   background:rgba(30,41,59,.70);
   color:white;
@@ -137,15 +116,20 @@ h1{
   padding:10px 14px;
   cursor:pointer;
   font-weight:900;
-  transition:transform .12s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+  transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
 }
+.logout:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,255,255,.16);
+  box-shadow:var(--shadowSm);
+}
+.logout:active{transform:translateY(0)}
 
 .grid{
   display:grid;
   grid-template-columns:360px 1fr;
   gap:24px;
 }
-
 .card{
   background:linear-gradient(180deg, rgba(15,23,42,.96) 0%, rgba(15,23,42,.88) 100%);
   border:1px solid rgba(255,255,255,.06);
@@ -153,19 +137,16 @@ h1{
   padding:22px;
   box-shadow:var(--shadow);
 }
+.card h2{margin-bottom:16px}
 
-.section-title{
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:18px;
+label{
+  display:block;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  margin:12px 0 8px;
 }
-.section-title h2{
-  margin:0;
-}
-
-.input{
+input, textarea, select{
   width:100%;
   background:rgba(2,6,23,.92);
   color:white;
@@ -176,84 +157,69 @@ h1{
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
   transition:border-color .15s ease, box-shadow .15s ease;
 }
-.input:focus{
+input:focus, textarea:focus, select:focus{
   border-color:rgba(74,222,128,.35);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(74,222,128,.12);
 }
-.label{
-  display:block;
-  color:var(--muted);
-  font-size:13px;
-  font-weight:800;
-  margin:12px 0 8px;
-}
-.small{
-  min-height:90px;
-}
+textarea{min-height:120px; resize:vertical}
 
-.split-actions{
+.actions{
   display:flex;
   gap:10px;
   margin-top:12px;
 }
-.split-actions button{
-  flex:1;
-  margin-top:0;
-}
+.actions button{flex:1}
 
-.thread{
-  background:rgba(17,25,54,.70);
-  border:1px solid rgba(255,255,255,.06);
-  border-radius:18px;
-  padding:16px;
-  margin-bottom:14px;
+button{
+  border:0;
+  border-radius:12px;
+  padding:13px 18px;
+  font-weight:900;
   cursor:pointer;
-  transition:transform .12s ease, border-color .15s ease, background .15s ease;
+  transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
 }
-
-.thread:hover{
-  border-color:rgba(74,222,128,.55);
-  transform:translateY(-1px);
+.green{
+  background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
+  color:#03140a;
+  box-shadow:0 10px 24px rgba(34,197,94,.18);
 }
-
-.thread.active{
-  border-color:rgba(74,222,128,.60);
-  background:rgba(19,37,29,.75);
-  box-shadow:0 10px 26px rgba(0,0,0,.30);
+.dark{
+  background:rgba(30,41,59,.72);
+  color:white;
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:none;
 }
-
-.thread h3{
-  font-size:16px;
-  margin-bottom:6px;
+.danger{
+  background:rgba(127,29,29,.45);
+  color:#fecaca;
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:none;
 }
+.green:hover{transform:translateY(-1px); box-shadow:0 14px 34px rgba(34,197,94,.22)}
+.dark:hover,.danger:hover{transform:translateY(-1px); border-color:rgba(255,255,255,.16); box-shadow:var(--shadowSm)}
+.green:active,.dark:active,.danger:active{transform:translateY(0)}
 
-.thread p{
+.msg{
+  margin-top:14px;
   color:var(--muted);
-  font-size:14px;
   line-height:1.4;
 }
 
-.badge{
-  display:inline-block;
-  margin-top:10px;
+.header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:16px;
+}
+.count{
   padding:6px 10px;
   border-radius:999px;
-  background:#14532d;
-  color:#4ade80;
-  font-size:12px;
-  font-weight:900;
-}
-
-.badge-muted{
-  background:rgba(30,41,59,.85);
-  color:#cbd5e1;
+  background:rgba(30,41,59,.72);
   border:1px solid rgba(255,255,255,.10);
-}
-
-.thread-meta{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
+  color:#cbd5e1;
+  font-weight:900;
+  font-size:12px;
 }
 
 .empty{
@@ -262,116 +228,113 @@ h1{
   padding:10px 0;
 }
 
-.message-box{
+.reply-card{
   background:rgba(17,25,54,.70);
-  border-radius:18px;
-  padding:18px;
-  margin-bottom:16px;
   border:1px solid rgba(255,255,255,.06);
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:14px;
+  box-shadow:0 10px 26px rgba(0,0,0,.22);
 }
-
-.customer{
-  border-left:4px solid #60a5fa;
+.reply-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
 }
-
-.ai{
-  border-left:4px solid #4ade80;
+.reply-name{
+  font-size:16px;
+  font-weight:950;
 }
-
-.message-box h4{
-  margin-bottom:8px;
+.pills{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:8px;
 }
-
-.message-box p{
+.pill{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  border:1px solid rgba(255,255,255,.10);
+}
+.pill.source{
+  background:#14532d;
+  color:#4ade80;
+  border-color:rgba(74,222,128,.18);
+}
+.pill.status{
+  background:rgba(30,41,59,.80);
   color:#cbd5e1;
+}
+.meta{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.bubbles{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.bubble{
+  background:rgba(2,6,23,.55);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:16px;
+  padding:14px;
+}
+.bubble-title{
+  font-weight:950;
+  font-size:12px;
+  margin-bottom:8px;
+  color:#cbd5e1;
+}
+.bubble.customer{border-left:4px solid #60a5fa}
+.bubble.ai{border-left:4px solid #4ade80}
+.bubble p{
+  color:#e2e8f0;
+  font-size:13px;
   line-height:1.5;
 }
-
-textarea{
-  width:100%;
-  min-height:120px;
-  background:rgba(2,6,23,.92);
-  color:white;
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:16px;
-  padding:16px;
-  margin-top:18px;
-  outline:none;
-  resize:vertical;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
-  transition:border-color .15s ease, box-shadow .15s ease;
-}
-textarea:focus{
-  border-color:rgba(74,222,128,.35);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(74,222,128,.12);
-}
-
-button{
-  border:0;
-  border-radius:12px;
-  padding:13px 18px;
-  font-weight:900;
-  cursor:pointer;
-  margin-top:12px;
-  transition:transform .12s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
-}
-
-.green{
-  background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
-  color:#03140a;
-  box-shadow:0 10px 24px rgba(34,197,94,.18);
-}
-
-.dark{
-  background:rgba(30,41,59,.72);
-  color:white;
-  border:1px solid rgba(255,255,255,.10);
-  margin-left:8px;
-}
-
-.danger{
-  background:rgba(127,29,29,.45);
-  color:#fecaca;
-  border:1px solid rgba(255,255,255,.10);
-}
-
-.danger:hover{
-  border-color:rgba(248,113,113,.30);
-}
-
-.row-actions{
+.reply-actions{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
+  justify-content:flex-end;
   margin-top:12px;
 }
-.row-actions button{
-  margin-top:0;
+.mini{
+  padding:9px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:950;
+  box-shadow:none;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(30,41,59,.72);
+  color:#e2e8f0;
 }
-
-.msg{
-  margin-top:14px;
-  color:var(--muted);
+.mini.active{
+  background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
+  color:#03140a;
+  border-color:rgba(0,0,0,.12);
 }
-
-.logout:hover,.dark:hover{
+.mini.danger{
+  background:rgba(127,29,29,.45);
+  color:#fecaca;
+}
+.mini:hover{
   transform:translateY(-1px);
+  box-shadow:var(--shadowSm);
   border-color:rgba(255,255,255,.16);
-  box-shadow:var(--shadowSm);
 }
-.green:hover{
-  transform:translateY(-1px);
-  box-shadow:0 14px 34px rgba(34,197,94,.22);
-}
-.danger:hover{
-  transform:translateY(-1px);
-  box-shadow:var(--shadowSm);
-}
-.logout:active,.dark:active,.green:active{
-  transform:translateY(0);
-}
-.danger:active{transform:translateY(0)}
+.mini:active{transform:translateY(0)}
 
+@media(max-width:1050px){
+  .bubbles{grid-template-columns:1fr}
+}
 @media(max-width:900px){
   body{display:block}
   .sidebar{width:100%;height:auto;position:relative}
@@ -382,12 +345,10 @@ button{
 }
 </style>
 </head>
-
 <body>
 
 <div class="sidebar">
   <div class="logo">AI <span>FLOW</span></div>
-
   <div class="menu">
     <a href="/dashboard">Dashboard</a>
     <a href="/leads-page">Leads</a>
@@ -402,13 +363,11 @@ button{
 </div>
 
 <div class="main">
-
   <div class="top">
     <div>
       <h1>AI Replies Inbox</h1>
-      <div class="sub">Review customer messages, AI replies and take over conversations.</div>
+      <div class="sub">Generate replies, review the inbox and manage statuses.</div>
     </div>
-
     <div class="user">
       <div id="clientEmail">Client</div>
       <button class="logout" onclick="logout()">Logout</button>
@@ -416,59 +375,36 @@ button{
   </div>
 
   <div class="grid">
-
     <div class="card">
-      <div class="section-title">
-        <h2>Conversations</h2>
+      <h2>Generate Reply</h2>
+      <label>Customer Name</label>
+      <input id="customerName" placeholder="John Smith">
+      <label>Source</label>
+      <select id="source">
+        <option>Website</option>
+        <option>Instagram</option>
+        <option>Facebook</option>
+        <option>WhatsApp</option>
+      </select>
+      <label>Customer Message</label>
+      <textarea id="customerMessage" placeholder="Type a customer message to generate an AI reply..."></textarea>
+      <div class="actions">
+        <button class="green" onclick="generateReply()">Generate Reply</button>
+        <button class="dark" onclick="loadDemoReplies()">Load Demo</button>
       </div>
-
-      <div style="margin-bottom:16px;">
-        <div class="label">Customer Name</div>
-        <input id="newCustomerName" class="input" placeholder="John Smith">
-        <div class="label">Source</div>
-        <select id="newSource" class="input">
-          <option>Website</option>
-          <option>Instagram</option>
-          <option>Facebook</option>
-          <option>WhatsApp</option>
-        </select>
-        <div class="label">Customer Message</div>
-        <textarea id="newCustomerMessage" class="input small" placeholder="Type a customer message to generate an AI reply..."></textarea>
-        <div class="split-actions">
-          <button class="green" onclick="createInbound()">Create + Generate</button>
-          <button class="dark" onclick="loadDemoConversations()">Load Demo</button>
-        </div>
-      </div>
-
-      <div id="threadsBody">
-        <div class="empty">No conversations yet. Create a demo conversation or add one above.</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="section-title">
-        <h2 id="threadTitle">Select a conversation</h2>
-        <div id="threadBadge"></div>
-      </div>
-
-      <div id="messages">
-        <div class="empty">Choose a conversation from the left panel.</div>
-      </div>
-
-      <textarea id="humanReply" placeholder="Write manual reply or edit AI response..."></textarea>
-
-      <div class="row-actions">
-        <button class="green" onclick="sendReply()">Send Reply</button>
-        <button class="dark" onclick="generateAI()">Generate AI Reply</button>
-        <button class="dark" onclick="saveDraft()">Save Draft</button>
-        <button class="danger" onclick="deleteCurrent()">Delete</button>
-      </div>
-
       <div id="msg" class="msg"></div>
     </div>
 
+    <div class="card">
+      <div class="header-row">
+        <h2 style="margin:0;">Inbox</h2>
+        <div class="count" id="countLabel">0</div>
+      </div>
+      <div id="repliesBody">
+        <div class="empty">Loading...</div>
+      </div>
+    </div>
   </div>
-
 </div>
 
 <script>
@@ -489,7 +425,6 @@ function logout(){
 }
 
 let replies = [];
-let activeId = null;
 
 function setMsg(text){
   document.getElementById("msg").innerText = text;
@@ -504,73 +439,76 @@ function escapeHtml(str){
     .replaceAll("'","&#039;");
 }
 
-async function loadReplies(){
-  setMsg("Loading inbox...");
+function shortDate(iso){
+  const s = String(iso || "");
+  if(!s) return "—";
+  return s.split("T")[0] || s.slice(0, 10) || "—";
+}
 
+async function loadReplies(){
   try{
     const res = await fetch("/replies-data?companyId=" + encodeURIComponent(companyId));
     const data = await res.json();
 
     if(!res.ok || data.error){
-      setMsg(data.error || "Replies error.");
+      document.getElementById("repliesBody").innerHTML = '<div class="empty">' + escapeHtml(data.error || "Replies error.") + '</div>';
       return;
     }
 
     replies = data.replies || [];
-    renderThreads();
-
-    if(activeId){
-      const exists = replies.find(r => String(r.id) === String(activeId));
-      if(exists){
-        openThread(activeId);
-      }else{
-        clearThread();
-      }
-    }else if(replies.length){
-      openThread(replies[0].id);
-    }else{
-      clearThread();
-    }
-
-    setMsg("Inbox updated.");
+    document.getElementById("countLabel").innerText = String(replies.length);
+    renderReplies();
   }catch(e){
-    setMsg("Connection error loading replies.");
+    document.getElementById("repliesBody").innerHTML = '<div class="empty">Connection error loading replies.</div>';
   }
 }
 
-function clearThread(){
-  activeId = null;
-  document.getElementById("threadTitle").innerText = "Select a conversation";
-  document.getElementById("threadBadge").innerHTML = "";
-  document.getElementById("messages").innerHTML = '<div class="empty">Choose a conversation from the left panel.</div>';
-  document.getElementById("humanReply").value = "";
-}
-
-function renderThreads(){
-  const body = document.getElementById("threadsBody");
+function renderReplies(){
+  const body = document.getElementById("repliesBody");
   body.innerHTML = "";
 
   if(!replies.length){
-    body.innerHTML = '<div class="empty">No conversations yet. Create a demo conversation or add one above.</div>';
+    body.innerHTML = '<div class="empty">No replies yet. Generate one on the left or load demo.</div>';
     return;
   }
 
   replies.forEach(item => {
     const div = document.createElement("div");
-    div.className = "thread" + (String(item.id) === String(activeId) ? " active" : "");
-    div.onclick = () => openThread(item.id, div);
+    div.className = "reply-card";
 
     const name = item.customer_name || "Customer";
-    const snippet = (item.customer_message || "").slice(0, 64) + ((item.customer_message || "").length > 64 ? "..." : "");
     const source = item.source || "Website";
     const status = item.status || "draft";
+    const createdAt = item.created_at || "";
 
     div.innerHTML = `
-      <h3>${escapeHtml(name)}</h3>
-      <p>${escapeHtml(snippet || "—")}</p>
-      <div class="thread-meta">
-        <span class="badge">${escapeHtml(source)}</span>
-        <span class="badge badge-muted">${escapeHtml(status)}</span>
+      <div class="reply-top">
+        <div>
+          <div class="reply-name">${escapeHtml(name)}</div>
+          <div class="pills">
+            <span class="pill source">${escapeHtml(source)}</span>
+            <span class="pill status">${escapeHtml(status)}</span>
+            <span class="meta">${escapeHtml(shortDate(createdAt))}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bubbles">
+        <div class="bubble customer">
+          <div class="bubble-title">Customer Message</div>
+          <p>${escapeHtml(item.customer_message || "—")}</p>
+        </div>
+        <div class="bubble ai">
+          <div class="bubble-title">AI Reply</div>
+          <p>${escapeHtml(item.ai_reply || "—")}</p>
+        </div>
+      </div>
+
+      <div class="reply-actions">
+        <button class="mini ${status === "draft" ? "active" : ""}" onclick="updateStatus(${item.id}, 'draft')">Draft</button>
+        <button class="mini ${status === "sent" ? "active" : ""}" onclick="updateStatus(${item.id}, 'sent')">Sent</button>
+        <button class="mini ${status === "archived" ? "active" : ""}" onclick="updateStatus(${item.id}, 'archived')">Archive</button>
+        <button class="mini danger" onclick="deleteReply(${item.id})">Delete</button>
       </div>
     `;
 
@@ -578,46 +516,17 @@ function renderThreads(){
   });
 }
 
-function openThread(id, el){
-  activeId = id;
-  document.querySelectorAll(".thread").forEach(node => node.classList.remove("active"));
-  if(el) el.classList.add("active");
+async function generateReply(){
+  const customerName = document.getElementById("customerName").value.trim();
+  const source = document.getElementById("source").value;
+  const customerMessage = document.getElementById("customerMessage").value.trim();
 
-  const t = replies.find(r => String(r.id) === String(id));
-  if(!t){
-    clearThread();
+  if(!customerMessage){
+    setMsg("Enter customer message first.");
     return;
   }
 
-  document.getElementById("threadTitle").innerText = t.customer_name || "Customer";
-  document.getElementById("threadBadge").innerHTML = `<span class="badge">${escapeHtml(t.source || "Website")}</span> <span class="badge badge-muted">${escapeHtml(t.status || "draft")}</span>`;
-
-  document.getElementById("messages").innerHTML = `
-    <div class="message-box customer">
-      <h4>Customer</h4>
-      <p>${escapeHtml(t.customer_message || "")}</p>
-    </div>
-    <div class="message-box ai">
-      <h4>AI FLOW</h4>
-      <p>${escapeHtml(t.ai_reply || "")}</p>
-    </div>
-  `;
-
-  document.getElementById("humanReply").value = t.ai_reply || "";
-  document.getElementById("msg").innerText = "";
-}
-
-async function createInbound(){
-  const name = document.getElementById("newCustomerName").value.trim();
-  const source = document.getElementById("newSource").value;
-  const message = document.getElementById("newCustomerMessage").value.trim();
-
-  if(!message){
-    setMsg("Enter a customer message first.");
-    return;
-  }
-
-  setMsg("Creating conversation...");
+  setMsg("Generating reply...");
 
   try{
     const res = await fetch("/create-ai-reply", {
@@ -625,31 +534,29 @@ async function createInbound(){
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         companyId: companyId,
-        customerName: name,
-        customerMessage: message,
+        customerName: customerName,
+        customerMessage: customerMessage,
         source: source
       })
     });
-
     const data = await res.json();
     if(!res.ok || data.error){
       setMsg(data.error || "Create reply error.");
       return;
     }
 
-    document.getElementById("newCustomerName").value = "";
-    document.getElementById("newCustomerMessage").value = "";
+    document.getElementById("customerName").value = "";
+    document.getElementById("customerMessage").value = "";
 
-    setMsg("Conversation created.");
-    activeId = data.id;
+    setMsg("Reply created.");
     await loadReplies();
   }catch(e){
-    setMsg("Connection error creating conversation.");
+    setMsg("Connection error creating reply.");
   }
 }
 
-async function loadDemoConversations(){
-  setMsg("Creating demo conversations...");
+async function loadDemoReplies(){
+  setMsg("Creating demo replies...");
   const demos = [
     {
       customerName:"Michael Johnson",
@@ -685,147 +592,64 @@ async function loadDemoConversations(){
         setMsg(data.error || "Demo create error.");
         return;
       }
-      activeId = data.id;
     }
 
-    setMsg("Demo conversations created.");
+    setMsg("Demo replies created.");
     await loadReplies();
   }catch(e){
-    setMsg("Connection error creating demo conversations.");
+    setMsg("Connection error creating demo replies.");
   }
 }
 
-async function saveDraft(){
-  if(!activeId){
-    setMsg("Select a conversation first.");
-    return;
-  }
-
-  const text = document.getElementById("humanReply").value;
-  setMsg("Saving draft...");
+async function updateStatus(id, status){
+  setMsg("Updating status...");
 
   try{
-    const res = await fetch("/update-ai-reply", {
+    const res = await fetch("/update-reply-status", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         companyId: companyId,
-        id: activeId,
-        aiReply: text,
-        status: "draft"
+        id: id,
+        status: status
       })
     });
     const data = await res.json();
     if(!res.ok || data.error){
-      setMsg(data.error || "Save draft error.");
+      setMsg(data.error || "Update status error.");
       return;
     }
 
-    setMsg("Draft saved.");
+    setMsg("Status updated.");
     await loadReplies();
   }catch(e){
-    setMsg("Connection error saving draft.");
+    setMsg("Connection error updating status.");
   }
 }
 
-async function sendReply(){
-  if(!activeId){
-    setMsg("Select a conversation first.");
-    return;
-  }
-
-  const text = document.getElementById("humanReply").value.trim();
-  if(!text){
-    setMsg("Write a reply first.");
-    return;
-  }
-
-  setMsg("Sending reply...");
+async function deleteReply(id){
+  if(!confirm("Delete this reply?")) return;
+  setMsg("Deleting reply...");
 
   try{
-    const res = await fetch("/update-ai-reply", {
+    const res = await fetch("/delete-reply", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         companyId: companyId,
-        id: activeId,
-        aiReply: text,
-        status: "sent"
+        id: id
       })
     });
     const data = await res.json();
     if(!res.ok || data.error){
-      setMsg(data.error || "Send reply error.");
+      setMsg(data.error || "Delete reply error.");
       return;
     }
 
-    setMsg("Reply sent.");
+    setMsg("Reply deleted.");
     await loadReplies();
   }catch(e){
-    setMsg("Connection error sending reply.");
-  }
-}
-
-async function deleteCurrent(){
-  if(!activeId){
-    setMsg("Select a conversation first.");
-    return;
-  }
-  if(!confirm("Delete this conversation?")) return;
-
-  setMsg("Deleting conversation...");
-
-  try{
-    const res = await fetch("/delete-ai-reply", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        companyId: companyId,
-        id: activeId
-      })
-    });
-    const data = await res.json();
-    if(!res.ok || data.error){
-      setMsg(data.error || "Delete error.");
-      return;
-    }
-
-    setMsg("Conversation deleted.");
-    activeId = null;
-    await loadReplies();
-  }catch(e){
-    setMsg("Connection error deleting conversation.");
-  }
-}
-
-async function generateAI(){
-  if(!activeId){
-    setMsg("Select a conversation first.");
-    return;
-  }
-
-  const t = replies.find(r => String(r.id) === String(activeId));
-  if(!t){
-    setMsg("Conversation not found.");
-    return;
-  }
-
-  setMsg("Generating AI reply...");
-
-  try{
-    const res = await fetch("/chat", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        message:"Write a short sales reply for this customer message: " + (t.customer_message || "")
-      })
-    });
-    const data = await res.json();
-
-    document.getElementById("humanReply").value = data.reply || "";
-    setMsg("AI reply generated. Save or send it.");
-  }catch(e){
-    setMsg("Connection error generating AI reply.");
+    setMsg("Connection error deleting reply.");
   }
 }
 
