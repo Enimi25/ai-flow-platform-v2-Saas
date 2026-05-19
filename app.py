@@ -208,6 +208,9 @@ def social_accounts_page():
 def ai_replies_page():
     return FileResponse("replies.html")
 
+@app.get("/billing")
+def billing_page():
+    return FileResponse("billing.html")
 
 @app.get("/analytics")
 def analytics_page():
