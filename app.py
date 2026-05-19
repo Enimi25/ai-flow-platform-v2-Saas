@@ -653,6 +653,133 @@ async def update_lead(request: Request):
     finally:
         conn.close()
 
+@app.post("/delete-lead")
+async def delete_lead(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    lead_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        lead_id_int = int(lead_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM v2_leads
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (company_id, lead_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("DELETE LEAD ERROR:", str(e))
+        return JSONResponse({"error": "Delete lead error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/update-content-post")
+async def update_content_post(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    post_id = data.get("id")
+    status = (data.get("status") or "").strip().lower()
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        post_id_int = int(post_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    if status not in ("draft", "approved", "published"):
+        return JSONResponse({"error": "Invalid status"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE v2_content_posts
+                SET status = %s
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (status, company_id, post_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("UPDATE CONTENT POST ERROR:", str(e))
+        return JSONResponse({"error": "Update content post error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/delete-content-post")
+async def delete_content_post(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    post_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    try:
+        post_id_int = int(post_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM v2_content_posts
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                (company_id, post_id_int),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("DELETE CONTENT POST ERROR:", str(e))
+        return JSONResponse({"error": "Delete content post error"}, status_code=500)
+
+    finally:
+        conn.close()
+
 
 # =========================================================
 # SOCIAL ACCOUNTS

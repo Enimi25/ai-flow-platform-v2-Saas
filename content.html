@@ -254,6 +254,50 @@ textarea{
   font-weight:900;
 }
 
+.post-actions{
+  margin-top:12px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.mini{
+  padding:8px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:950;
+  box-shadow:none;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(30,41,59,.55);
+  color:white;
+}
+.mini:hover{
+  transform:translateY(-1px);
+  box-shadow:var(--shadowSm);
+  border-color:rgba(255,255,255,.16);
+}
+.mini:active{transform:translateY(0)}
+.mini-green{
+  background:rgba(20,83,45,.55);
+  color:#b9f6cc;
+  border-color:rgba(74,222,128,.20);
+}
+.mini-yellow{
+  background:rgba(66,32,6,.55);
+  color:#fde68a;
+  border-color:rgba(250,204,21,.22);
+}
+.mini-blue{
+  background:rgba(30,58,138,.45);
+  color:#bfdbfe;
+  border-color:rgba(96,165,250,.25);
+}
+.mini-red{
+  background:rgba(127,29,29,.45);
+  color:#fecaca;
+  border-color:rgba(248,113,113,.30);
+}
+
 .msg{
   color:var(--muted);
   margin-bottom:16px;
@@ -408,6 +452,12 @@ async function loadPosts(){
         <h3>${post.title || "Untitled Post"}</h3>
         <p>${post.content || ""}</p>
         <div class="meta">${post.platform || ""} · ${post.post_type || ""} · ${post.status || "draft"}</div>
+        <div class="post-actions">
+          <button class="mini mini-yellow" onclick="setPostStatus(${post.id}, 'draft')">Draft</button>
+          <button class="mini mini-green" onclick="setPostStatus(${post.id}, 'approved')">Approve</button>
+          <button class="mini mini-blue" onclick="setPostStatus(${post.id}, 'published')">Publish</button>
+          <button class="mini mini-red" onclick="deletePost(${post.id})">Delete</button>
+        </div>
       `;
 
       body.appendChild(div);
@@ -417,6 +467,62 @@ async function loadPosts(){
 
   }catch(e){
     setMsg("Connection error.");
+  }
+}
+
+async function setPostStatus(id, status){
+  setMsg("Updating post...");
+
+  try{
+    const res = await fetch("/update-content-post", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: id,
+        status: status
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Update post error.");
+      return;
+    }
+
+    setMsg("Post updated.");
+    loadPosts();
+
+  }catch(e){
+    setMsg("Connection error updating post.");
+  }
+}
+
+async function deletePost(id){
+  if(!confirm("Delete this post?")) return;
+  setMsg("Deleting post...");
+
+  try{
+    const res = await fetch("/delete-content-post", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: id
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Delete post error.");
+      return;
+    }
+
+    setMsg("Post deleted.");
+    loadPosts();
+
+  }catch(e){
+    setMsg("Connection error deleting post.");
   }
 }
 

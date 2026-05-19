@@ -198,6 +198,10 @@ button{
   box-shadow:var(--shadow);
 }
 
+.card + .card{
+  margin-top:18px;
+}
+
 .stats{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
@@ -220,6 +224,59 @@ button{
 .stat-value{
   font-size:32px;
   font-weight:900;
+}
+
+label{
+  display:block;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:8px;
+  letter-spacing:.02em;
+}
+
+input, select, textarea{
+  width:100%;
+  background:rgba(2,6,23,.92);
+  color:white;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:14px;
+  padding:14px;
+  outline:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+
+input:focus, select:focus, textarea:focus{
+  border-color:rgba(74,222,128,.35);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(74,222,128,.12);
+}
+
+textarea{
+  min-height:96px;
+  resize:vertical;
+}
+
+.form-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-bottom:14px;
+}
+
+.form-grid .full{
+  grid-column:1 / -1;
+}
+
+.form-actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.form-actions .green,
+.form-actions .dark{
+  padding:12px 16px;
 }
 
 table{
@@ -255,6 +312,50 @@ td{
 .in_progress{background:#3b0764;color:#c084fc}
 .converted{background:#1e3a8a;color:#60a5fa}
 
+.row-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.mini{
+  padding:8px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:950;
+  box-shadow:none;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(30,41,59,.55);
+  color:white;
+}
+.mini:hover{
+  transform:translateY(-1px);
+  box-shadow:var(--shadowSm);
+  border-color:rgba(255,255,255,.16);
+}
+.mini:active{transform:translateY(0)}
+.mini-green{
+  background:rgba(20,83,45,.55);
+  color:#b9f6cc;
+  border-color:rgba(74,222,128,.20);
+}
+.mini-purple{
+  background:rgba(59,7,100,.45);
+  color:#e9d5ff;
+  border-color:rgba(192,132,252,.22);
+}
+.mini-blue{
+  background:rgba(30,58,138,.45);
+  color:#bfdbfe;
+  border-color:rgba(96,165,250,.25);
+}
+.mini-red{
+  background:rgba(127,29,29,.45);
+  color:#fecaca;
+  border-color:rgba(248,113,113,.30);
+}
+
 .empty{
   color:var(--muted);
   padding:18px 0;
@@ -266,6 +367,7 @@ td{
   .main{padding:24px}
   .main > *{max-width:none}
   .top{flex-direction:column;align-items:flex-start;gap:16px}
+  .form-grid{grid-template-columns:1fr}
   table{font-size:13px}
 }
 </style>
@@ -310,6 +412,44 @@ td{
 
   <div id="msg" class="msg">Loading leads...</div>
 
+  <div class="card">
+    <h2 style="font-size:22px;margin-bottom:14px;">Create Lead</h2>
+    <div class="form-grid">
+      <div>
+        <label>Name</label>
+        <input id="leadName" placeholder="John Smith">
+      </div>
+      <div>
+        <label>Email</label>
+        <input id="leadEmail" placeholder="john@example.com">
+      </div>
+      <div>
+        <label>Phone</label>
+        <input id="leadPhone" placeholder="+1 555 000 000">
+      </div>
+      <div>
+        <label>Source</label>
+        <input id="leadSource" placeholder="Instagram">
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="leadStatus">
+          <option value="new">new</option>
+          <option value="in_progress">in_progress</option>
+          <option value="converted">converted</option>
+        </select>
+      </div>
+      <div class="full">
+        <label>Message</label>
+        <textarea id="leadMessage" placeholder="What did the customer ask?"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="green" onclick="createLead()">Create Lead</button>
+      <button class="dark" onclick="resetLeadForm()">Reset</button>
+    </div>
+  </div>
+
   <div class="stats">
     <div class="stat">
       <div class="stat-title">Total Leads</div>
@@ -343,12 +483,13 @@ td{
           <th>Status</th>
           <th>Message</th>
           <th>Date</th>
+          <th style="text-align:right;">Actions</th>
         </tr>
       </thead>
 
       <tbody id="leadsBody">
         <tr>
-          <td colspan="7" class="empty">No leads yet.</td>
+          <td colspan="8" class="empty">No leads yet.</td>
         </tr>
       </tbody>
     </table>
@@ -388,6 +529,15 @@ function shortDate(value){
   return value.split("T")[0];
 }
 
+function resetLeadForm(){
+  document.getElementById("leadName").value = "";
+  document.getElementById("leadEmail").value = "";
+  document.getElementById("leadPhone").value = "";
+  document.getElementById("leadSource").value = "";
+  document.getElementById("leadStatus").value = "new";
+  document.getElementById("leadMessage").value = "";
+}
+
 function updateStats(leads){
   const total = leads.length;
   const fresh = leads.filter(l => l.status === "new").length;
@@ -405,7 +555,7 @@ function renderLeads(leads){
   body.innerHTML = "";
 
   if(!leads.length){
-    body.innerHTML = '<tr><td colspan="7" class="empty">No leads yet. Click Load Demo Leads.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="empty">No leads yet. Click Load Demo Leads.</td></tr>';
     updateStats([]);
     return;
   }
@@ -415,19 +565,123 @@ function renderLeads(leads){
     const tr = document.createElement("tr");
 
     tr.innerHTML = `
-            <td>${lead.name || "Unknown"}</td>
+      <td>${lead.name || "Unknown"}</td>
       <td>${lead.email || ""}</td>
       <td>${lead.phone || ""}</td>
       <td>${lead.source || ""}</td>
       <td><span class="status ${statusClass(status)}">${status}</span></td>
       <td>${lead.message || ""}</td>
       <td>${shortDate(lead.created_at)}</td>
+      <td style="text-align:right;">
+        <div class="row-actions">
+          <button class="mini mini-green" onclick="setLeadStatus(${lead.id}, 'new')">New</button>
+          <button class="mini mini-purple" onclick="setLeadStatus(${lead.id}, 'in_progress')">In Progress</button>
+          <button class="mini mini-blue" onclick="setLeadStatus(${lead.id}, 'converted')">Converted</button>
+          <button class="mini mini-red" onclick="deleteLead(${lead.id})">Delete</button>
+        </div>
+      </td>
     `;
 
     body.appendChild(tr);
   });
 
   updateStats(leads);
+}
+
+async function createLead(){
+  const name = document.getElementById("leadName").value.trim();
+  const emailValue = document.getElementById("leadEmail").value.trim();
+  const phone = document.getElementById("leadPhone").value.trim();
+  const source = document.getElementById("leadSource").value.trim();
+  const status = document.getElementById("leadStatus").value;
+  const message = document.getElementById("leadMessage").value.trim();
+
+  setMsg("Creating lead...");
+
+  try{
+    const res = await fetch("/create-lead",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        name: name,
+        email: emailValue,
+        phone: phone,
+        source: source,
+        status: status,
+        message: message
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Create lead error.");
+      return;
+    }
+
+    resetLeadForm();
+    setMsg("Lead created.");
+    loadLeads();
+
+  }catch(e){
+    setMsg("Connection error creating lead.");
+  }
+}
+
+async function setLeadStatus(id, status){
+  setMsg("Updating lead...");
+
+  try{
+    const res = await fetch("/update-lead",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: id,
+        status: status
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Update lead error.");
+      return;
+    }
+
+    setMsg("Lead updated.");
+    loadLeads();
+
+  }catch(e){
+    setMsg("Connection error updating lead.");
+  }
+}
+
+async function deleteLead(id){
+  if(!confirm("Delete this lead?")) return;
+  setMsg("Deleting lead...");
+
+  try{
+    const res = await fetch("/delete-lead",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        id: id
+      })
+    });
+
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Delete lead error.");
+      return;
+    }
+
+    setMsg("Lead deleted.");
+    loadLeads();
+
+  }catch(e){
+    setMsg("Connection error deleting lead.");
+  }
 }
 
 async function loadLeads(){
