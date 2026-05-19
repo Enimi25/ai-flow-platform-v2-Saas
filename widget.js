@@ -49,9 +49,11 @@
 
   const DEFAULT_CHAT_API = origin + "/chat";
   const DEFAULT_CREATE_LEAD_API = origin + "/create-lead";
+  const DEFAULT_WIDGET_SETTINGS_API = origin + "/widget-settings";
 
   const API = config.apiUrl || DEFAULT_CHAT_API;
   const CREATE_LEAD_API = config.createLeadUrl || DEFAULT_CREATE_LEAD_API;
+  const WIDGET_SETTINGS_API = config.widgetSettingsUrl || DEFAULT_WIDGET_SETTINGS_API;
 
   const companyId = scriptCompanyId || config.companyId || "";
   const siteName = config.siteName || document.title || "this business";
@@ -63,6 +65,17 @@
   let isOpen = false;
   let isSending = false;
   let leadCaptured = false;
+
+  const widgetDefaults = {
+    assistantName: "AI FLOW Assistant",
+    welcomeMessage: "Hi! How can I help you today?",
+    leadQuestion: "What is the best phone number or email to contact you?",
+    aiTone: "Friendly",
+    aiGoal: "Capture leads",
+    businessDescription: ""
+  };
+
+  let widgetSettings = Object.assign({}, widgetDefaults);
 
   const css = document.createElement("style");
   css.innerHTML = `
@@ -295,7 +308,7 @@
   box.innerHTML = `
     <div id="aiw-head">
       <div id="aiw-head-left">
-        <div id="aiw-title">AI Sales Assistant</div>
+        <div id="aiw-title">AI FLOW Assistant</div>
         <div id="aiw-online">Online now</div>
       </div>
       <button id="aiw-close" type="button">×</button>
@@ -322,6 +335,30 @@
   const input = box.querySelector("#aiw-input");
   const sendBtn = box.querySelector("#aiw-send");
   const closeBtn = box.querySelector("#aiw-close");
+  let greeted = false;
+
+  async function loadWidgetSettings() {
+    if (!companyId) return;
+
+    try {
+      const res = await fetch(WIDGET_SETTINGS_API + "?companyId=" + encodeURIComponent(companyId));
+      const data = await res.json();
+      if (!res.ok || !data || data.error) return;
+
+      if (data && data.settings) {
+        widgetSettings = Object.assign({}, widgetDefaults, data.settings);
+      }
+    } catch (e) {}
+  }
+
+  function applyWidgetSettings() {
+    try {
+      const titleEl = box.querySelector("#aiw-title");
+      if (titleEl) {
+        titleEl.innerText = widgetSettings.assistantName || widgetDefaults.assistantName;
+      }
+    } catch (e) {}
+  }
 
   function openWidget() {
     isOpen = true;
@@ -504,7 +541,18 @@
     });
   });
 
-  setTimeout(function () {
-    addMessage("Hello. How can I help you with price, booking, or payment?", "bot");
-  }, 500);
+  function greetOnce() {
+    if (greeted) return;
+    greeted = true;
+    addMessage(widgetSettings.welcomeMessage || widgetDefaults.welcomeMessage, "bot");
+  }
+
+  // Load settings (best-effort) and then apply + greet.
+  loadWidgetSettings().then(function () {
+    applyWidgetSettings();
+    setTimeout(greetOnce, 250);
+  });
+
+  // Fallback greet if settings fetch is slow or fails.
+  setTimeout(greetOnce, 800);
 })();
