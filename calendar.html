@@ -168,3 +168,84 @@ button{
   color:#94a3b8;
   line-height:1.5;
 }
+Да, брат, ты прав. Давай дописываем с места, где у тебя остановилось.
+
+У тебя файл закончился здесь:
+
+.empty{
+  color:#94a3b8;
+  line-height:1.5;
+}
+
+Сразу после этого вставь вот этот остаток файла:
+
+@media(max-width:900px){
+  body{display:block}
+  .sidebar{width:100%}
+  .main{padding:24px}
+  .grid{grid-template-columns:1fr}
+  .top{flex-direction:column;align-items:flex-start;gap:16px}
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo">AI <span>FLOW</span></div>
+  <div class="menu">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/leads-page">Leads</a>
+    <a href="/content-factory">Content Factory</a>
+    <a href="/social-accounts">Social Accounts</a>
+    <a href="/ai-replies">AI Replies</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/calendar" class="active">Calendar</a>
+    <a href="/dashboard">Billing</a>
+    <a href="/dashboard">Settings</a>
+  </div>
+</div>
+<div class="main">
+  <div class="top">
+    <div>
+      <h1>Calendar</h1>
+      <div class="sub">Manage demo calls, client appointments and AI-booked meetings.</div>
+    </div>
+    <div class="user">
+      <div id="clientEmail">Client</div>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h2>Create Booking</h2>
+      <label>Client Name</label>
+      <input id="clientName" placeholder="John Smith">
+      <label>Email</label>
+      <input id="bookingEmail" placeholder="client@example.com">
+      <label>Phone</label>
+      <input id="bookingPhone" placeholder="+1 555 000 000">
+      <label>Date</label>
+      <input id="bookingDate" type="date">
+      <label>Time</label>
+      <input id="bookingTime" type="time">
+      <label>Meeting Type</label>
+      <select id="meetingType">
+        <option>AI FLOW Demo Call</option>
+        <option>Sales Consultation</option>
+        <option>Content Factory Review</option>
+        <option>Client Onboarding</option>
+      </select>
+      <button onclick="createLocalBooking()">Create Booking</button>
+      <button class="dark" onclick="loadDemoBookings()">Load Demo Bookings</button>
+      <div id="msg" class="msg"></div>
+    </div>
+    <div class="card">
+      <h2>Upcoming Bookings</h2>
+      <div id="bookingsBody">
+        <div class="empty">No bookings yet. Create a booking or load demo bookings.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const email = localStorage.getItem("ai_flow_email");
+const companyId = localStorage
