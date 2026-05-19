@@ -518,6 +518,141 @@ def dashboard_data(companyId: str = ""):
     finally:
         conn.close()
 
+#
+# =========================================================
+# LEADS CRM
+# =========================================================
+#
+
+@app.post("/create-lead")
+async def create_lead(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    source = (data.get("source") or "").strip()
+    status = (data.get("status") or "new").strip() or "new"
+    message = (data.get("message") or "").strip()
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_leads (
+                    company_id,
+                    name,
+                    email,
+                    phone,
+                    source,
+                    status,
+                    message,
+                    created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    company_id,
+                    name,
+                    email,
+                    phone,
+                    source,
+                    status,
+                    message,
+                    now,
+                ),
+            )
+            lead_id = cur.fetchone()[0]
+
+        conn.commit()
+
+        return JSONResponse({"success": True, "id": lead_id})
+
+    except Exception as e:
+        print("CREATE LEAD ERROR:", str(e))
+        return JSONResponse({"error": "Create lead error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/update-lead")
+async def update_lead(request: Request):
+    """
+    Minimal MVP update endpoint for CRM actions.
+    Contract (flexible):
+    - companyId (required)
+    - id (required)
+    - optional: name, email, phone, source, status, message
+    """
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    lead_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if lead_id is None or str(lead_id).strip() == "":
+        return JSONResponse({"error": "Missing id"}, status_code=400)
+
+    updates = {}
+    for key in ("name", "email", "phone", "source", "status", "message"):
+        if key in data and data.get(key) is not None:
+            updates[key] = str(data.get(key)).strip()
+
+    if not updates:
+        return JSONResponse({"error": "No fields to update"}, status_code=400)
+
+    allowed = ("name", "email", "phone", "source", "status", "message")
+    set_parts = []
+    values = []
+    for key in allowed:
+        if key in updates:
+            set_parts.append(f"{key} = %s")
+            values.append(updates[key])
+
+    values.extend([company_id, lead_id])
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE v2_leads
+                SET {", ".join(set_parts)}
+                WHERE company_id = %s
+                AND id = %s
+                """,
+                tuple(values),
+            )
+
+            if cur.rowcount == 0:
+                return JSONResponse({"error": "Lead not found"}, status_code=404)
+
+        conn.commit()
+        return JSONResponse({"success": True, "id": int(lead_id)})
+
+    except Exception as e:
+        print("UPDATE LEAD ERROR:", str(e))
+        return JSONResponse({"error": "Update lead error"}, status_code=500)
+
+    finally:
+        conn.close()
+
 
 # =========================================================
 # SOCIAL ACCOUNTS
