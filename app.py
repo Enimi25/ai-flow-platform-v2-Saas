@@ -170,6 +170,35 @@ def init_db():
                 """
             )
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_company_settings (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    industry TEXT DEFAULT '',
+                    website TEXT DEFAULT '',
+                    phone TEXT DEFAULT '',
+                    assistant_name TEXT DEFAULT 'AI FLOW Assistant',
+                    ai_tone TEXT DEFAULT 'Friendly',
+                    ai_goal TEXT DEFAULT 'Capture leads',
+                    business_description TEXT DEFAULT '',
+                    welcome_message TEXT DEFAULT '',
+                    lead_question TEXT DEFAULT '',
+                    email_notifications TEXT DEFAULT 'Enabled',
+                    lead_alerts TEXT DEFAULT 'Enabled',
+                    weekly_reports TEXT DEFAULT 'Enabled',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_company_settings_company_id
+                ON v2_company_settings (company_id);
+                """
+            )
+
         conn.commit()
         print("DATABASE READY")
         return True
@@ -1134,6 +1163,272 @@ def analytics_data(companyId: str = ""):
     except Exception as e:
         print("ANALYTICS DATA ERROR:", str(e))
         return JSONResponse({"error": "Analytics data error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# SETTINGS
+# =========================================================
+
+@app.get("/settings-data")
+def settings_data(companyId: str = ""):
+    if not companyId:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    defaults = {
+        "industry": "Beauty / Salon",
+        "website": "",
+        "phone": "",
+        "assistantName": "AI FLOW Assistant",
+        "aiTone": "Friendly",
+        "aiGoal": "Capture leads",
+        "businessDescription": "",
+        "welcomeMessage": "Hi! How can I help you today?",
+        "leadQuestion": "What is the best phone number or email to contact you?",
+        "emailNotifications": "Enabled",
+        "leadAlerts": "Enabled",
+        "weeklyReports": "Enabled",
+        "updatedAt": "",
+    }
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT company_id, company_name, owner_email, plan, status, created_at
+                FROM companies
+                WHERE company_id = %s
+                """,
+                (companyId,),
+            )
+            company = cur.fetchone() or {
+                "company_id": companyId,
+                "company_name": "",
+                "owner_email": "",
+                "plan": "Growth Studio",
+                "status": "active",
+                "created_at": "",
+            }
+
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_company_settings
+                WHERE company_id = %s
+                """,
+                (companyId,),
+            )
+            settings_row = cur.fetchone()
+
+        settings = dict(defaults)
+
+        # Prefer company table name if present; settings.html may override with its own input.
+        if settings_row:
+            settings["industry"] = settings_row.get("industry") or settings["industry"]
+            settings["website"] = settings_row.get("website") or ""
+            settings["phone"] = settings_row.get("phone") or ""
+            settings["assistantName"] = settings_row.get("assistant_name") or settings["assistantName"]
+            settings["aiTone"] = settings_row.get("ai_tone") or settings["aiTone"]
+            settings["aiGoal"] = settings_row.get("ai_goal") or settings["aiGoal"]
+            settings["businessDescription"] = settings_row.get("business_description") or ""
+            settings["welcomeMessage"] = settings_row.get("welcome_message") or settings["welcomeMessage"]
+            settings["leadQuestion"] = settings_row.get("lead_question") or settings["leadQuestion"]
+            settings["emailNotifications"] = (
+                settings_row.get("email_notifications") or settings["emailNotifications"]
+            )
+            settings["leadAlerts"] = settings_row.get("lead_alerts") or settings["leadAlerts"]
+            settings["weeklyReports"] = settings_row.get("weekly_reports") or settings["weeklyReports"]
+            settings["updatedAt"] = settings_row.get("updated_at") or ""
+
+        return JSONResponse({"success": True, "company": company, "settings": settings})
+
+    except Exception as e:
+        print("SETTINGS DATA ERROR:", str(e))
+        return JSONResponse({"error": "Settings data error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.post("/save-settings")
+async def save_settings(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    company_name = (data.get("companyName") or "").strip()
+    industry = (data.get("industry") or "").strip()
+    website = (data.get("website") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    assistant_name = (data.get("assistantName") or "AI FLOW Assistant").strip() or "AI FLOW Assistant"
+    ai_tone = (data.get("aiTone") or "Friendly").strip() or "Friendly"
+    ai_goal = (data.get("aiGoal") or "Capture leads").strip() or "Capture leads"
+    business_description = (data.get("businessDescription") or "").strip()
+    welcome_message = (data.get("welcomeMessage") or "").strip()
+    lead_question = (data.get("leadQuestion") or "").strip()
+    email_notifications = (data.get("emailNotifications") or "Enabled").strip() or "Enabled"
+    lead_alerts = (data.get("leadAlerts") or "Enabled").strip() or "Enabled"
+    weekly_reports = (data.get("weeklyReports") or "Enabled").strip() or "Enabled"
+    updated_at = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            if company_name:
+                cur.execute(
+                    """
+                    UPDATE companies
+                    SET company_name = %s
+                    WHERE company_id = %s
+                    """,
+                    (company_name, company_id),
+                )
+
+            # Upsert (manual): update first, then insert if no row
+            cur.execute(
+                """
+                UPDATE v2_company_settings
+                SET
+                    industry = %s,
+                    website = %s,
+                    phone = %s,
+                    assistant_name = %s,
+                    ai_tone = %s,
+                    ai_goal = %s,
+                    business_description = %s,
+                    welcome_message = %s,
+                    lead_question = %s,
+                    email_notifications = %s,
+                    lead_alerts = %s,
+                    weekly_reports = %s,
+                    updated_at = %s
+                WHERE company_id = %s
+                """,
+                (
+                    industry,
+                    website,
+                    phone,
+                    assistant_name,
+                    ai_tone,
+                    ai_goal,
+                    business_description,
+                    welcome_message,
+                    lead_question,
+                    email_notifications,
+                    lead_alerts,
+                    weekly_reports,
+                    updated_at,
+                    company_id,
+                ),
+            )
+
+            if cur.rowcount == 0:
+                cur.execute(
+                    """
+                    INSERT INTO v2_company_settings (
+                        company_id,
+                        industry,
+                        website,
+                        phone,
+                        assistant_name,
+                        ai_tone,
+                        ai_goal,
+                        business_description,
+                        welcome_message,
+                        lead_question,
+                        email_notifications,
+                        lead_alerts,
+                        weekly_reports,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        company_id,
+                        industry,
+                        website,
+                        phone,
+                        assistant_name,
+                        ai_tone,
+                        ai_goal,
+                        business_description,
+                        welcome_message,
+                        lead_question,
+                        email_notifications,
+                        lead_alerts,
+                        weekly_reports,
+                        updated_at,
+                    ),
+                )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("SAVE SETTINGS ERROR:", str(e))
+        return JSONResponse({"error": "Save settings error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
+@app.get("/widget-settings")
+def widget_settings(companyId: str = ""):
+    if not companyId:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    defaults = {
+        "assistantName": "AI FLOW Assistant",
+        "welcomeMessage": "Hi! How can I help you today?",
+        "leadQuestion": "What is the best phone number or email to contact you?",
+        "aiTone": "Friendly",
+        "aiGoal": "Capture leads",
+        "businessDescription": "",
+    }
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"success": True, "settings": defaults})
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT assistant_name, welcome_message, lead_question, ai_tone, ai_goal, business_description
+                FROM v2_company_settings
+                WHERE company_id = %s
+                """,
+                (companyId,),
+            )
+            row = cur.fetchone()
+
+        if not row:
+            return JSONResponse({"success": True, "settings": defaults})
+
+        merged = dict(defaults)
+        merged["assistantName"] = row.get("assistant_name") or merged["assistantName"]
+        merged["welcomeMessage"] = row.get("welcome_message") or merged["welcomeMessage"]
+        merged["leadQuestion"] = row.get("lead_question") or merged["leadQuestion"]
+        merged["aiTone"] = row.get("ai_tone") or merged["aiTone"]
+        merged["aiGoal"] = row.get("ai_goal") or merged["aiGoal"]
+        merged["businessDescription"] = row.get("business_description") or merged["businessDescription"]
+
+        return JSONResponse({"success": True, "settings": merged})
+
+    except Exception as e:
+        print("WIDGET SETTINGS ERROR:", str(e))
+        return JSONResponse({"success": True, "settings": defaults})
 
     finally:
         conn.close()

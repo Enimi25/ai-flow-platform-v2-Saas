@@ -307,6 +307,9 @@ button{
     <div class="card">
       <h2>AI Assistant Settings</h2>
 
+      <label>Assistant Name</label>
+      <input id="assistantName" placeholder="AI FLOW Assistant">
+
       <label>AI Tone</label>
       <select id="aiTone">
         <option>Friendly</option>
@@ -324,6 +327,12 @@ button{
         <option>Sell services</option>
         <option>Qualify prospects</option>
       </select>
+
+      <label>Welcome Message</label>
+      <textarea id="welcomeMessage" placeholder="Hi! How can I help you today?"></textarea>
+
+      <label>Lead Question</label>
+      <input id="leadQuestion" placeholder="What is the best phone number or email to contact you?">
 
       <label>Business Description</label>
       <textarea id="businessDescription" placeholder="Describe what the business does, services, prices and ideal customer..."></textarea>
@@ -374,12 +383,12 @@ button{
 
       <div class="row">
         <span>Plan</span>
-        <strong>Growth Studio</strong>
+        <strong id="workspacePlan">—</strong>
       </div>
 
       <div class="row">
         <span>Status</span>
-        <strong style="color:#4ade80;">Active</strong>
+        <strong id="workspaceStatus" style="color:#4ade80;">—</strong>
       </div>
 
       <button class="dark" onclick="resetSettings()" style="margin-top:18px;">Reset Demo Settings</button>
@@ -410,70 +419,108 @@ function logout(){
   window.location.href = "/login";
 }
 
-function settingsKey(){
-  return "ai_flow_settings_" + companyId;
+function setAllMsgs(text){
+  document.getElementById("profileMsg").innerText = text;
+  document.getElementById("aiMsg").innerText = text;
+  document.getElementById("notifyMsg").innerText = text;
 }
 
-function saveSettings(){
-  const data = {
+async function saveSettings(){
+  setAllMsgs("Saving settings...");
+
+  const payload = {
+    companyId: companyId,
     companyName: document.getElementById("companyName").value,
     industry: document.getElementById("industry").value,
     website: document.getElementById("website").value,
-    businessPhone: document.getElementById("businessPhone").value,
+    phone: document.getElementById("businessPhone").value,
+    assistantName: document.getElementById("assistantName").value,
     aiTone: document.getElementById("aiTone").value,
     aiGoal: document.getElementById("aiGoal").value,
     businessDescription: document.getElementById("businessDescription").value,
+    welcomeMessage: document.getElementById("welcomeMessage").value,
+    leadQuestion: document.getElementById("leadQuestion").value,
     emailNotifications: document.getElementById("emailNotifications").value,
     leadAlerts: document.getElementById("leadAlerts").value,
     weeklyReports: document.getElementById("weeklyReports").value
   };
 
-  localStorage.setItem(settingsKey(), JSON.stringify(data));
+  try{
+    const res = await fetch("/save-settings", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
 
-  document.getElementById("profileMsg").innerText = "Profile saved.";
-  document.getElementById("aiMsg").innerText = "AI settings saved.";
-  document.getElementById("notifyMsg").innerText = "Notifications saved.";
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setAllMsgs(data.error || "Save settings error.");
+      return;
+    }
+
+    document.getElementById("profileMsg").innerText = "Profile saved.";
+    document.getElementById("aiMsg").innerText = "AI settings saved.";
+    document.getElementById("notifyMsg").innerText = "Notifications saved.";
+    document.getElementById("workspaceMsg").innerText = "Settings saved to PostgreSQL.";
+
+    loadSettings();
+  }catch(e){
+    setAllMsgs("Connection error saving settings.");
+  }
 }
 
-function loadSettings(){
-  const raw = localStorage.getItem(settingsKey());
-
-  if(!raw){
-    return;
-  }
-
+async function loadSettings(){
   try{
-    const data = JSON.parse(raw);
+    const res = await fetch("/settings-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+    if(!res.ok || data.error){
+      document.getElementById("workspaceMsg").innerText = data.error || "Settings load error.";
+      return;
+    }
 
-    document.getElementById("companyName").value = data.companyName || "";
-    document.getElementById("industry").value = data.industry || "Beauty / Salon";
-    document.getElementById("website").value = data.website || "";
-    document.getElementById("businessPhone").value = data.businessPhone || "";
-    document.getElementById("aiTone").value = data.aiTone || "Friendly";
-    document.getElementById("aiGoal").value = data.aiGoal || "Capture leads";
-    document.getElementById("businessDescription").value = data.businessDescription || "";
-    document.getElementById("emailNotifications").value = data.emailNotifications || "Enabled";
-    document.getElementById("leadAlerts").value = data.leadAlerts || "Enabled";
-    document.getElementById("weeklyReports").value = data.weeklyReports || "Enabled";
+    const company = data.company || {};
+    const s = data.settings || {};
 
-  }catch(e){}
+    document.getElementById("companyName").value = company.company_name || "";
+    document.getElementById("industry").value = s.industry || "Beauty / Salon";
+    document.getElementById("website").value = s.website || "";
+    document.getElementById("businessPhone").value = s.phone || "";
+
+    document.getElementById("assistantName").value = s.assistantName || "AI FLOW Assistant";
+    document.getElementById("aiTone").value = s.aiTone || "Friendly";
+    document.getElementById("aiGoal").value = s.aiGoal || "Capture leads";
+    document.getElementById("welcomeMessage").value = s.welcomeMessage || "Hi! How can I help you today?";
+    document.getElementById("leadQuestion").value = s.leadQuestion || "What is the best phone number or email to contact you?";
+    document.getElementById("businessDescription").value = s.businessDescription || "";
+
+    document.getElementById("emailNotifications").value = s.emailNotifications || "Enabled";
+    document.getElementById("leadAlerts").value = s.leadAlerts || "Enabled";
+    document.getElementById("weeklyReports").value = s.weeklyReports || "Enabled";
+
+    document.getElementById("workspacePlan").innerText = company.plan || "Growth Studio";
+    document.getElementById("workspaceStatus").innerText = (company.status || "active").toUpperCase();
+
+  }catch(e){
+    document.getElementById("workspaceMsg").innerText = "Connection error loading settings.";
+  }
 }
 
 function resetSettings(){
-  localStorage.removeItem(settingsKey());
-
   document.getElementById("companyName").value = "";
   document.getElementById("industry").value = "Beauty / Salon";
   document.getElementById("website").value = "";
   document.getElementById("businessPhone").value = "";
+  document.getElementById("assistantName").value = "AI FLOW Assistant";
   document.getElementById("aiTone").value = "Friendly";
   document.getElementById("aiGoal").value = "Capture leads";
   document.getElementById("businessDescription").value = "";
+  document.getElementById("welcomeMessage").value = "Hi! How can I help you today?";
+  document.getElementById("leadQuestion").value = "What is the best phone number or email to contact you?";
   document.getElementById("emailNotifications").value = "Enabled";
   document.getElementById("leadAlerts").value = "Enabled";
   document.getElementById("weeklyReports").value = "Enabled";
 
-  document.getElementById("workspaceMsg").innerText = "Demo settings reset.";
+  document.getElementById("workspaceMsg").innerText = "Defaults loaded. Click Save to persist.";
 }
 
 loadSettings();
