@@ -470,6 +470,20 @@ button:active{transform:translateY(0)}
 
     <div class="card">
 
+      <div class="icon">🎵</div>
+
+      <h2>TikTok</h2>
+
+      <p>Connect TikTok to manage social automation drafts and publishing.</p>
+
+      <div id="tiktokStatus" class="status">Not Connected</div>
+
+      <button onclick="connectSocial('TikTok')">Connect TikTok</button>
+
+    </div>
+
+    <div class="card">
+
       <div class="icon">💬</div>
 
       <h2>WhatsApp</h2>
@@ -633,6 +647,29 @@ async function loadSocialData(){
       setConnectedHtml("");
     }
 
+    // Load TikTok connected account (if configured).
+    try{
+      const res3 = await fetch("/api/tiktok/account?companyId=" + encodeURIComponent(companyId));
+      const data3 = await res3.json();
+      if(res3.ok && data3 && data3.success && data3.account){
+        const a = data3.account;
+        const html2 = `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;">
+            <div style="font-weight:900;">TikTok Connected Account</div>
+            <button onclick="disconnectTikTok()" style="width:auto;padding:10px 14px;">Disconnect TikTok</button>
+          </div>
+          <div style="margin-top:12px;">
+            <div><strong>${esc(a.account_name || "TikTok")}</strong> <span style="opacity:.75">(${esc(a.account_id || "")})</span></div>
+          </div>
+        `;
+        const existing = document.getElementById("connectedAccounts")?.innerHTML || "";
+        setConnectedHtml((existing || "") + html2);
+        markConnected("TikTok");
+      }
+    }catch(e){
+      // ignore
+    }
+
     setMsg("Social accounts loaded.");
 
   }catch(e){
@@ -648,6 +685,12 @@ async function connectSocial(platform){
   if(platform === "Facebook" || platform === "Instagram"){
     setMsg("Redirecting to Meta to connect " + platform + "...");
     window.location.href = "/api/meta/connect?companyId=" + encodeURIComponent(companyId);
+    return;
+  }
+
+  if(platform === "TikTok"){
+    setMsg("Redirecting to TikTok to connect...");
+    window.location.href = "/api/tiktok/connect?companyId=" + encodeURIComponent(companyId);
     return;
   }
 
@@ -706,6 +749,33 @@ async function disconnectMeta(){
     setMsg("Meta disconnected.");
   }catch(e){
     setMsg("Connection error disconnecting Meta.");
+  }
+}
+
+async function disconnectTikTok(){
+  setMsg("Disconnecting TikTok...");
+  try{
+    const res = await fetch("/api/tiktok/disconnect",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Disconnect error.");
+      return;
+    }
+    const el = document.getElementById("tiktokStatus");
+    if(el){
+      el.innerText = "Not Connected";
+      el.classList.remove("connected");
+    }
+    // Reload everything to refresh connected accounts box.
+    setConnectedHtml("");
+    await loadSocialData();
+    setMsg("TikTok disconnected.");
+  }catch(e){
+    setMsg("Connection error disconnecting TikTok.");
   }
 }
 

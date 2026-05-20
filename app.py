@@ -177,11 +177,19 @@ def init_db():
                     account_id TEXT DEFAULT '',
                     access_token TEXT DEFAULT '',
                     token_expires_at TEXT DEFAULT '',
+                    refresh_token TEXT DEFAULT '',
+                    refresh_expires_at TEXT DEFAULT '',
+                    scope TEXT DEFAULT '',
                     created_at TEXT DEFAULT '',
                     updated_at TEXT DEFAULT ''
                 );
                 """
             )
+
+            # Backward-compatible migrations for older DBs.
+            cur.execute("ALTER TABLE v2_social_tokens ADD COLUMN IF NOT EXISTS refresh_token TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_social_tokens ADD COLUMN IF NOT EXISTS refresh_expires_at TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_social_tokens ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT ''")
 
             cur.execute(
                 """
@@ -198,6 +206,46 @@ def init_db():
                     company_id TEXT DEFAULT '',
                     created_at TEXT DEFAULT ''
                 );
+                """
+            )
+
+            # Short-lived OAuth state store for TikTok connect flow.
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_tiktok_oauth_states (
+                    state TEXT PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    created_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            # Social content automation drafts (daily).
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_social_content_drafts (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    content_date TEXT DEFAULT '',
+                    platform TEXT DEFAULT '',
+                    draft_type TEXT DEFAULT '',
+                    title TEXT DEFAULT '',
+                    caption TEXT DEFAULT '',
+                    hook TEXT DEFAULT '',
+                    hashtags TEXT DEFAULT '',
+                    visual_idea TEXT DEFAULT '',
+                    status TEXT DEFAULT 'draft',
+                    publish_message TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_v2_social_content_drafts_company_date
+                ON v2_social_content_drafts (company_id, content_date);
                 """
             )
 
@@ -1026,6 +1074,31 @@ def _http_get_json(url: str, timeout_sec: int = 15):
         return json.loads(raw)
 
 
+def _http_post_form_json(url: str, form_data: dict, timeout_sec: int = 20):
+    body = urllib.parse.urlencode(form_data).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "User-Agent": "AI-FLOW/1.0",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+        if not raw:
+            return {}
+        return json.loads(raw)
+
+
+def _tiktok_config():
+    client_key = (os.getenv("TIKTOK_CLIENT_KEY") or "").strip()
+    client_secret = (os.getenv("TIKTOK_CLIENT_SECRET") or "").strip()
+    redirect_uri = (os.getenv("TIKTOK_REDIRECT_URI") or "").strip()
+    return client_key, client_secret, redirect_uri
+
+
 @app.get("/api/meta/connect")
 def meta_connect(companyId: str = ""):
     company_id = (companyId or "").strip()
@@ -1328,6 +1401,293 @@ async def meta_disconnect(request: Request):
 
 
 # =========================================================
+# TIKTOK OAUTH (MVP)
+# =========================================================
+
+@app.get("/api/tiktok/connect")
+def tiktok_connect(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    client_key, client_secret, redirect_uri = _tiktok_config()
+    if not client_key or not client_secret or not redirect_uri:
+        return JSONResponse(
+            {
+                "error": "TikTok OAuth is not configured",
+                "detail": "Missing TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET / TIKTOK_REDIRECT_URI",
+            },
+            status_code=500,
+        )
+
+    state = secrets.token_urlsafe(32)
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_tiktok_oauth_states (state, company_id, created_at)
+                VALUES (%s, %s, %s)
+                """,
+                (state, company_id, now),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Keep scopes minimal for MVP (connect + show account). Publishing scopes require TikTok review/audit.
+    scope = "user.info.basic"
+
+    qs = urllib.parse.urlencode(
+        {
+            "client_key": client_key,
+            "response_type": "code",
+            "scope": scope,
+            "redirect_uri": redirect_uri,
+            "state": state,
+        }
+    )
+    auth_url = f"https://www.tiktok.com/v2/auth/authorize/?{qs}"
+
+    return HTMLResponse(
+        f"""<!doctype html>
+<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url={auth_url}"></head>
+<body style="font-family:Arial,sans-serif;background:#061923;color:#f7fbff;padding:24px;">
+Redirecting to TikTok OAuth...
+</body></html>"""
+    )
+
+
+@app.get("/api/tiktok/callback")
+def tiktok_callback(code: str = "", state: str = ""):
+    if not code or not state:
+        return JSONResponse({"error": "Missing code/state"}, status_code=400)
+
+    client_key, client_secret, redirect_uri = _tiktok_config()
+    if not client_key or not client_secret or not redirect_uri:
+        return JSONResponse({"error": "TikTok OAuth is not configured"}, status_code=500)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    company_id = ""
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT company_id FROM v2_tiktok_oauth_states WHERE state = %s",
+                (state,),
+            )
+            row = cur.fetchone()
+            if row:
+                company_id = (row.get("company_id") or "").strip()
+            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE state = %s", (state,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    if not company_id:
+        return JSONResponse({"error": "Invalid state"}, status_code=400)
+
+    # Exchange code -> access token
+    token_url = "https://open.tiktokapis.com/v2/oauth/token/"
+    try:
+        token_data = _http_post_form_json(
+            token_url,
+            {
+                "client_key": client_key,
+                "client_secret": client_secret,
+                "code": urllib.parse.unquote(code),
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri,
+            },
+        )
+    except Exception as e:
+        print("TIKTOK TOKEN EXCHANGE ERROR:", str(e))
+        return JSONResponse({"error": "TikTok token exchange error"}, status_code=500)
+
+    access_token = (token_data.get("access_token") or "").strip()
+    refresh_token = (token_data.get("refresh_token") or "").strip()
+    open_id = (token_data.get("open_id") or "").strip()
+    scope = (token_data.get("scope") or "").strip()
+    expires_in = token_data.get("expires_in")
+    refresh_expires_in = token_data.get("refresh_expires_in")
+
+    if not access_token or not open_id:
+        detail = {
+            "error": token_data.get("error"),
+            "error_description": token_data.get("error_description"),
+            "log_id": token_data.get("log_id"),
+        }
+        return JSONResponse(
+            {"error": "TikTok token exchange failed", "detail": detail},
+            status_code=500,
+        )
+
+    expires_at = ""
+    refresh_expires_at = ""
+    try:
+        if expires_in is not None:
+            expires_at = (datetime.utcnow() + timedelta(seconds=int(expires_in))).isoformat() + "Z"
+        if refresh_expires_in is not None:
+            refresh_expires_at = (datetime.utcnow() + timedelta(seconds=int(refresh_expires_in))).isoformat() + "Z"
+    except Exception:
+        expires_at = ""
+        refresh_expires_at = ""
+
+    # Fetch basic user info (display name)
+    display_name = "TikTok Account"
+    try:
+        user_info_url = "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url"
+        req = urllib.request.Request(
+            user_info_url,
+            method="GET",
+            headers={"User-Agent": "AI-FLOW/1.0", "Authorization": f"Bearer {access_token}"},
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            user_data = json.loads(raw)
+            data_obj = user_data.get("data") or {}
+            user_obj = data_obj.get("user") or {}
+            display_name = (user_obj.get("display_name") or "").strip() or display_name
+    except Exception as e:
+        print("TIKTOK USER INFO ERROR:", str(e))
+
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            # Save account info
+            cur.execute(
+                "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s",
+                (company_id, "TikTok"),
+            )
+            cur.execute(
+                """
+                INSERT INTO v2_social_accounts (company_id, platform, status, account_name, account_id, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (company_id, "TikTok", "connected", display_name, open_id, now, now),
+            )
+
+            # Save tokens (server-side only)
+            cur.execute(
+                """
+                INSERT INTO v2_social_tokens (company_id, provider, platform, account_id, access_token, token_expires_at, refresh_token, refresh_expires_at, scope, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (company_id, provider, platform, account_id)
+                DO UPDATE SET
+                    access_token = EXCLUDED.access_token,
+                    token_expires_at = EXCLUDED.token_expires_at,
+                    refresh_token = EXCLUDED.refresh_token,
+                    refresh_expires_at = EXCLUDED.refresh_expires_at,
+                    scope = EXCLUDED.scope,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    company_id,
+                    "tiktok",
+                    "TikTok",
+                    open_id,
+                    access_token,
+                    expires_at,
+                    refresh_token,
+                    refresh_expires_at,
+                    scope,
+                    now,
+                    now,
+                ),
+            )
+
+        conn.commit()
+    except Exception as e:
+        print("TIKTOK CALLBACK DB ERROR:", str(e))
+        return JSONResponse({"error": "TikTok callback save error"}, status_code=500)
+    finally:
+        conn.close()
+
+    return HTMLResponse(
+        """<!doctype html><html><head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;background:#061923;color:#f7fbff;padding:24px;">
+Connected. You can close this tab.
+<script>window.location.href='/social-accounts?tiktok=connected';</script>
+</body></html>"""
+    )
+
+
+@app.get("/api/tiktok/account")
+def tiktok_account(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT platform, status, account_name, account_id, created_at, updated_at
+                FROM v2_social_accounts
+                WHERE company_id = %s
+                AND platform = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (company_id, "TikTok"),
+            )
+            account = cur.fetchone()
+
+        return JSONResponse({"success": True, "account": account})
+    except Exception as e:
+        print("TIKTOK ACCOUNT ERROR:", str(e))
+        return JSONResponse({"error": "TikTok account error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/api/tiktok/disconnect")
+async def tiktok_disconnect(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM v2_social_tokens WHERE company_id = %s AND provider = %s",
+                (company_id, "tiktok"),
+            )
+            cur.execute(
+                "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s",
+                (company_id, "TikTok"),
+            )
+        conn.commit()
+        return JSONResponse({"success": True})
+    except Exception as e:
+        print("TIKTOK DISCONNECT ERROR:", str(e))
+        return JSONResponse({"error": "TikTok disconnect error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+# =========================================================
 # BOOKINGS / CALENDAR
 # =========================================================
 
@@ -1515,6 +1875,569 @@ def social_data(companyId: str = ""):
             status_code=500,
         )
 
+    finally:
+        conn.close()
+
+
+# =========================================================
+# SOCIAL CONTENT AUTOMATION (MVP)
+# =========================================================
+
+_SOCIAL_DRAFT_TYPES_BY_PLATFORM = {
+    "Facebook": ["Facebook post", "AI tip", "AI statistic/fact post"],
+    "Instagram": ["Instagram caption", "Instagram reel idea/script", "AI tip", "AI statistic/fact post"],
+    "TikTok": ["TikTok video idea/script", "AI tip", "AI statistic/fact post"],
+}
+
+
+def _today_utc_date_str():
+    return datetime.utcnow().date().isoformat()
+
+
+def _fallback_social_draft(company_name: str, platform: str, draft_type: str, date_str: str):
+    brand = (company_name or "your business").strip() or "your business"
+    topic = "AI sales automation"
+
+    if draft_type == "Instagram reel idea/script":
+        title = f"{platform} Reel Idea: 3 Ways {topic} Saves Time"
+        hook = "Stop replying manually. Here are 3 quick wins with AI automation."
+        caption = (
+            f"Reel script idea:\n"
+            f"1) Hook: \"Still replying to leads one by one?\"\n"
+            f"2) Show: instant replies + booking link\n"
+            f"3) Proof: faster follow-ups, fewer missed leads\n"
+            f"4) CTA: \"Comment 'FLOW' and we’ll send the setup.\"\n"
+        )
+        hashtags = "#sales #automation #ai #leadgeneration #business"
+        visual = "Vertical reel: screen recording of a lead coming in, AI reply, then booking confirmed."
+        return {
+            "title": title,
+            "caption": caption,
+            "hook": hook,
+            "hashtags": hashtags,
+            "visual_idea": visual,
+        }
+
+    if draft_type in ("TikTok video idea/script",):
+        title = f"TikTok Idea: Instant Lead Reply Demo ({date_str})"
+        hook = "Watch how a lead turns into a booking in under 30 seconds."
+        caption = (
+            "Video script:\n"
+            "1) Show incoming lead message\n"
+            "2) Show AI reply asking 1 question\n"
+            "3) Show booking confirmation\n"
+            "CTA: \"Want this for your business? DM 'AI FLOW'\""
+        )
+        hashtags = "#tiktokmarketing #automation #ai #crm #leadgen"
+        visual = "Vertical screen recording + captions, fast cuts, end with booking calendar."
+        return {
+            "title": title,
+            "caption": caption,
+            "hook": hook,
+            "hashtags": hashtags,
+            "visual_idea": visual,
+        }
+
+    if draft_type == "AI statistic/fact post":
+        title = f"{platform} Fact: Faster Replies Win More Deals"
+        hook = "Fast response time is one of the biggest predictors of conversion."
+        caption = (
+            f"Fact: businesses that respond faster capture more opportunities.\n"
+            f"With AI FLOW, {brand} can reply instantly, qualify, and book calls.\n"
+            f"Want the setup? Reply with your website."
+        )
+        hashtags = "#ai #sales #conversion #leadgeneration #businessgrowth"
+        visual = "Simple chart-style graphic: Response time vs conversion rate."
+        return {
+            "title": title,
+            "caption": caption,
+            "hook": hook,
+            "hashtags": hashtags,
+            "visual_idea": visual,
+        }
+
+    if draft_type == "AI tip":
+        title = f"{platform} Tip: Ask One Clear Question"
+        hook = "One good question beats a long pitch."
+        caption = (
+            "Tip: Keep replies short and ask one clear follow-up question.\n"
+            "Example: \"What’s the best phone number or email to reach you?\""
+        )
+        hashtags = "#aitips #sales #customerexperience #automation"
+        visual = "Minimal dark card graphic with the tip headline + one example question."
+        return {
+            "title": title,
+            "caption": caption,
+            "hook": hook,
+            "hashtags": hashtags,
+            "visual_idea": visual,
+        }
+
+    # Default short post
+    title = f"{platform} Post: {topic} for {brand}"
+    hook = "Reply faster. Capture more leads. Book more appointments."
+    caption = (
+        f"{hook}\n"
+        f"{brand} can automate follow-ups, qualify leads, and fill the calendar with AI.\n"
+        "Want a demo? Send your email and we’ll set it up."
+    )
+    hashtags = "#sales #automation #ai #smallbusiness #agency"
+    visual = "Screenshot-style mock: chat widget + CRM lead captured + booking card."
+    return {"title": title, "caption": caption, "hook": hook, "hashtags": hashtags, "visual_idea": visual}
+
+
+def _generate_social_draft(company_id: str, platform: str, draft_type: str):
+    """
+    Returns dict with keys: title, caption, hook, hashtags, visual_idea.
+    Uses Groq if configured; falls back to deterministic templates.
+    """
+    company_name = ""
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT company_name FROM companies WHERE company_id = %s",
+                    (company_id,),
+                )
+                row = cur.fetchone()
+                company_name = (row.get("company_name") or "").strip() if row else ""
+        except Exception:
+            company_name = ""
+        finally:
+            conn.close()
+
+    date_str = _today_utc_date_str()
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if api_key:
+        try:
+            client = Groq(api_key=api_key.strip())
+            prompt = f"""
+Generate ONE social content draft for AI FLOW client.
+
+Company: {company_name or "Client"}
+Platform: {platform}
+Draft type: {draft_type}
+Date: {date_str}
+
+Return JSON ONLY with keys:
+title, caption, hook, hashtags, visual_idea
+
+Rules:
+- write in English
+- keep it short and clear
+- hashtags should be one string with # tags
+- caption can include short script if type is reel/video
+"""
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=380,
+            )
+            raw = (completion.choices[0].message.content or "").strip()
+            obj = json.loads(raw)
+            return {
+                "title": str(obj.get("title") or "").strip(),
+                "caption": str(obj.get("caption") or "").strip(),
+                "hook": str(obj.get("hook") or "").strip(),
+                "hashtags": str(obj.get("hashtags") or "").strip(),
+                "visual_idea": str(obj.get("visual_idea") or "").strip(),
+            }
+        except Exception as e:
+            print("SOCIAL DRAFT GROQ ERROR:", str(e))
+
+    return _fallback_social_draft(company_name, platform, draft_type, date_str)
+
+
+def _ensure_daily_social_drafts(company_id: str):
+    """Create at least 1 draft per day; we generate 1 per platform for a better MVP experience."""
+    today = _today_utc_date_str()
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return False, "Database error"
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM v2_social_content_drafts
+                WHERE company_id = %s AND content_date = %s
+                """,
+                (company_id, today),
+            )
+            count = cur.fetchone()[0] or 0
+
+        if int(count) > 0:
+            return True, ""
+
+        # Create 3 drafts (FB/IG/TikTok) for today.
+        platforms = ["Facebook", "Instagram", "TikTok"]
+        for platform in platforms:
+            types = _SOCIAL_DRAFT_TYPES_BY_PLATFORM.get(platform) or ["AI tip"]
+            # Deterministic pick per day/platform.
+            idx = (int(today.replace("-", "")) + len(platform)) % len(types)
+            draft_type = types[idx]
+            draft = _generate_social_draft(company_id, platform, draft_type)
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO v2_social_content_drafts (
+                        company_id, content_date, platform, draft_type,
+                        title, caption, hook, hashtags, visual_idea,
+                        status, publish_message, created_at, updated_at
+                    )
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        company_id,
+                        today,
+                        platform,
+                        draft_type,
+                        draft.get("title") or "",
+                        draft.get("caption") or "",
+                        draft.get("hook") or "",
+                        draft.get("hashtags") or "",
+                        draft.get("visual_idea") or "",
+                        "draft",
+                        "",
+                        now,
+                        now,
+                    ),
+                )
+
+        conn.commit()
+        return True, ""
+    except Exception as e:
+        print("ENSURE DAILY SOCIAL DRAFTS ERROR:", str(e))
+        return False, "Social draft generation error"
+    finally:
+        conn.close()
+
+
+@app.get("/social-content-data")
+def social_content_data(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    ok, err = _ensure_daily_social_drafts(company_id)
+    if not ok:
+        return JSONResponse({"error": err or "Social content error"}, status_code=500)
+
+    today = _today_utc_date_str()
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_social_content_drafts
+                WHERE company_id = %s AND content_date = %s
+                ORDER BY id DESC
+                """,
+                (company_id, today),
+            )
+            today_drafts = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_social_content_drafts
+                WHERE company_id = %s
+                ORDER BY id DESC
+                LIMIT 60
+                """,
+                (company_id,),
+            )
+            history = cur.fetchall()
+
+        return JSONResponse(
+            {"success": True, "today": today, "drafts": today_drafts, "history": history}
+        )
+    except Exception as e:
+        print("SOCIAL CONTENT DATA ERROR:", str(e))
+        return JSONResponse({"error": "Social content data error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/social-content/regenerate")
+async def social_content_regenerate(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    draft_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    try:
+        draft_id_int = int(draft_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT platform, draft_type
+                FROM v2_social_content_drafts
+                WHERE company_id = %s AND id = %s
+                """,
+                (company_id, draft_id_int),
+            )
+            row = cur.fetchone()
+            if not row:
+                return JSONResponse({"error": "Draft not found"}, status_code=404)
+
+        platform = row.get("platform") or "Instagram"
+        draft_type = row.get("draft_type") or "Instagram caption"
+        draft = _generate_social_draft(company_id, platform, draft_type)
+        now = datetime.utcnow().isoformat() + "Z"
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE v2_social_content_drafts
+                SET title=%s, caption=%s, hook=%s, hashtags=%s, visual_idea=%s,
+                    status=%s, publish_message=%s, updated_at=%s
+                WHERE company_id=%s AND id=%s
+                """,
+                (
+                    draft.get("title") or "",
+                    draft.get("caption") or "",
+                    draft.get("hook") or "",
+                    draft.get("hashtags") or "",
+                    draft.get("visual_idea") or "",
+                    "draft",
+                    "",
+                    now,
+                    company_id,
+                    draft_id_int,
+                ),
+            )
+
+            if cur.rowcount == 0:
+                return JSONResponse({"error": "Draft not found"}, status_code=404)
+
+        conn.commit()
+        return JSONResponse({"success": True})
+    except Exception as e:
+        print("SOCIAL CONTENT REGENERATE ERROR:", str(e))
+        return JSONResponse({"error": "Regenerate error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/social-content/update")
+async def social_content_update(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    draft_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    try:
+        draft_id_int = int(draft_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    fields_map = {
+        "title": "title",
+        "caption": "caption",
+        "hook": "hook",
+        "hashtags": "hashtags",
+        "visualIdea": "visual_idea",
+    }
+
+    updates = []
+    values = []
+    for k, col in fields_map.items():
+        if k in data and data.get(k) is not None:
+            updates.append(f"{col} = %s")
+            values.append(str(data.get(k)).strip())
+
+    if not updates:
+        return JSONResponse({"error": "No fields to update"}, status_code=400)
+
+    now = datetime.utcnow().isoformat() + "Z"
+    updates.append("updated_at = %s")
+    values.append(now)
+    values.extend([company_id, draft_id_int])
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE v2_social_content_drafts
+                SET {", ".join(updates)}
+                WHERE company_id = %s AND id = %s
+                """,
+                tuple(values),
+            )
+            if cur.rowcount == 0:
+                return JSONResponse({"error": "Draft not found"}, status_code=404)
+
+        conn.commit()
+        return JSONResponse({"success": True})
+    except Exception as e:
+        print("SOCIAL CONTENT UPDATE ERROR:", str(e))
+        return JSONResponse({"error": "Update error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/social-content/status")
+async def social_content_status(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    draft_id = data.get("id")
+    status = (data.get("status") or "").strip()
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    try:
+        draft_id_int = int(draft_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    allowed = {"draft", "approved", "posted", "failed"}
+    if status not in allowed:
+        return JSONResponse({"error": "Invalid status"}, status_code=400)
+
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE v2_social_content_drafts
+                SET status = %s, updated_at = %s
+                WHERE company_id = %s AND id = %s
+                """,
+                (status, now, company_id, draft_id_int),
+            )
+            if cur.rowcount == 0:
+                return JSONResponse({"error": "Draft not found"}, status_code=404)
+
+        conn.commit()
+        return JSONResponse({"success": True})
+    except Exception as e:
+        print("SOCIAL CONTENT STATUS ERROR:", str(e))
+        return JSONResponse({"error": "Status update error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/social-content/publish")
+async def social_content_publish(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    draft_id = data.get("id")
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    try:
+        draft_id_int = int(draft_id)
+    except Exception:
+        return JSONResponse({"error": "Invalid id"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, platform, status, caption
+                FROM v2_social_content_drafts
+                WHERE company_id = %s AND id = %s
+                """,
+                (company_id, draft_id_int),
+            )
+            draft = cur.fetchone()
+            if not draft:
+                return JSONResponse({"error": "Draft not found"}, status_code=404)
+
+            if (draft.get("status") or "") != "approved":
+                return JSONResponse({"error": "Approve the draft before publishing"}, status_code=400)
+
+            platform = (draft.get("platform") or "").strip() or "Instagram"
+
+            # Check if we have tokens for this platform/provider.
+            provider = "meta" if platform in ("Facebook", "Instagram") else "tiktok"
+            cur.execute(
+                """
+                SELECT platform, scope
+                FROM v2_social_tokens
+                WHERE company_id = %s AND provider = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (company_id, provider),
+            )
+            token_row = cur.fetchone()
+
+        # For MVP we do NOT auto-publish without proper permissions and review.
+        if not token_row:
+            return JSONResponse(
+                {
+                    "error": f"{platform} is not connected. Connect your account before publishing.",
+                },
+                status_code=400,
+            )
+
+        if provider == "meta":
+            return JSONResponse(
+                {
+                    "error": "Meta publishing is not enabled in this MVP connection.",
+                    "detail": "To publish to Facebook/Instagram via API you typically need pages_manage_posts / instagram_content_publish permissions.",
+                },
+                status_code=400,
+            )
+
+        # TikTok publishing requires Content Posting API approval and scopes.
+        scope = (token_row.get("scope") or "").strip()
+        if "video.publish" not in scope and "video.upload" not in scope:
+            return JSONResponse(
+                {
+                    "error": "TikTok publishing permission is missing.",
+                    "detail": "This connection has basic scopes only. Enable Content Posting API scopes (video.upload/video.publish) in TikTok Developer Portal and complete review/audit.",
+                },
+                status_code=400,
+            )
+
+        return JSONResponse(
+            {
+                "error": "TikTok publishing is not enabled in this MVP build yet.",
+                "detail": "Draft stays approved. Implementing actual media upload/publish requires video files and Content Posting API flow.",
+            },
+            status_code=400,
+        )
+
+    except Exception as e:
+        print("SOCIAL CONTENT PUBLISH ERROR:", str(e))
+        return JSONResponse({"error": "Publish error"}, status_code=500)
     finally:
         conn.close()
 

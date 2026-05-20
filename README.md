@@ -26,3 +26,32 @@ Notes:
 - Access tokens are stored server-side in PostgreSQL (not exposed to the browser).
 - Disconnect removes Meta tokens and connected Meta accounts for that company.
 
+## TikTok OAuth Setup (MVP)
+
+AI FLOW supports connecting a TikTok account (basic connect + account display).
+
+### Required Environment Variables (Render)
+
+- `TIKTOK_CLIENT_KEY`
+- `TIKTOK_CLIENT_SECRET`
+- `TIKTOK_REDIRECT_URI`
+
+`TIKTOK_REDIRECT_URI` must point to the deployed callback endpoint:
+
+`https://<your-render-domain>/api/tiktok/callback`
+
+Notes:
+- Tokens are stored server-side in PostgreSQL (`v2_social_tokens`), not exposed to the browser.
+- For publishing to TikTok via API you typically need Content Posting API access and scopes like `video.upload` / `video.publish` (requires TikTok review/audit). The MVP connect flow requests only `user.info.basic`.
+
+## Social Content Automation (Daily Drafts)
+
+The dashboard auto-generates daily social content drafts for:
+- Facebook
+- Instagram
+- TikTok
+
+How it works (MVP):
+- Drafts are stored in PostgreSQL (`v2_social_content_drafts`).
+- When the dashboard loads, it calls `/social-content-data?companyId=...` which ensures at least one draft exists for the current UTC day (the MVP generates one per platform).
+- Drafts start as `draft`, can be `approved`, and publishing is blocked unless the necessary platform permissions/scopes are configured.

@@ -296,6 +296,89 @@ td{
   font-weight:800;
 }
 
+.draft-card{
+  background:var(--panel2);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:26px;
+  padding:18px;
+  margin-bottom:14px;
+  backdrop-filter: blur(18px);
+}
+
+.draft-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.draft-card h3{
+  font-size:16px;
+  margin-bottom:6px;
+}
+
+.draft-meta{
+  margin-top:8px;
+  font-size:12px;
+  color:var(--muted);
+  font-weight:800;
+}
+
+.draft-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+
+.mini-btn{
+  padding:10px 12px;
+  border-radius:12px;
+  font-weight:900;
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  cursor:pointer;
+  transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.mini-btn:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,255,255,0.18);
+  box-shadow:var(--shadowSm);
+}
+.mini-btn:active{transform:translateY(0)}
+.mini-primary{
+  border:0;
+  color:#071820;
+  background:linear-gradient(135deg, rgba(184,255,122,0.98) 0%, rgba(65,220,255,0.72) 100%);
+}
+.mini-danger{
+  border-color:rgba(255,120,120,0.28);
+  background:rgba(255,120,120,0.10);
+  color:#ffd5d5;
+}
+
+.edit-area{
+  margin-top:12px;
+  display:none;
+}
+.edit-area textarea{
+  width:100%;
+  min-height:120px;
+  resize:vertical;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;
+  padding:12px 14px;
+  color:var(--text);
+  outline:none;
+}
+.edit-area textarea:focus{
+  border-color:rgba(184,255,122,0.36);
+  box-shadow:0 0 0 3px rgba(184,255,122,0.10);
+}
+
 .empty{
   color:var(--muted);
   line-height:1.5;
@@ -457,6 +540,24 @@ td{
 
     </div>
 
+    <div class="box" style="margin-top:24px;">
+      <h2>Social Content Automation</h2>
+      <div style="color:var(--muted);margin-top:-8px;margin-bottom:16px;">
+        Daily drafts for Facebook, Instagram, and TikTok. Approve before publishing.
+      </div>
+
+      <div id="socialDraftsToday">
+        <div class="empty">Loading today&apos;s drafts...</div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <div style="font-size:16px;font-weight:900;margin-bottom:10px;">Content History</div>
+        <div id="socialDraftHistory">
+          <div class="empty">Loading content history...</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -537,6 +638,7 @@ async function loadDashboardData() {
 
     renderLeads(leads);
     renderPosts(data.posts || []);
+    loadSocialContent();
 
     setMessage("Dashboard updated.");
 
@@ -595,6 +697,200 @@ function renderPosts(posts) {
 
     body.appendChild(div);
   });
+}
+
+function esc(s){
+  return String(s || "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll("\"","&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function toggleEdit(id){
+  const box = document.getElementById("edit_" + id);
+  if(!box) return;
+  box.style.display = (box.style.display === "block") ? "none" : "block";
+}
+
+async function saveDraftEdit(id){
+  const ta = document.getElementById("editText_" + id);
+  if(!ta) return;
+  const caption = ta.value || "";
+  setMessage("Saving draft...");
+  try{
+    const res = await fetch("/social-content/update",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, id, caption})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMessage(data.error || "Save error.");
+      return;
+    }
+    setMessage("Draft saved.");
+    loadSocialContent();
+  }catch(e){
+    setMessage("Connection error saving draft.");
+  }
+}
+
+async function setDraftStatus(id, status){
+  setMessage("Updating draft...");
+  try{
+    const res = await fetch("/social-content/status",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, id, status})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMessage(data.error || "Status update error.");
+      return;
+    }
+    setMessage("Draft updated.");
+    loadSocialContent();
+  }catch(e){
+    setMessage("Connection error updating draft.");
+  }
+}
+
+async function regenerateDraft(id){
+  setMessage("Regenerating draft...");
+  try{
+    const res = await fetch("/social-content/regenerate",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, id})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMessage(data.error || "Regenerate error.");
+      return;
+    }
+    setMessage("Draft regenerated.");
+    loadSocialContent();
+  }catch(e){
+    setMessage("Connection error regenerating draft.");
+  }
+}
+
+async function publishDraft(id){
+  setMessage("Publishing draft...");
+  try{
+    const res = await fetch("/social-content/publish",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, id})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      const msg = (data && (data.error || data.detail)) ? (data.error + (data.detail ? " — " + data.detail : "")) : "Publish error.";
+      setMessage(msg);
+      return;
+    }
+    setMessage("Published.");
+    loadSocialContent();
+  }catch(e){
+    setMessage("Connection error publishing draft.");
+  }
+}
+
+function renderSocialDraftsToday(drafts){
+  const el = document.getElementById("socialDraftsToday");
+  if(!el) return;
+  if(!drafts || !drafts.length){
+    el.innerHTML = '<div class="empty">No drafts for today yet.</div>';
+    return;
+  }
+
+  el.innerHTML = "";
+  drafts.slice(0, 6).forEach(d => {
+    const id = d.id;
+    const status = cleanStatus(d.status);
+    const div = document.createElement("div");
+    div.className = "draft-card";
+    div.innerHTML = `
+      <div class="draft-header">
+        <div style="min-width:260px;flex:1;">
+          <h3>${esc(d.title || "Untitled Draft")}</h3>
+          <div class="draft-meta">
+            ${esc(d.platform || "")} · ${esc(d.draft_type || "")} ·
+            <span class="status ${statusClass(status)}">${esc(status)}</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px;color:var(--muted);white-space:pre-wrap;">${esc(d.hook || "")}</div>
+      <div style="margin-top:10px;white-space:pre-wrap;">${esc(d.caption || "")}</div>
+      <div style="margin-top:10px;color:#c8f9ff;font-weight:800;">${esc(d.hashtags || "")}</div>
+      <div style="margin-top:10px;color:var(--muted);">Suggested visual: ${esc(d.visual_idea || "")}</div>
+
+      <div class="draft-actions">
+        <button class="mini-btn" onclick="regenerateDraft(${id})">Regenerate</button>
+        <button class="mini-btn" onclick="toggleEdit(${id})">Edit</button>
+        <button class="mini-btn mini-primary" onclick="setDraftStatus(${id}, 'approved')">Approve</button>
+        <button class="mini-btn" onclick="publishDraft(${id})">Publish</button>
+      </div>
+
+      <div class="edit-area" id="edit_${id}">
+        <div style="font-weight:900;margin-bottom:10px;">Edit Caption</div>
+        <textarea id="editText_${id}">${esc(d.caption || "")}</textarea>
+        <div class="draft-actions">
+          <button class="mini-btn mini-primary" onclick="saveDraftEdit(${id})">Save</button>
+          <button class="mini-btn" onclick="toggleEdit(${id})">Cancel</button>
+        </div>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function renderSocialDraftHistory(history){
+  const el = document.getElementById("socialDraftHistory");
+  if(!el) return;
+  if(!history || !history.length){
+    el.innerHTML = '<div class="empty">No content history yet.</div>';
+    return;
+  }
+  const items = history.slice(0, 12).map(d => {
+    const status = cleanStatus(d.status);
+    return `
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid rgba(255,255,255,0.08);">
+        <div style="min-width:240px;flex:1;">
+          <div style="font-weight:900;">${esc(d.title || "Untitled")}</div>
+          <div style="color:var(--muted);font-size:12px;font-weight:800;margin-top:4px;">
+            ${esc(d.content_date || "")} · ${esc(d.platform || "")} · ${esc(d.draft_type || "")}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="status ${statusClass(status)}">${esc(status)}</span>
+          <button class="mini-btn" onclick="setDraftStatus(${d.id}, 'draft')">Draft</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+  el.innerHTML = `<div>${items}</div>`;
+}
+
+async function loadSocialContent(){
+  try{
+    const res = await fetch("/social-content-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+    if(!res.ok || data.error){
+      const el1 = document.getElementById("socialDraftsToday");
+      const el2 = document.getElementById("socialDraftHistory");
+      if(el1) el1.innerHTML = '<div class="empty">' + esc(data.error || "Social content error.") + '</div>';
+      if(el2) el2.innerHTML = '<div class="empty"></div>';
+      return;
+    }
+    renderSocialDraftsToday(data.drafts || []);
+    renderSocialDraftHistory(data.history || []);
+  }catch(e){
+    const el1 = document.getElementById("socialDraftsToday");
+    if(el1) el1.innerHTML = '<div class="empty">Connection error loading social drafts.</div>';
+  }
 }
 
 async function loadDemoData() {
