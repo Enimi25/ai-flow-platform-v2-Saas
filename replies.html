@@ -8,23 +8,25 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#050816;
-  --bg2:#070b1d;
-  --sidebarA:#0b1023;
-  --panel:#0f172a;
-  --panel2:#111936;
-  --text:#ffffff;
-  --muted:#94a3b8;
-  --border:rgba(255,255,255,.08);
-  --accent:#4ade80;
-  --accent2:#22c55e;
-  --shadow:0 14px 40px rgba(0,0,0,.35);
-  --shadowSm:0 8px 22px rgba(0,0,0,.28);
+  --bg:#061923;
+  --bg2:#040f16;
+  --sidebarA:rgba(6, 25, 35, 0.92);
+  --panel:rgba(255,255,255,0.06);
+  --panel2:rgba(255,255,255,0.04);
+  --text:#f7fbff;
+  --muted:#9fb7c3;
+  --border:rgba(255,255,255,0.12);
+  --border2:rgba(255,255,255,0.08);
+  --accent:#b8ff7a;
+  --accent2:#41dcff;
+  --shadow:0 30px 80px rgba(0,0,0,.16);
+  --shadowSm:0 18px 50px rgba(0,0,0,.18);
 }
 body{
   background:
-    radial-gradient(1200px 800px at 18% -10%, rgba(74,222,128,.12), transparent 55%),
-    radial-gradient(900px 700px at 110% 10%, rgba(96,165,250,.10), transparent 55%),
+    radial-gradient(980px 720px at 14% -10%, rgba(184,255,122,0.18), transparent 58%),
+    radial-gradient(900px 700px at 110% 10%, rgba(65,220,255,0.14), transparent 55%),
+    radial-gradient(760px 640px at 70% 120%, rgba(139,92,246,0.10), transparent 58%),
     var(--bg);
   color:var(--text);
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
@@ -34,7 +36,8 @@ body{
 }
 .sidebar{
   width:260px;
-  background:linear-gradient(180deg, var(--sidebarA) 0%, var(--bg2) 100%);
+  background:linear-gradient(180deg, rgba(6, 25, 35, 0.92) 0%, rgba(4, 15, 22, 0.98) 100%);
+  backdrop-filter: blur(18px);
   border-right:1px solid var(--border);
   padding:26px 18px;
   height:100vh;
@@ -57,7 +60,7 @@ body{
 }
 .menu a{
   text-decoration:none;
-  color:#cbd5e1;
+  color:#d7e6eb;
   padding:12px 12px;
   border-radius:14px;
   font-size:14px;
@@ -66,16 +69,16 @@ body{
   transition:background .15s ease,color .15s ease,border-color .15s ease,transform .12s ease;
 }
 .menu a:hover{
-  background:rgba(255,255,255,.06);
-  border-color:rgba(255,255,255,.08);
-  color:white;
+  background:rgba(255,255,255,0.06);
+  border-color:rgba(255,255,255,0.12);
+  color:var(--text);
 }
 .menu .active{
-  background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
-  color:#03140a;
+  background:linear-gradient(135deg, rgba(184,255,122,0.95) 0%, rgba(65,220,255,0.72) 100%);
+  color:#071820;
   font-weight:900;
   border-color:rgba(0,0,0,.12);
-  box-shadow:0 10px 24px rgba(34,197,94,.18);
+  box-shadow:0 20px 60px rgba(184,255,122,0.16);
 }
 .main{
   flex:1;
@@ -109,9 +112,9 @@ h1{
   gap:14px;
 }
 .logout{
-  background:rgba(30,41,59,.70);
-  color:white;
-  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.12);
   border-radius:12px;
   padding:10px 14px;
   cursor:pointer;
@@ -120,7 +123,7 @@ h1{
 }
 .logout:hover{
   transform:translateY(-1px);
-  border-color:rgba(255,255,255,.16);
+  border-color:rgba(255,255,255,0.18);
   box-shadow:var(--shadowSm);
 }
 .logout:active{transform:translateY(0)}
@@ -131,11 +134,12 @@ h1{
   gap:24px;
 }
 .card{
-  background:linear-gradient(180deg, rgba(15,23,42,.96) 0%, rgba(15,23,42,.88) 100%);
-  border:1px solid rgba(255,255,255,.06);
-  border-radius:20px;
+  background:var(--panel);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:30px;
   padding:22px;
   box-shadow:var(--shadow);
+  backdrop-filter: blur(18px);
 }
 .card h2{margin-bottom:16px}
 
@@ -148,9 +152,9 @@ label{
 }
 input, textarea, select{
   width:100%;
-  background:rgba(2,6,23,.92);
-  color:white;
-  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.12);
   border-radius:14px;
   padding:12px 14px;
   outline:none;
@@ -158,8 +162,8 @@ input, textarea, select{
   transition:border-color .15s ease, box-shadow .15s ease;
 }
 input:focus, textarea:focus, select:focus{
-  border-color:rgba(74,222,128,.35);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(74,222,128,.12);
+  border-color:rgba(184,255,122,0.36);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(184,255,122,0.12);
 }
 textarea{min-height:120px; resize:vertical}
 
@@ -179,14 +183,14 @@ button{
   transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
 }
 .green{
-  background:linear-gradient(180deg, var(--accent) 0%, var(--accent2) 100%);
-  color:#03140a;
-  box-shadow:0 10px 24px rgba(34,197,94,.18);
+  background:linear-gradient(135deg, rgba(184,255,122,0.98) 0%, rgba(65,220,255,0.72) 100%);
+  color:#071820;
+  box-shadow:0 22px 70px rgba(184,255,122,0.14);
 }
 .dark{
-  background:rgba(30,41,59,.72);
-  color:white;
-  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.12);
   box-shadow:none;
 }
 .danger{
@@ -195,8 +199,8 @@ button{
   border:1px solid rgba(255,255,255,.10);
   box-shadow:none;
 }
-.green:hover{transform:translateY(-1px); box-shadow:0 14px 34px rgba(34,197,94,.22)}
-.dark:hover,.danger:hover{transform:translateY(-1px); border-color:rgba(255,255,255,.16); box-shadow:var(--shadowSm)}
+.green:hover{transform:translateY(-1px); box-shadow:0 26px 70px rgba(184,255,122,0.18)}
+.dark:hover,.danger:hover{transform:translateY(-1px); border-color:rgba(255,255,255,0.18); box-shadow:var(--shadowSm)}
 .green:active,.dark:active,.danger:active{transform:translateY(0)}
 
 .msg{
@@ -215,9 +219,9 @@ button{
 .count{
   padding:6px 10px;
   border-radius:999px;
-  background:rgba(30,41,59,.72);
-  border:1px solid rgba(255,255,255,.10);
-  color:#cbd5e1;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  color:#d7e6eb;
   font-weight:900;
   font-size:12px;
 }
@@ -229,12 +233,13 @@ button{
 }
 
 .reply-card{
-  background:rgba(17,25,54,.70);
-  border:1px solid rgba(255,255,255,.06);
-  border-radius:18px;
+  background:var(--panel2);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:26px;
   padding:16px;
   margin-bottom:14px;
-  box-shadow:0 10px 26px rgba(0,0,0,.22);
+  box-shadow:0 30px 80px rgba(0,0,0,.16);
+  backdrop-filter: blur(18px);
 }
 .reply-top{
   display:flex;
