@@ -2369,7 +2369,7 @@ async def social_content_publish(request: Request):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT id, platform, status, caption
+                SELECT id, platform, status, caption, hashtags
                 FROM v2_social_content_drafts
                 WHERE company_id = %s AND id = %s
                 """,
@@ -2384,56 +2384,172 @@ async def social_content_publish(request: Request):
 
             platform = (draft.get("platform") or "").strip() or "Instagram"
 
-            # Check if we have tokens for this platform/provider.
-            provider = "meta" if platform in ("Facebook", "Instagram") else "tiktok"
-            cur.execute(
-                """
-                SELECT platform, scope
-                FROM v2_social_tokens
-                WHERE company_id = %s AND provider = %s
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (company_id, provider),
-            )
-            token_row = cur.fetchone()
+        # Facebook: attempt a simple text post to the most recently connected Page.
+        if platform == "Facebook":
+            conn2 = get_db_connection()
+            if not conn2:
+                return JSONResponse({"error": "Database error"}, status_code=500)
+            try:
+                with conn2.cursor(cursor_factory=RealDictCursor) as cur2:
+                    cur2.execute(
+                        """
+                        SELECT account_id
+                        FROM v2_social_accounts
+                        WHERE company_id = %s AND platform = 'Facebook'
+                        ORDER BY id DESC
+                        LIMIT 1
+                        """,
+                        (company_id,),
+                    )
+                    row = cur2.fetchone()
+                    page_id = (row.get("account_id") or "").strip() if row else ""
+                    if not page_id:
+                        return JSONResponse(
+                            {"error": "Facebook Page is not connected. Connect Meta first."},
+                            status_code=400,
+                        )
 
-        # For MVP we do NOT auto-publish without proper permissions and review.
-        if not token_row:
+                    cur2.execute(
+                        """
+                        SELECT access_token
+                        FROM v2_social_tokens
+                        WHERE company_id = %s AND provider = %s AND platform = %s AND account_id = %s
+                        ORDER BY id DESC
+                        LIMIT 1
+                        """,
+                        (company_id, "meta", "Facebook", page_id),
+                    )
+                    tok = cur2.fetchone()
+                    page_token = (tok.get("access_token") or "").strip() if tok else ""
+                    if not page_token:
+                        return JSONResponse(
+                            {"error": "Facebook token missing. Reconnect Meta to refresh tokens."},
+                            status_code=400,
+                        )
+            finally:
+                conn2.close()
+
+            message = (draft.get("caption") or "").strip()
+            tags = (draft.get("hashtags") or "").strip()
+            if tags:
+                message = (message + "\n\n" + tags).strip()
+
+            publish_url = f"https://graph.facebook.com/v20.0/{page_id}/feed"
+            try:
+                resp = _http_post_form_json(
+                    publish_url,
+                    {"message": message, "access_token": page_token},
+                    timeout_sec=25,
+                )
+            except Exception as e:
+                print("FACEBOOK PUBLISH HTTP ERROR:", str(e))
+                return JSONResponse({"error": "Facebook publish error"}, status_code=500)
+
+            if resp.get("error"):
+                # Keep draft approved; store error message for debugging.
+                err_obj = resp.get("error") or {}
+                msg = (err_obj.get("message") or "Facebook publish failed").strip()
+                now = datetime.utcnow().isoformat() + "Z"
+                try:
+                    conn3 = get_db_connection()
+                    if conn3:
+                        with conn3.cursor() as cur3:
+                            cur3.execute(
+                                """
+                                UPDATE v2_social_content_drafts
+                                SET publish_message = %s, updated_at = %s
+                                WHERE company_id = %s AND id = %s
+                                """,
+                                (msg[:400], now, company_id, draft_id_int),
+                            )
+                        conn3.commit()
+                finally:
+                    if "conn3" in locals() and conn3:
+                        conn3.close()
+                return JSONResponse(
+                    {
+                        "error": "Facebook publish failed",
+                        "detail": msg,
+                    },
+                    status_code=400,
+                )
+
+            post_id = (resp.get("id") or "").strip()
+            if not post_id:
+                return JSONResponse({"error": "Facebook publish returned no post id"}, status_code=500)
+
+            now = datetime.utcnow().isoformat() + "Z"
+            conn4 = get_db_connection()
+            if not conn4:
+                return JSONResponse({"error": "Database error"}, status_code=500)
+            try:
+                with conn4.cursor() as cur4:
+                    cur4.execute(
+                        """
+                        UPDATE v2_social_content_drafts
+                        SET status = %s, publish_message = %s, updated_at = %s
+                        WHERE company_id = %s AND id = %s
+                        """,
+                        ("posted", f"Facebook post id: {post_id}", now, company_id, draft_id_int),
+                    )
+                conn4.commit()
+            finally:
+                conn4.close()
+
+            return JSONResponse({"success": True, "platform": "Facebook", "postId": post_id})
+
+        # Instagram: would require instagram_content_publish + media container flow.
+        if platform == "Instagram":
             return JSONResponse(
                 {
-                    "error": f"{platform} is not connected. Connect your account before publishing.",
+                    "error": "Instagram publishing is not enabled in this MVP build yet.",
+                    "detail": "Instagram publishing requires Meta Instagram Graph API publishing flow and instagram_content_publish permission.",
                 },
                 status_code=400,
             )
 
-        if provider == "meta":
+        # TikTok: requires Content Posting API scopes and a real video upload/publish flow.
+        if platform == "TikTok":
+            # Check token + scopes for clearer messaging.
+            conn2 = get_db_connection()
+            scope = ""
+            try:
+                if conn2:
+                    with conn2.cursor(cursor_factory=RealDictCursor) as cur2:
+                        cur2.execute(
+                            """
+                            SELECT scope
+                            FROM v2_social_tokens
+                            WHERE company_id = %s AND provider = %s
+                            ORDER BY id DESC
+                            LIMIT 1
+                            """,
+                            (company_id, "tiktok"),
+                        )
+                        row = cur2.fetchone()
+                        scope = (row.get("scope") or "").strip() if row else ""
+            finally:
+                if conn2:
+                    conn2.close()
+
+            if "video.publish" not in scope and "video.upload" not in scope:
+                return JSONResponse(
+                    {
+                        "error": "TikTok publishing permission is missing.",
+                        "detail": "Enable Content Posting API scopes (video.upload/video.publish) in TikTok Developer Portal and complete review/audit.",
+                    },
+                    status_code=400,
+                )
+
             return JSONResponse(
                 {
-                    "error": "Meta publishing is not enabled in this MVP connection.",
-                    "detail": "To publish to Facebook/Instagram via API you typically need pages_manage_posts / instagram_content_publish permissions.",
+                    "error": "TikTok publishing is not enabled in this MVP build yet.",
+                    "detail": "Implementing real TikTok publishing requires video files and the Content Posting API media transfer flow.",
                 },
                 status_code=400,
             )
 
-        # TikTok publishing requires Content Posting API approval and scopes.
-        scope = (token_row.get("scope") or "").strip()
-        if "video.publish" not in scope and "video.upload" not in scope:
-            return JSONResponse(
-                {
-                    "error": "TikTok publishing permission is missing.",
-                    "detail": "This connection has basic scopes only. Enable Content Posting API scopes (video.upload/video.publish) in TikTok Developer Portal and complete review/audit.",
-                },
-                status_code=400,
-            )
-
-        return JSONResponse(
-            {
-                "error": "TikTok publishing is not enabled in this MVP build yet.",
-                "detail": "Draft stays approved. Implementing actual media upload/publish requires video files and Content Posting API flow.",
-            },
-            status_code=400,
-        )
+        return JSONResponse({"error": "Unsupported platform"}, status_code=400)
 
     except Exception as e:
         print("SOCIAL CONTENT PUBLISH ERROR:", str(e))
