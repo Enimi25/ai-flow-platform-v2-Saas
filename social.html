@@ -484,6 +484,10 @@ button:active{transform:translateY(0)}
 
   </div>
 
+  <div class="note" id="connectedAccounts" style="display:none;margin-top:18px;">
+    Connected accounts will appear here.
+  </div>
+
   <div class="note" id="msg">
 
     Loading social accounts...
@@ -522,6 +526,18 @@ function setMsg(text){
 
   document.getElementById("msg").innerText = text;
 
+}
+
+function setConnectedHtml(html){
+  const box = document.getElementById("connectedAccounts");
+  if(!box) return;
+  if(!html){
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  box.style.display = "block";
+  box.innerHTML = html;
 }
 
 function copyWidget(){
@@ -578,6 +594,45 @@ async function loadSocialData(){
 
     });
 
+    // Load Meta connected Pages / Instagram accounts (if configured).
+    try{
+      const res2 = await fetch("/api/meta/accounts?companyId=" + encodeURIComponent(companyId));
+      const data2 = await res2.json();
+      if(res2.ok && data2 && data2.success){
+        const pages = data2.pages || [];
+        const instas = data2.instagrams || [];
+        if(pages.length || instas.length){
+          const pageItems = pages.map(p => `<li><strong>${esc(p.account_name || "Facebook Page")}</strong> <span style="opacity:.75">(${esc(p.account_id)})</span></li>`).join("");
+          const instaItems = instas.map(a => `<li><strong>${esc(a.account_name || "Instagram")}</strong> <span style="opacity:.75">(${esc(a.account_id)})</span></li>`).join("");
+          const html = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div style="font-weight:900;">Meta Connected Accounts</div>
+              <button onclick="disconnectMeta()" style="width:auto;padding:10px 14px;">Disconnect Meta</button>
+            </div>
+            <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div>
+                <div style="font-weight:900;margin-bottom:8px;">Facebook Pages</div>
+                <ul style="margin-left:18px;line-height:1.7;">${pageItems || "<li>None</li>"}</ul>
+              </div>
+              <div>
+                <div style="font-weight:900;margin-bottom:8px;">Instagram Accounts</div>
+                <ul style="margin-left:18px;line-height:1.7;">${instaItems || "<li>None</li>"}</ul>
+              </div>
+            </div>
+          `;
+          setConnectedHtml(html);
+          markConnected("Facebook");
+          markConnected("Instagram");
+        }else{
+          setConnectedHtml("");
+        }
+      }else{
+        setConnectedHtml("");
+      }
+    }catch(e){
+      setConnectedHtml("");
+    }
+
     setMsg("Social accounts loaded.");
 
   }catch(e){
@@ -590,46 +645,68 @@ async function loadSocialData(){
 
 async function connectSocial(platform){
 
-  setMsg("Connecting " + platform + "...");
-
-  try{
-
-    const res = await fetch("/connect-social-demo", {
-
-      method:"POST",
-
-      headers:{"Content-Type":"application/json"},
-
-      body:JSON.stringify({
-
-        companyId: companyId,
-
-        platform: platform
-
-      })
-
-    });
-
-    const data = await res.json();
-
-    if(!res.ok || data.error){
-
-      setMsg(data.error || "Connect error.");
-
-      return;
-
-    }
-
-    markConnected(platform);
-
-    setMsg(platform + " connected and saved to PostgreSQL.");
-
-  }catch(e){
-
-    setMsg("Connection error connecting " + platform + ".");
-
+  if(platform === "Facebook" || platform === "Instagram"){
+    setMsg("Redirecting to Meta to connect " + platform + "...");
+    window.location.href = "/api/meta/connect?companyId=" + encodeURIComponent(companyId);
+    return;
   }
 
+  // Keep demo connect flow for other channels in MVP mode.
+  setMsg("Connecting " + platform + "...");
+  try{
+    const res = await fetch("/connect-social-demo", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ companyId, platform })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Connect error.");
+      return;
+    }
+    markConnected(platform);
+    setMsg(platform + " connected and saved to PostgreSQL.");
+  }catch(e){
+    setMsg("Connection error connecting " + platform + ".");
+  }
+
+}
+
+function esc(s){
+  return String(s || "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll("\"","&quot;")
+    .replaceAll("'","&#039;");
+}
+
+async function disconnectMeta(){
+  setMsg("Disconnecting Meta...");
+  try{
+    const res = await fetch("/api/meta/disconnect",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Disconnect error.");
+      return;
+    }
+    // Reset UI statuses
+    ["facebook","instagram"].forEach(k => {
+      const el = document.getElementById(k + "Status");
+      if(el){
+        el.innerText = "Not Connected";
+        el.classList.remove("connected");
+      }
+    });
+    setConnectedHtml("");
+    setMsg("Meta disconnected.");
+  }catch(e){
+    setMsg("Connection error disconnecting Meta.");
+  }
 }
 
 loadSocialData();
@@ -653,4 +730,3 @@ loadSocialData();
 </body>
 
 </html>
-  backdrop-filter: blur(18px);

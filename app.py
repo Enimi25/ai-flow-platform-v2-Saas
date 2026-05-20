@@ -7,7 +7,11 @@ from groq import Groq
 import os
 import hashlib
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
+import secrets
+import urllib.parse
+import urllib.request
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -158,6 +162,41 @@ def init_db():
                     account_id TEXT DEFAULT '',
                     created_at TEXT DEFAULT '',
                     updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            # Store OAuth access tokens separately so we never expose tokens via /social-data.
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_social_tokens (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    provider TEXT DEFAULT '',
+                    platform TEXT DEFAULT '',
+                    account_id TEXT DEFAULT '',
+                    access_token TEXT DEFAULT '',
+                    token_expires_at TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_social_tokens_unique
+                ON v2_social_tokens (company_id, provider, platform, account_id);
+                """
+            )
+
+            # Short-lived OAuth state store for Meta connect flow.
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_meta_oauth_states (
+                    state TEXT PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    created_at TEXT DEFAULT ''
                 );
                 """
             )
@@ -968,6 +1007,324 @@ async def delete_content_post(request: Request):
 # =========================================================
 # SOCIAL ACCOUNTS
 # =========================================================
+
+def _meta_config():
+    app_id = (os.getenv("META_APP_ID") or "").strip()
+    app_secret = (os.getenv("META_APP_SECRET") or "").strip()
+    redirect_uri = (os.getenv("META_REDIRECT_URI") or "").strip()
+    return app_id, app_secret, redirect_uri
+
+
+def _http_get_json(url: str, timeout_sec: int = 15):
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"User-Agent": "AI-FLOW/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+        return json.loads(raw)
+
+
+@app.get("/api/meta/connect")
+def meta_connect(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    app_id, app_secret, redirect_uri = _meta_config()
+    if not app_id or not app_secret or not redirect_uri:
+        return JSONResponse(
+            {
+                "error": "Meta OAuth is not configured",
+                "detail": "Missing META_APP_ID / META_APP_SECRET / META_REDIRECT_URI",
+            },
+            status_code=500,
+        )
+
+    state = secrets.token_urlsafe(32)
+    now = datetime.utcnow().isoformat() + "Z"
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_meta_oauth_states (state, company_id, created_at)
+                VALUES (%s, %s, %s)
+                """,
+                (state, company_id, now),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Minimal scopes for Pages list + IG business account discovery.
+    scope = ",".join(
+        [
+            "public_profile",
+            "pages_show_list",
+            "pages_read_engagement",
+            "pages_manage_metadata",
+            "instagram_basic",
+        ]
+    )
+
+    qs = urllib.parse.urlencode(
+        {
+            "client_id": app_id,
+            "redirect_uri": redirect_uri,
+            "state": state,
+            "response_type": "code",
+            "scope": scope,
+        }
+    )
+    auth_url = f"https://www.facebook.com/v20.0/dialog/oauth?{qs}"
+
+    return HTMLResponse(
+        f"""<!doctype html>
+<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url={auth_url}"></head>
+<body style="font-family:Arial,sans-serif;background:#061923;color:#f7fbff;padding:24px;">
+Redirecting to Meta OAuth...
+</body></html>"""
+    )
+
+
+@app.get("/api/meta/callback")
+def meta_callback(code: str = "", state: str = ""):
+    if not code or not state:
+        return JSONResponse({"error": "Missing code/state"}, status_code=400)
+
+    app_id, app_secret, redirect_uri = _meta_config()
+    if not app_id or not app_secret or not redirect_uri:
+        return JSONResponse({"error": "Meta OAuth is not configured"}, status_code=500)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    company_id = ""
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT company_id FROM v2_meta_oauth_states WHERE state = %s",
+                (state,),
+            )
+            row = cur.fetchone()
+            if row:
+                company_id = row.get("company_id") or ""
+            cur.execute("DELETE FROM v2_meta_oauth_states WHERE state = %s", (state,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    if not company_id:
+        return JSONResponse({"error": "Invalid state"}, status_code=400)
+
+    # Exchange code -> user access token
+    token_qs = urllib.parse.urlencode(
+        {
+            "client_id": app_id,
+            "redirect_uri": redirect_uri,
+            "client_secret": app_secret,
+            "code": code,
+        }
+    )
+    token_url = f"https://graph.facebook.com/v20.0/oauth/access_token?{token_qs}"
+
+    try:
+        token_data = _http_get_json(token_url)
+        user_token = token_data.get("access_token") or ""
+        expires_in = token_data.get("expires_in")
+    except Exception as e:
+        print("META TOKEN EXCHANGE ERROR:", str(e))
+        return JSONResponse({"error": "Meta token exchange error"}, status_code=500)
+
+    if not user_token:
+        return JSONResponse({"error": "Meta token exchange failed"}, status_code=500)
+
+    expires_at = ""
+    try:
+        if expires_in is not None:
+            expires_at = (datetime.utcnow() + timedelta(seconds=int(expires_in))).isoformat() + "Z"
+    except Exception:
+        expires_at = ""
+
+    # Fetch Pages + IG business accounts
+    accounts_url = (
+        "https://graph.facebook.com/v20.0/me/accounts?"
+        + urllib.parse.urlencode(
+            {
+                "fields": "id,name,access_token,instagram_business_account{id,username,name}",
+                "access_token": user_token,
+            }
+        )
+    )
+
+    try:
+        accounts_data = _http_get_json(accounts_url)
+        pages = accounts_data.get("data") or []
+    except Exception as e:
+        print("META ACCOUNTS ERROR:", str(e))
+        pages = []
+
+    now = datetime.utcnow().isoformat() + "Z"
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            # Store user token (company-level) for future calls (not exposed to frontend).
+            cur.execute(
+                """
+                INSERT INTO v2_social_tokens (company_id, provider, platform, account_id, access_token, token_expires_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (company_id, provider, platform, account_id)
+                DO UPDATE SET access_token = EXCLUDED.access_token, token_expires_at = EXCLUDED.token_expires_at, updated_at = EXCLUDED.updated_at
+                """,
+                (company_id, "meta", "meta_user", "me", user_token, expires_at, now, now),
+            )
+
+            for p in pages:
+                page_id = str(p.get("id") or "")
+                page_name = str(p.get("name") or "")
+                page_token = str(p.get("access_token") or "")
+
+                if page_id:
+                    # Prevent duplicates (do not assume any unique index exists in the DB).
+                    cur.execute(
+                        "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s AND account_id = %s",
+                        (company_id, "Facebook", page_id),
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO v2_social_accounts (company_id, platform, status, account_name, account_id, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (company_id, "Facebook", "connected", page_name, page_id, now, now),
+                    )
+
+                    # Store page token
+                    if page_token:
+                        cur.execute(
+                            """
+                            INSERT INTO v2_social_tokens (company_id, provider, platform, account_id, access_token, token_expires_at, created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (company_id, provider, platform, account_id)
+                            DO UPDATE SET access_token = EXCLUDED.access_token, token_expires_at = EXCLUDED.token_expires_at, updated_at = EXCLUDED.updated_at
+                            """,
+                            (company_id, "meta", "Facebook", page_id, page_token, "", now, now),
+                        )
+
+                ig = p.get("instagram_business_account") or {}
+                ig_id = str(ig.get("id") or "")
+                ig_name = str(ig.get("username") or ig.get("name") or "")
+                if ig_id:
+                    cur.execute(
+                        "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s AND account_id = %s",
+                        (company_id, "Instagram", ig_id),
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO v2_social_accounts (company_id, platform, status, account_name, account_id, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (company_id, "Instagram", "connected", ig_name, ig_id, now, now),
+                    )
+                    if page_token:
+                        cur.execute(
+                            """
+                            INSERT INTO v2_social_tokens (company_id, provider, platform, account_id, access_token, token_expires_at, created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (company_id, provider, platform, account_id)
+                            DO UPDATE SET access_token = EXCLUDED.access_token, updated_at = EXCLUDED.updated_at
+                            """,
+                            (company_id, "meta", "Instagram", ig_id, page_token, "", now, now),
+                        )
+
+        conn.commit()
+    except Exception as e:
+        print("META CALLBACK DB ERROR:", str(e))
+        return JSONResponse({"error": "Meta callback save error"}, status_code=500)
+    finally:
+        conn.close()
+
+    # Redirect back to Social Accounts page
+    return HTMLResponse(
+        """<!doctype html><html><head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;background:#061923;color:#f7fbff;padding:24px;">
+Connected. You can close this tab.
+<script>window.location.href='/social-accounts?meta=connected';</script>
+</body></html>"""
+    )
+
+
+@app.get("/api/meta/accounts")
+def meta_accounts(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, platform, status, account_name, account_id, created_at, updated_at
+                FROM v2_social_accounts
+                WHERE company_id = %s
+                AND platform IN ('Facebook', 'Instagram')
+                ORDER BY id DESC
+                """,
+                (company_id,),
+            )
+            rows = cur.fetchall()
+
+        pages = [r for r in rows if r.get("platform") == "Facebook"]
+        instagrams = [r for r in rows if r.get("platform") == "Instagram"]
+        return JSONResponse({"success": True, "pages": pages, "instagrams": instagrams})
+    except Exception as e:
+        print("META ACCOUNTS DATA ERROR:", str(e))
+        return JSONResponse({"error": "Meta accounts error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/api/meta/disconnect")
+async def meta_disconnect(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM v2_social_tokens WHERE company_id = %s AND provider = %s",
+                (company_id, "meta"),
+            )
+            cur.execute(
+                "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform IN ('Facebook','Instagram')",
+                (company_id,),
+            )
+        conn.commit()
+        return JSONResponse({"success": True})
+    except Exception as e:
+        print("META DISCONNECT ERROR:", str(e))
+        return JSONResponse({"error": "Meta disconnect error"}, status_code=500)
+    finally:
+        conn.close()
 
 
 # =========================================================
