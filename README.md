@@ -2,6 +2,23 @@
 
 FastAPI backend (`app.py`) serving static HTML pages for the AI FLOW SaaS MVP.
 
+## Render Environment Variables
+
+Required (social integrations):
+- `META_APP_ID`
+- `META_APP_SECRET`
+- `META_REDIRECT_URI`
+- `TIKTOK_CLIENT_KEY`
+- `TIKTOK_CLIENT_SECRET`
+- `TIKTOK_REDIRECT_URI`
+
+Optional (AI generation):
+- `GROQ_API_KEY`
+
+Notes:
+- Redirect URIs must be **exactly** the same as registered in the provider dashboards.
+- Redirect URIs must be HTTPS and must not include `#` fragments (TikTok web redirect URI must not include query params).
+
 ## Meta (Facebook / Instagram) OAuth Setup
 
 AI FLOW supports connecting Facebook Pages and Instagram Business accounts via Meta OAuth.

@@ -1071,7 +1071,10 @@ def _http_get_json(url: str, timeout_sec: int = 15):
     )
     with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
         raw = resp.read().decode("utf-8", errors="replace")
-        return json.loads(raw)
+        try:
+            return json.loads(raw) if raw else {}
+        except Exception:
+            return {}
 
 
 def _http_post_form_json(url: str, form_data: dict, timeout_sec: int = 20):
@@ -1089,7 +1092,50 @@ def _http_post_form_json(url: str, form_data: dict, timeout_sec: int = 20):
         raw = resp.read().decode("utf-8", errors="replace")
         if not raw:
             return {}
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {}
+
+
+def _iso_z(dt: datetime):
+    return dt.isoformat() + "Z"
+
+
+def _parse_iso_z(s: str):
+    try:
+        if not s:
+            return None
+        v = str(s).strip()
+        if v.endswith("Z"):
+            v = v[:-1]
+        return datetime.fromisoformat(v)
+    except Exception:
+        return None
+
+
+def _company_exists(company_id: str):
+    company_id = (company_id or "").strip()
+    if not company_id:
+        return False
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM companies WHERE company_id = %s LIMIT 1", (company_id,))
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
+def _oauth_state_is_fresh(created_at: str, ttl_minutes: int = 20):
+    dt = _parse_iso_z(created_at)
+    if not dt:
+        return False
+    return dt >= (datetime.utcnow() - timedelta(minutes=ttl_minutes))
 
 
 def _tiktok_config():
@@ -1099,11 +1145,28 @@ def _tiktok_config():
     return client_key, client_secret, redirect_uri
 
 
+def _validate_redirect_uri(uri: str, provider: str):
+    u = (uri or "").strip()
+    if not u:
+        return "Missing redirect URI"
+    # Both Meta + TikTok require an exact, pre-registered HTTPS redirect URI.
+    if not (u.startswith("https://") or u.startswith("http://localhost")):
+        return "Redirect URI must be https (localhost allowed for development)"
+    if "#" in u:
+        return "Redirect URI must not contain a # fragment"
+    # TikTok explicitly disallows query parameters in redirect_uri for web apps.
+    if provider == "tiktok" and "?" in u:
+        return "TikTok redirect URI must not contain query parameters"
+    return ""
+
+
 @app.get("/api/meta/connect")
 def meta_connect(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     app_id, app_secret, redirect_uri = _meta_config()
     if not app_id or not app_secret or not redirect_uri:
@@ -1114,9 +1177,13 @@ def meta_connect(companyId: str = ""):
             },
             status_code=500,
         )
+    uri_err = _validate_redirect_uri(redirect_uri, "meta")
+    if uri_err:
+        return JSONResponse({"error": "Meta OAuth redirect URI is invalid", "detail": uri_err}, status_code=500)
 
     state = secrets.token_urlsafe(32)
-    now = datetime.utcnow().isoformat() + "Z"
+    now = _iso_z(datetime.utcnow())
+    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
 
     conn = get_db_connection()
     if not conn:
@@ -1124,6 +1191,8 @@ def meta_connect(companyId: str = ""):
 
     try:
         with conn.cursor() as cur:
+            # Cleanup old states to avoid DB growth
+            cur.execute("DELETE FROM v2_meta_oauth_states WHERE created_at < %s", (cutoff,))
             cur.execute(
                 """
                 INSERT INTO v2_meta_oauth_states (state, company_id, created_at)
@@ -1183,12 +1252,13 @@ def meta_callback(code: str = "", state: str = ""):
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT company_id FROM v2_meta_oauth_states WHERE state = %s",
+                "SELECT company_id, created_at FROM v2_meta_oauth_states WHERE state = %s",
                 (state,),
             )
             row = cur.fetchone()
             if row:
-                company_id = row.get("company_id") or ""
+                if _oauth_state_is_fresh(row.get("created_at") or ""):
+                    company_id = row.get("company_id") or ""
             cur.execute("DELETE FROM v2_meta_oauth_states WHERE state = %s", (state,))
         conn.commit()
     finally:
@@ -1197,7 +1267,7 @@ def meta_callback(code: str = "", state: str = ""):
     if not company_id:
         return JSONResponse({"error": "Invalid state"}, status_code=400)
 
-    # Exchange code -> user access token
+    # Exchange code -> user access token (avoid logging any secrets)
     token_qs = urllib.parse.urlencode(
         {
             "client_id": app_id,
@@ -1213,7 +1283,7 @@ def meta_callback(code: str = "", state: str = ""):
         user_token = token_data.get("access_token") or ""
         expires_in = token_data.get("expires_in")
     except Exception as e:
-        print("META TOKEN EXCHANGE ERROR:", str(e))
+        print("META TOKEN EXCHANGE ERROR:", type(e).__name__)
         return JSONResponse({"error": "Meta token exchange error"}, status_code=500)
 
     if not user_token:
@@ -1241,10 +1311,10 @@ def meta_callback(code: str = "", state: str = ""):
         accounts_data = _http_get_json(accounts_url)
         pages = accounts_data.get("data") or []
     except Exception as e:
-        print("META ACCOUNTS ERROR:", str(e))
+        print("META ACCOUNTS ERROR:", type(e).__name__)
         pages = []
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = _iso_z(datetime.utcnow())
     conn = get_db_connection()
     if not conn:
         return JSONResponse({"error": "Database error"}, status_code=500)
@@ -1321,7 +1391,8 @@ def meta_callback(code: str = "", state: str = ""):
 
         conn.commit()
     except Exception as e:
-        print("META CALLBACK DB ERROR:", str(e))
+        # Avoid logging token contents; keep logs minimal.
+        print("META CALLBACK DB ERROR:", type(e).__name__)
         return JSONResponse({"error": "Meta callback save error"}, status_code=500)
     finally:
         conn.close()
@@ -1341,6 +1412,8 @@ def meta_accounts(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     conn = get_db_connection()
     if not conn:
@@ -1364,7 +1437,7 @@ def meta_accounts(companyId: str = ""):
         instagrams = [r for r in rows if r.get("platform") == "Instagram"]
         return JSONResponse({"success": True, "pages": pages, "instagrams": instagrams})
     except Exception as e:
-        print("META ACCOUNTS DATA ERROR:", str(e))
+        print("META ACCOUNTS DATA ERROR:", type(e).__name__)
         return JSONResponse({"error": "Meta accounts error"}, status_code=500)
     finally:
         conn.close()
@@ -1376,6 +1449,8 @@ async def meta_disconnect(request: Request):
     company_id = (data.get("companyId") or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     conn = get_db_connection()
     if not conn:
@@ -1394,7 +1469,7 @@ async def meta_disconnect(request: Request):
         conn.commit()
         return JSONResponse({"success": True})
     except Exception as e:
-        print("META DISCONNECT ERROR:", str(e))
+        print("META DISCONNECT ERROR:", type(e).__name__)
         return JSONResponse({"error": "Meta disconnect error"}, status_code=500)
     finally:
         conn.close()
@@ -1409,6 +1484,8 @@ def tiktok_connect(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     if not client_key or not client_secret or not redirect_uri:
@@ -1419,9 +1496,13 @@ def tiktok_connect(companyId: str = ""):
             },
             status_code=500,
         )
+    uri_err = _validate_redirect_uri(redirect_uri, "tiktok")
+    if uri_err:
+        return JSONResponse({"error": "TikTok OAuth redirect URI is invalid", "detail": uri_err}, status_code=500)
 
     state = secrets.token_urlsafe(32)
-    now = datetime.utcnow().isoformat() + "Z"
+    now = _iso_z(datetime.utcnow())
+    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
 
     conn = get_db_connection()
     if not conn:
@@ -1429,6 +1510,7 @@ def tiktok_connect(companyId: str = ""):
 
     try:
         with conn.cursor() as cur:
+            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE created_at < %s", (cutoff,))
             cur.execute(
                 """
                 INSERT INTO v2_tiktok_oauth_states (state, company_id, created_at)
@@ -1480,12 +1562,13 @@ def tiktok_callback(code: str = "", state: str = ""):
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT company_id FROM v2_tiktok_oauth_states WHERE state = %s",
+                "SELECT company_id, created_at FROM v2_tiktok_oauth_states WHERE state = %s",
                 (state,),
             )
             row = cur.fetchone()
             if row:
-                company_id = (row.get("company_id") or "").strip()
+                if _oauth_state_is_fresh(row.get("created_at") or ""):
+                    company_id = (row.get("company_id") or "").strip()
             cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE state = %s", (state,))
         conn.commit()
     finally:
@@ -1508,7 +1591,7 @@ def tiktok_callback(code: str = "", state: str = ""):
             },
         )
     except Exception as e:
-        print("TIKTOK TOKEN EXCHANGE ERROR:", str(e))
+        print("TIKTOK TOKEN EXCHANGE ERROR:", type(e).__name__)
         return JSONResponse({"error": "TikTok token exchange error"}, status_code=500)
 
     access_token = (token_data.get("access_token") or "").strip()
@@ -1533,9 +1616,9 @@ def tiktok_callback(code: str = "", state: str = ""):
     refresh_expires_at = ""
     try:
         if expires_in is not None:
-            expires_at = (datetime.utcnow() + timedelta(seconds=int(expires_in))).isoformat() + "Z"
+            expires_at = _iso_z(datetime.utcnow() + timedelta(seconds=int(expires_in)))
         if refresh_expires_in is not None:
-            refresh_expires_at = (datetime.utcnow() + timedelta(seconds=int(refresh_expires_in))).isoformat() + "Z"
+            refresh_expires_at = _iso_z(datetime.utcnow() + timedelta(seconds=int(refresh_expires_in)))
     except Exception:
         expires_at = ""
         refresh_expires_at = ""
@@ -1556,9 +1639,9 @@ def tiktok_callback(code: str = "", state: str = ""):
             user_obj = data_obj.get("user") or {}
             display_name = (user_obj.get("display_name") or "").strip() or display_name
     except Exception as e:
-        print("TIKTOK USER INFO ERROR:", str(e))
+        print("TIKTOK USER INFO ERROR:", type(e).__name__)
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = _iso_z(datetime.utcnow())
 
     conn = get_db_connection()
     if not conn:
@@ -1610,7 +1693,7 @@ def tiktok_callback(code: str = "", state: str = ""):
 
         conn.commit()
     except Exception as e:
-        print("TIKTOK CALLBACK DB ERROR:", str(e))
+        print("TIKTOK CALLBACK DB ERROR:", type(e).__name__)
         return JSONResponse({"error": "TikTok callback save error"}, status_code=500)
     finally:
         conn.close()
@@ -1629,6 +1712,8 @@ def tiktok_account(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     conn = get_db_connection()
     if not conn:
@@ -1651,7 +1736,7 @@ def tiktok_account(companyId: str = ""):
 
         return JSONResponse({"success": True, "account": account})
     except Exception as e:
-        print("TIKTOK ACCOUNT ERROR:", str(e))
+        print("TIKTOK ACCOUNT ERROR:", type(e).__name__)
         return JSONResponse({"error": "TikTok account error"}, status_code=500)
     finally:
         conn.close()
@@ -1663,6 +1748,8 @@ async def tiktok_disconnect(request: Request):
     company_id = (data.get("companyId") or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     conn = get_db_connection()
     if not conn:
@@ -1681,7 +1768,7 @@ async def tiktok_disconnect(request: Request):
         conn.commit()
         return JSONResponse({"success": True})
     except Exception as e:
-        print("TIKTOK DISCONNECT ERROR:", str(e))
+        print("TIKTOK DISCONNECT ERROR:", type(e).__name__)
         return JSONResponse({"error": "TikTok disconnect error"}, status_code=500)
     finally:
         conn.close()
@@ -2054,29 +2141,31 @@ Rules:
 def _ensure_daily_social_drafts(company_id: str):
     """Create at least 1 draft per day; we generate 1 per platform for a better MVP experience."""
     today = _today_utc_date_str()
-    now = datetime.utcnow().isoformat() + "Z"
+    now = _iso_z(datetime.utcnow())
 
     conn = get_db_connection()
     if not conn:
         return False, "Database error"
 
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT COUNT(*) FROM v2_social_content_drafts
-                WHERE company_id = %s AND content_date = %s
-                """,
-                (company_id, today),
-            )
-            count = cur.fetchone()[0] or 0
-
-        if int(count) > 0:
-            return True, ""
-
-        # Create 3 drafts (FB/IG/TikTok) for today.
+        # Create missing daily drafts (atomic-ish via INSERT ... SELECT ... WHERE NOT EXISTS).
         platforms = ["Facebook", "Instagram", "TikTok"]
         for platform in platforms:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM v2_social_content_drafts
+                    WHERE company_id = %s AND content_date = %s AND platform = %s
+                    LIMIT 1
+                    """,
+                    (company_id, today, platform),
+                )
+                already = cur.fetchone() is not None
+
+            if already:
+                continue
+
             types = _SOCIAL_DRAFT_TYPES_BY_PLATFORM.get(platform) or ["AI tip"]
             # Deterministic pick per day/platform.
             idx = (int(today.replace("-", "")) + len(platform)) % len(types)
@@ -2084,6 +2173,7 @@ def _ensure_daily_social_drafts(company_id: str):
             draft = _generate_social_draft(company_id, platform, draft_type)
 
             with conn.cursor() as cur:
+                # Prevent duplicates if multiple requests race.
                 cur.execute(
                     """
                     INSERT INTO v2_social_content_drafts (
@@ -2091,7 +2181,12 @@ def _ensure_daily_social_drafts(company_id: str):
                         title, caption, hook, hashtags, visual_idea,
                         status, publish_message, created_at, updated_at
                     )
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM v2_social_content_drafts
+                        WHERE company_id = %s AND content_date = %s AND platform = %s
+                    )
                     """,
                     (
                         company_id,
@@ -2107,6 +2202,9 @@ def _ensure_daily_social_drafts(company_id: str):
                         "",
                         now,
                         now,
+                        company_id,
+                        today,
+                        platform,
                     ),
                 )
 
@@ -2124,6 +2222,8 @@ def social_content_data(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     ok, err = _ensure_daily_social_drafts(company_id)
     if not ok:
@@ -2178,6 +2278,8 @@ async def social_content_regenerate(request: Request):
 
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -2248,6 +2350,8 @@ async def social_content_update(request: Request):
 
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -2311,6 +2415,8 @@ async def social_content_status(request: Request):
 
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -2356,6 +2462,8 @@ async def social_content_publish(request: Request):
 
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -2442,14 +2550,24 @@ async def social_content_publish(request: Request):
                     timeout_sec=25,
                 )
             except Exception as e:
-                print("FACEBOOK PUBLISH HTTP ERROR:", str(e))
+                print("FACEBOOK PUBLISH HTTP ERROR:", type(e).__name__)
                 return JSONResponse({"error": "Facebook publish error"}, status_code=500)
 
             if resp.get("error"):
                 # Keep draft approved; store error message for debugging.
                 err_obj = resp.get("error") or {}
                 msg = (err_obj.get("message") or "Facebook publish failed").strip()
-                now = datetime.utcnow().isoformat() + "Z"
+                low = msg.lower()
+                short_msg = msg
+                if "pages_manage_posts" in low or "permissions error" in low or "(#200)" in low:
+                    short_msg = (
+                        "Missing Meta permissions to publish to Facebook Pages. "
+                        "Enable pages_manage_posts (and pages_read_engagement) in your Meta app, then reconnect Meta."
+                    )
+                elif "access token" in low and "expired" in low:
+                    short_msg = "Facebook token expired. Reconnect Meta to refresh tokens."
+
+                now = _iso_z(datetime.utcnow())
                 try:
                     conn3 = get_db_connection()
                     if conn3:
@@ -2460,7 +2578,7 @@ async def social_content_publish(request: Request):
                                 SET publish_message = %s, updated_at = %s
                                 WHERE company_id = %s AND id = %s
                                 """,
-                                (msg[:400], now, company_id, draft_id_int),
+                                (short_msg[:400], now, company_id, draft_id_int),
                             )
                         conn3.commit()
                 finally:
@@ -2469,7 +2587,7 @@ async def social_content_publish(request: Request):
                 return JSONResponse(
                     {
                         "error": "Facebook publish failed",
-                        "detail": msg,
+                        "detail": short_msg,
                     },
                     status_code=400,
                 )
@@ -2478,7 +2596,7 @@ async def social_content_publish(request: Request):
             if not post_id:
                 return JSONResponse({"error": "Facebook publish returned no post id"}, status_code=500)
 
-            now = datetime.utcnow().isoformat() + "Z"
+            now = _iso_z(datetime.utcnow())
             conn4 = get_db_connection()
             if not conn4:
                 return JSONResponse({"error": "Database error"}, status_code=500)
