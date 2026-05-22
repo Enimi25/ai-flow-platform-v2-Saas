@@ -269,6 +269,17 @@ button{
   margin-top:14px;
 }
 
+.payrow{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:16px;
+}
+.payrow button{
+  width:auto;
+  min-width:180px;
+}
+
 @media(max-width:1000px){
   .grid{
     grid-template-columns:1fr;
@@ -341,6 +352,11 @@ button{
     </div>
 
     <div id="msg" class="msg"></div>
+
+    <div class="payrow">
+      <button class="green" onclick="startStripeCheckout()">Pay with Stripe</button>
+      <button class="dark" onclick="checkPaymentStatus()">Refresh Payment Status</button>
+    </div>
   </div>
 
   <div class="grid">
@@ -437,6 +453,47 @@ function logout(){
 
 function setMsg(text){
   document.getElementById("msg").innerText = text;
+}
+
+async function startStripeCheckout(){
+  setMsg("Creating Stripe checkout session...");
+  try{
+    const res = await fetch("/api/stripe/create-checkout-session", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId: companyId, projectName: "ai_flow_saas"})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg((data && (data.error || data.detail)) ? (data.error + (data.detail ? " (" + data.detail + ")" : "")) : "Stripe error.");
+      return;
+    }
+    if(data.url){
+      window.location.href = data.url;
+      return;
+    }
+    setMsg("Stripe session created, but no redirect URL returned.");
+  }catch(e){
+    setMsg("Connection error creating Stripe checkout.");
+  }
+}
+
+async function checkPaymentStatus(){
+  // Minimal UX: show server-side status from settings-data (company.payment_status).
+  setMsg("Checking payment status...");
+  try{
+    const res = await fetch("/settings-data?companyId=" + encodeURIComponent(companyId));
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setMsg(data.error || "Status check error.");
+      return;
+    }
+    const company = data.company || {};
+    const st = (company.payment_status || "unpaid");
+    setMsg("Payment status: " + st);
+  }catch(e){
+    setMsg("Connection error checking status.");
+  }
 }
 
 async function selectPlan(plan){

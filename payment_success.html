@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI FLOW Payment Success</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#061923;
+      --text:#f7fbff;
+      --muted:#9fb7c3;
+      --panel:rgba(255,255,255,0.06);
+      --border:rgba(255,255,255,0.12);
+      --accent:#b8ff7a;
+      --accent2:#41dcff;
+      --shadow:0 30px 80px rgba(0,0,0,.16);
+    }
+    body{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+      background:
+        radial-gradient(980px 720px at 14% -10%, rgba(184,255,122,0.18), transparent 58%),
+        radial-gradient(900px 700px at 110% 10%, rgba(65,220,255,0.14), transparent 55%),
+        radial-gradient(760px 640px at 70% 120%, rgba(139,92,246,0.10), transparent 58%),
+        var(--bg);
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
+      line-height:1.4;
+    }
+    .card{
+      width:100%;
+      max-width:680px;
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:30px;
+      padding:24px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .logo{
+      font-size:22px;
+      font-weight:950;
+      letter-spacing:.2px;
+      margin-bottom:18px;
+    }
+    .logo span{color:var(--accent)}
+    h1{
+      font-size:28px;
+      font-weight:900;
+      margin-bottom:10px;
+      letter-spacing:-.2px;
+    }
+    p{color:var(--muted);margin-bottom:18px;line-height:1.6}
+    .note{
+      margin-top:12px;
+      padding:14px 14px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(255,255,255,0.04);
+      color:#d7e6eb;
+    }
+    .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+    a.btn{
+      text-decoration:none;
+      display:inline-block;
+      padding:12px 14px;
+      border-radius:12px;
+      font-weight:900;
+      border:1px solid rgba(255,255,255,0.12);
+      color:var(--text);
+      background:rgba(255,255,255,0.06);
+    }
+    a.primary{
+      border:0;
+      color:#071820;
+      background:linear-gradient(135deg, rgba(184,255,122,0.98) 0%, rgba(65,220,255,0.72) 100%);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">AI <span>FLOW</span></div>
+    <h1>Payment received</h1>
+    <p>Thanks. Your payment is being verified. Your account will be activated after Stripe confirms the payment via webhook.</p>
+    <div class="note" id="statusBox">Status: processing</div>
+    <div class="row">
+      <a class="btn primary" href="/billing">Back to Billing</a>
+      <a class="btn" href="/dashboard">Go to Dashboard</a>
+    </div>
+  </div>
+  <script>
+  (function(){
+    const params = new URLSearchParams(window.location.search || "");
+    const sid = params.get("session_id") || params.get("sessionId") || "";
+    const el = document.getElementById("statusBox");
+    if(!el) return;
+    if(!sid){
+      el.innerText = "Status: processing";
+      return;
+    }
+    el.innerText = "Status: processing (Session: " + sid.slice(0, 12) + "...)";
+  })();
+  </script>
+</body>
+</html>
+

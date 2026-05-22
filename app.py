@@ -15,6 +15,7 @@ import urllib.request
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import stripe
 
 
 app = FastAPI()
@@ -76,6 +77,7 @@ def init_db():
             cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'Growth Studio'")
             cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'")
             cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'")
 
             cur.execute(
                 """
@@ -249,6 +251,37 @@ def init_db():
                 """
             )
 
+            # Stripe payment records (MVP).
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_payments (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    project_name TEXT DEFAULT '',
+                    stripe_session_id TEXT DEFAULT '',
+                    customer_email TEXT DEFAULT '',
+                    amount INTEGER DEFAULT 0,
+                    currency TEXT DEFAULT '',
+                    status TEXT DEFAULT '',
+                    created_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_payments_session
+                ON v2_payments (stripe_session_id);
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_v2_payments_company
+                ON v2_payments (company_id);
+                """
+            )
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS v2_ai_replies (
@@ -376,6 +409,16 @@ def admin_page():
 @app.get("/onboarding")
 def onboarding_page():
     return page_response("onboarding.html")
+
+
+@app.get("/payment/success")
+def payment_success_page():
+    return page_response("payment_success.html")
+
+
+@app.get("/payment/cancel")
+def payment_cancel_page():
+    return page_response("payment_cancel.html")
 
 @app.get("/admin-data")
 def admin_data():
@@ -2848,7 +2891,7 @@ def settings_data(companyId: str = ""):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT company_id, company_name, owner_email, plan, status, created_at
+                SELECT company_id, company_name, owner_email, plan, status, created_at, payment_status
                 FROM companies
                 WHERE company_id = %s
                 """,
@@ -2861,6 +2904,7 @@ def settings_data(companyId: str = ""):
                 "plan": "Growth Studio",
                 "status": "active",
                 "created_at": "",
+                "payment_status": "unpaid",
             }
 
             cur.execute(
@@ -3192,6 +3236,198 @@ async def update_plan(request: Request):
 
     finally:
         conn.close()
+
+
+# =========================================================
+# STRIPE PAYMENTS (MVP)
+# =========================================================
+
+def _stripe_config():
+    secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
+    webhook_secret = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip()
+    price_id = (os.getenv("STRIPE_PRICE_ID") or "").strip()
+    public_url = (os.getenv("APP_PUBLIC_URL") or "").strip().rstrip("/")
+    return secret_key, webhook_secret, price_id, public_url
+
+
+@app.post("/api/stripe/create-checkout-session")
+async def stripe_create_checkout_session(request: Request):
+    data = await request.json()
+
+    company_id = (data.get("companyId") or "").strip()
+    project_name = (data.get("projectName") or "ai_flow_saas").strip() or "ai_flow_saas"
+
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+
+    secret_key, webhook_secret, price_id, public_url = _stripe_config()
+    if not secret_key or not webhook_secret or not price_id or not public_url:
+        return JSONResponse(
+            {
+                "error": "Stripe is not configured",
+                "detail": "Missing STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID / APP_PUBLIC_URL",
+            },
+            status_code=500,
+        )
+
+    stripe.api_key = secret_key
+
+    # Use owner email from companies table if available (helps prefill Checkout).
+    customer_email = ""
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT owner_email FROM companies WHERE company_id = %s",
+                (company_id,),
+            )
+            row = cur.fetchone()
+            if row:
+                customer_email = (row.get("owner_email") or "").strip()
+    except Exception as e:
+        print("STRIPE PREFILL EMAIL ERROR:", type(e).__name__)
+        customer_email = ""
+    finally:
+        conn.close()
+
+    success_url = f"{public_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{public_url}/payment/cancel"
+
+    now = _iso_z(datetime.utcnow())
+
+    try:
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            customer_email=customer_email or None,
+            metadata={"company_id": company_id, "project_name": project_name},
+        )
+    except Exception as e:
+        print("STRIPE CREATE SESSION ERROR:", type(e).__name__)
+        return JSONResponse({"error": "Stripe session create error"}, status_code=500)
+
+    # Record session in DB (status stays "created"; webhook will mark "paid").
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_payments (company_id, project_name, stripe_session_id, customer_email, amount, currency, status, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (stripe_session_id)
+                DO NOTHING
+                """,
+                (
+                    company_id,
+                    project_name,
+                    session.get("id") or "",
+                    customer_email or "",
+                    0,
+                    "",
+                    "created",
+                    now,
+                ),
+            )
+        conn.commit()
+    except Exception as e:
+        print("STRIPE SAVE SESSION ERROR:", type(e).__name__)
+        # Continue anyway; session is created, webhook can still insert later.
+    finally:
+        conn.close()
+
+    return JSONResponse({"success": True, "url": session.get("url")})
+
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    secret_key, webhook_secret, price_id, public_url = _stripe_config()
+    if not secret_key or not webhook_secret:
+        return JSONResponse({"error": "Stripe is not configured"}, status_code=500)
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature") or ""
+
+    stripe.api_key = secret_key
+
+    try:
+        event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=webhook_secret)
+    except Exception as e:
+        # Never log payload/signature/secrets
+        print("STRIPE WEBHOOK SIGNATURE ERROR:", type(e).__name__)
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
+
+    event_type = (event.get("type") or "").strip()
+    obj = (event.get("data") or {}).get("object") or {}
+
+    if event_type in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
+        session_id = (obj.get("id") or "").strip()
+        payment_status = (obj.get("payment_status") or "").strip()  # usually "paid" for one-time; subscription varies
+        currency = (obj.get("currency") or "").strip()
+        amount_total = obj.get("amount_total")
+        customer_email = (obj.get("customer_details") or {}).get("email") or (obj.get("customer_email") or "")
+
+        metadata = obj.get("metadata") or {}
+        company_id = (metadata.get("company_id") or "").strip()
+        project_name = (metadata.get("project_name") or "").strip()
+
+        status = "paid" if payment_status == "paid" else "completed"
+        now = _iso_z(datetime.utcnow())
+
+        conn = get_db_connection()
+        if not conn:
+            return JSONResponse({"error": "Database error"}, status_code=500)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO v2_payments (company_id, project_name, stripe_session_id, customer_email, amount, currency, status, created_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (stripe_session_id)
+                    DO UPDATE SET
+                        customer_email = EXCLUDED.customer_email,
+                        amount = EXCLUDED.amount,
+                        currency = EXCLUDED.currency,
+                        status = EXCLUDED.status
+                    """,
+                    (
+                        company_id,
+                        project_name,
+                        session_id,
+                        str(customer_email or "")[:200],
+                        int(amount_total or 0),
+                        str(currency or "")[:12],
+                        status,
+                        now,
+                    ),
+                )
+
+                # Mark company as paid only when Stripe indicates paid.
+                if company_id and status == "paid":
+                    cur.execute(
+                        """
+                        UPDATE companies
+                        SET payment_status = %s
+                        WHERE company_id = %s
+                        """,
+                        ("paid", company_id),
+                    )
+
+            conn.commit()
+        except Exception as e:
+            print("STRIPE WEBHOOK DB ERROR:", type(e).__name__)
+            return JSONResponse({"error": "Webhook DB error"}, status_code=500)
+        finally:
+            conn.close()
+
+    return JSONResponse({"received": True})
 
 
 @app.post("/connect-social-demo")

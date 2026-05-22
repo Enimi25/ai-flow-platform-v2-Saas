@@ -72,3 +72,26 @@ How it works (MVP):
 - Drafts are stored in PostgreSQL (`v2_social_content_drafts`).
 - When the dashboard loads, it calls `/social-content-data?companyId=...` which ensures at least one draft exists for the current UTC day (the MVP generates one per platform).
 - Drafts start as `draft`, can be `approved`, and publishing is blocked unless the necessary platform permissions/scopes are configured.
+
+## Stripe Payments (Checkout)
+
+Required environment variables:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_ID`
+- `APP_PUBLIC_URL` (example: `https://your-app.onrender.com`)
+
+How to set up:
+1. In Stripe, create a Product + Price and copy the Price ID into `STRIPE_PRICE_ID`.
+2. Add a webhook endpoint in Stripe pointing to:
+   `https://<your-render-domain>/api/stripe/webhook`
+   Subscribe at least to: `checkout.session.completed`.
+3. In Render, set `APP_PUBLIC_URL` to your deployed app URL (no trailing slash).
+
+How to test:
+- Use Stripe test mode keys.
+- Start checkout from `/billing` (Pay with Stripe).
+- Confirm the payment, then check company payment status via Billing "Refresh Payment Status".
+
+Notes:
+- The app does not trust the success URL to grant access. It only marks accounts as paid via Stripe webhooks.
