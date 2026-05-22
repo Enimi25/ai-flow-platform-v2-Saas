@@ -78,11 +78,14 @@ How it works (MVP):
 Required environment variables:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_ID`
+- `STRIPE_PRICE_STARTER`
+- `STRIPE_PRICE_PRO`
 - `APP_PUBLIC_URL` (example: `https://your-app.onrender.com`)
 
 How to set up:
-1. In Stripe, create a Product + Price and copy the Price ID into `STRIPE_PRICE_ID`.
+1. In Stripe, create 2 recurring Prices (monthly):
+   - Starter ($39/mo) -> `STRIPE_PRICE_STARTER`
+   - Pro ($99/mo) -> `STRIPE_PRICE_PRO`
 2. Add a webhook endpoint in Stripe pointing to:
    `https://<your-render-domain>/api/stripe/webhook`
    Subscribe at least to: `checkout.session.completed`.

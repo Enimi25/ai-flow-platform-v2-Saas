@@ -3245,9 +3245,10 @@ async def update_plan(request: Request):
 def _stripe_config():
     secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
     webhook_secret = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip()
-    price_id = (os.getenv("STRIPE_PRICE_ID") or "").strip()
+    price_starter = (os.getenv("STRIPE_PRICE_STARTER") or "").strip()
+    price_pro = (os.getenv("STRIPE_PRICE_PRO") or "").strip()
     public_url = (os.getenv("APP_PUBLIC_URL") or "").strip().rstrip("/")
-    return secret_key, webhook_secret, price_id, public_url
+    return secret_key, webhook_secret, price_starter, price_pro, public_url
 
 
 @app.post("/api/stripe/create-checkout-session")
@@ -3256,19 +3257,30 @@ async def stripe_create_checkout_session(request: Request):
 
     company_id = (data.get("companyId") or "").strip()
     project_name = (data.get("projectName") or "ai_flow_saas").strip() or "ai_flow_saas"
+    plan = (data.get("plan") or "").strip().lower()
 
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
     if not _company_exists(company_id):
         return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
-    secret_key, webhook_secret, price_id, public_url = _stripe_config()
-    if not secret_key or not webhook_secret or not price_id or not public_url:
+    if plan not in ("starter", "pro"):
+        return JSONResponse({"error": "Invalid plan. Use starter or pro."}, status_code=400)
+
+    secret_key, webhook_secret, price_starter, price_pro, public_url = _stripe_config()
+    if not secret_key or not webhook_secret or not public_url:
         return JSONResponse(
             {
                 "error": "Stripe is not configured",
-                "detail": "Missing STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID / APP_PUBLIC_URL",
+                "detail": "Missing STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_STARTER / STRIPE_PRICE_PRO / APP_PUBLIC_URL",
             },
+            status_code=500,
+        )
+
+    price_id = price_starter if plan == "starter" else price_pro
+    if not price_id:
+        return JSONResponse(
+            {"error": "Stripe is not configured", "detail": f"Missing Stripe price id for {plan}"},
             status_code=500,
         )
 
@@ -3306,7 +3318,7 @@ async def stripe_create_checkout_session(request: Request):
             success_url=success_url,
             cancel_url=cancel_url,
             customer_email=customer_email or None,
-            metadata={"company_id": company_id, "project_name": project_name},
+            metadata={"company_id": company_id, "project_name": project_name, "plan": plan},
         )
     except Exception as e:
         print("STRIPE CREATE SESSION ERROR:", type(e).__name__)
@@ -3327,7 +3339,7 @@ async def stripe_create_checkout_session(request: Request):
                 """,
                 (
                     company_id,
-                    project_name,
+                    project_name + ":" + plan,
                     session.get("id") or "",
                     customer_email or "",
                     0,
@@ -3348,7 +3360,7 @@ async def stripe_create_checkout_session(request: Request):
 
 @app.post("/api/stripe/webhook")
 async def stripe_webhook(request: Request):
-    secret_key, webhook_secret, price_id, public_url = _stripe_config()
+    secret_key, webhook_secret, price_starter, price_pro, public_url = _stripe_config()
     if not secret_key or not webhook_secret:
         return JSONResponse({"error": "Stripe is not configured"}, status_code=500)
 
@@ -3377,6 +3389,7 @@ async def stripe_webhook(request: Request):
         metadata = obj.get("metadata") or {}
         company_id = (metadata.get("company_id") or "").strip()
         project_name = (metadata.get("project_name") or "").strip()
+        plan = (metadata.get("plan") or "").strip()
 
         status = "paid" if payment_status == "paid" else "completed"
         now = _iso_z(datetime.utcnow())
@@ -3399,7 +3412,7 @@ async def stripe_webhook(request: Request):
                     """,
                     (
                         company_id,
-                        project_name,
+                        project_name + ((":" + plan) if plan else ""),
                         session_id,
                         str(customer_email or "")[:200],
                         int(amount_total or 0),

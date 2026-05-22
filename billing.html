@@ -337,25 +337,20 @@ button{
     </div>
 
     <div class="row">
-      <span>Status</span>
-      <strong style="color:#4ade80;">Active</strong>
+      <span>Payment Status</span>
+      <strong id="paymentStatus" style="color:#fbbf24;">Unpaid</strong>
     </div>
 
     <div class="row">
-      <span>Next Billing Date</span>
-      <strong>2026-06-01</strong>
-    </div>
-
-    <div class="row">
-      <span>Payment Method</span>
-      <strong>Demo Card ending 4242</strong>
+      <span>Activation</span>
+      <strong style="color:#94a3b8;">Webhook confirmed only</strong>
     </div>
 
     <div id="msg" class="msg"></div>
 
     <div class="payrow">
-      <button class="green" onclick="startStripeCheckout()">Pay with Stripe</button>
-      <button class="dark" onclick="checkPaymentStatus()">Refresh Payment Status</button>
+      <button class="dark" onclick="checkPaymentStatus()">Refresh Status</button>
+      <button class="dark" onclick="contactSales()">Contact Sales</button>
     </div>
   </div>
 
@@ -363,52 +358,48 @@ button{
 
     <div class="plan">
       <span class="badge">Starter</span>
-      <h2>AI Website Bot</h2>
+      <h2>Starter</h2>
       <div class="price">$39 <span>/month</span></div>
-      <div class="desc">For small businesses that need a simple AI chat widget on their website.</div>
+      <div class="desc">For teams that need a simple website AI assistant and lead capture.</div>
 
       <div class="features">
-        <div class="feature">✓ Website AI chat widget</div>
+        <div class="feature">✓ Website AI assistant</div>
         <div class="feature">✓ Lead capture</div>
-        <div class="feature">✓ Basic CRM dashboard</div>
-        <div class="feature">✓ Email support</div>
+        <div class="feature">✓ Basic dashboard access</div>
       </div>
 
-      <button class="dark" onclick="selectPlan('AI Website Bot')">Select Plan</button>
+      <button class="green" onclick="startStripeCheckout('starter')">Pay Starter</button>
     </div>
 
     <div class="plan active">
-      <span class="badge">Current Plan</span>
-      <h2>Growth Studio</h2>
+      <span class="badge">Most Popular</span>
+      <h2>Pro</h2>
       <div class="price">$99 <span>/month</span></div>
-      <div class="desc">For businesses that want leads, AI replies, content and social automation.</div>
+      <div class="desc">For teams that want AI replies, content factory and social automation.</div>
 
       <div class="features">
         <div class="feature">✓ Everything in Starter</div>
-        <div class="feature">✓ Content Factory</div>
-        <div class="feature">✓ Social accounts dashboard</div>
         <div class="feature">✓ AI Replies inbox</div>
-        <div class="feature">✓ Calendar bookings</div>
+        <div class="feature">✓ Content Factory</div>
+        <div class="feature">✓ Social automation drafts</div>
       </div>
 
-      <button class="green" onclick="selectPlan('Growth Studio')">Current Plan</button>
+      <button class="green" onclick="startStripeCheckout('pro')">Pay Pro</button>
     </div>
 
     <div class="plan">
-      <span class="badge">Scale</span>
-      <h2>Agency Pro</h2>
-      <div class="price">$299 <span>/month</span></div>
-      <div class="desc">For agencies and teams managing multiple clients and automation workflows.</div>
+      <span class="badge">Enterprise</span>
+      <h2>Custom / Enterprise</h2>
+      <div class="price">Custom <span>pricing</span></div>
+      <div class="desc">For larger teams, custom integrations, and volume usage.</div>
 
       <div class="features">
-        <div class="feature">✓ Multiple client workspaces</div>
-        <div class="feature">✓ Advanced analytics</div>
-        <div class="feature">✓ Priority AI generation</div>
-        <div class="feature">✓ Team access</div>
-        <div class="feature">✓ Priority support</div>
+        <div class="feature">✓ Custom workflows</div>
+        <div class="feature">✓ Dedicated support</div>
+        <div class="feature">✓ Custom onboarding</div>
       </div>
 
-      <button class="dark" onclick="selectPlan('Agency Pro')">Select Plan</button>
+      <button class="dark" onclick="contactSales()">Contact Sales</button>
     </div>
 
   </div>
@@ -455,13 +446,20 @@ function setMsg(text){
   document.getElementById("msg").innerText = text;
 }
 
-async function startStripeCheckout(){
+function contactSales(){
+  const to = "sales@ai-flow-platform.com";
+  const subject = encodeURIComponent("AI FLOW Enterprise");
+  const body = encodeURIComponent("Hi, I want to discuss an Enterprise plan for companyId: " + companyId);
+  window.location.href = "mailto:" + to + "?subject=" + subject + "&body=" + body;
+}
+
+async function startStripeCheckout(plan){
   setMsg("Creating Stripe checkout session...");
   try{
     const res = await fetch("/api/stripe/create-checkout-session", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({companyId: companyId, projectName: "ai_flow_saas"})
+      body:JSON.stringify({companyId: companyId, projectName: "ai_flow_saas", plan: plan})
     });
     const data = await res.json();
     if(!res.ok || data.error){
@@ -490,6 +488,11 @@ async function checkPaymentStatus(){
     }
     const company = data.company || {};
     const st = (company.payment_status || "unpaid");
+    const stEl = document.getElementById("paymentStatus");
+    if(stEl){
+      stEl.innerText = (st === "paid") ? "Paid" : "Unpaid";
+      stEl.style.color = (st === "paid") ? "#4ade80" : "#fbbf24";
+    }
     setMsg("Payment status: " + st);
   }catch(e){
     setMsg("Connection error checking status.");
