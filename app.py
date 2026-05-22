@@ -3251,6 +3251,22 @@ def _stripe_config():
     return secret_key, webhook_secret, price_starter, price_pro, public_url
 
 
+def _stripe_safe_error_info(err: Exception):
+    # StripeError fields are safe; never include request body, api key, etc.
+    try:
+        code = getattr(err, "code", None)
+        param = getattr(err, "param", None)
+        user_message = getattr(err, "user_message", None) or getattr(err, "user_message", None)
+        return {
+            "type": type(err).__name__,
+            "code": str(code) if code else "",
+            "param": str(param) if param else "",
+            "user_message": str(user_message) if user_message else "",
+        }
+    except Exception:
+        return {"type": type(err).__name__, "code": "", "param": "", "user_message": ""}
+
+
 @app.post("/api/stripe/create-checkout-session")
 async def stripe_create_checkout_session(request: Request):
     data = await request.json()
@@ -3277,12 +3293,20 @@ async def stripe_create_checkout_session(request: Request):
             status_code=500,
         )
 
+    # Validate env vars before calling Stripe.
+    if not (secret_key.startswith("sk_test_") or secret_key.startswith("sk_live_")):
+        return JSONResponse({"error": "Stripe is not configured", "detail": "Invalid STRIPE_SECRET_KEY"}, status_code=400)
+    if not public_url.startswith("https://"):
+        return JSONResponse({"error": "Stripe is not configured", "detail": "APP_PUBLIC_URL must start with https://"}, status_code=400)
+
     price_id = price_starter if plan == "starter" else price_pro
     if not price_id:
         return JSONResponse(
             {"error": "Stripe is not configured", "detail": f"Missing Stripe price id for {plan}"},
             status_code=500,
         )
+    if not price_id.startswith("price_"):
+        return JSONResponse({"error": "Stripe is not configured", "detail": f"Invalid Stripe price id for {plan}"}, status_code=400)
 
     stripe.api_key = secret_key
 
@@ -3320,6 +3344,11 @@ async def stripe_create_checkout_session(request: Request):
             customer_email=customer_email or None,
             metadata={"company_id": company_id, "project_name": project_name, "plan": plan},
         )
+    except stripe.error.StripeError as e:
+        info = _stripe_safe_error_info(e)
+        print("STRIPE CREATE SESSION ERROR:", json.dumps(info, ensure_ascii=True))
+        msg = info.get("user_message") or "Stripe checkout error. Please verify your Price IDs and Stripe keys."
+        return JSONResponse({"error": msg, "code": info.get("code") or "", "param": info.get("param") or ""}, status_code=400)
     except Exception as e:
         print("STRIPE CREATE SESSION ERROR:", type(e).__name__)
         return JSONResponse({"error": "Stripe session create error"}, status_code=500)
@@ -3363,6 +3392,8 @@ async def stripe_webhook(request: Request):
     secret_key, webhook_secret, price_starter, price_pro, public_url = _stripe_config()
     if not secret_key or not webhook_secret:
         return JSONResponse({"error": "Stripe is not configured"}, status_code=500)
+    if not (secret_key.startswith("sk_test_") or secret_key.startswith("sk_live_")):
+        return JSONResponse({"error": "Stripe is not configured"}, status_code=500)
 
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature") or ""
@@ -3371,6 +3402,10 @@ async def stripe_webhook(request: Request):
 
     try:
         event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=webhook_secret)
+    except stripe.error.StripeError as e:
+        info = _stripe_safe_error_info(e)
+        print("STRIPE WEBHOOK SIGNATURE ERROR:", json.dumps(info, ensure_ascii=True))
+        return JSONResponse({"error": "Invalid signature"}, status_code=400)
     except Exception as e:
         # Never log payload/signature/secrets
         print("STRIPE WEBHOOK SIGNATURE ERROR:", type(e).__name__)
