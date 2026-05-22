@@ -39,6 +39,8 @@
       gap:16px;
       margin-bottom:22px;
     }
+    .left-top{display:flex;flex-direction:column;gap:6px}
+    .title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     h1{font-size:34px;letter-spacing:-.2px}
     .sub{color:var(--muted);margin-top:6px}
     .btn{
@@ -55,6 +57,24 @@
     }
     .btn:hover{transform:translateY(-1px);box-shadow:0 26px 70px rgba(184,255,122,0.18)}
     .btn:active{transform:translateY(0)}
+    .btn2{
+      border-radius:12px;
+      padding:12px 14px;
+      font-weight:950;
+      cursor:pointer;
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:var(--shadowSm);
+      transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
+      white-space:nowrap;
+      text-decoration:none;
+      display:inline-block;
+    }
+    .btn2:hover{transform:translateY(-1px);background:rgba(255,255,255,0.08)}
+    .btn2:active{transform:translateY(0)}
+    .nav{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .who{color:var(--muted);font-size:13px;margin-top:4px}
     .msg{color:var(--muted);margin:12px 0 18px}
     .cards{
       display:grid;
@@ -101,11 +121,23 @@
 <body>
   <div class="wrap">
     <div class="top">
-      <div>
-        <h1>Admin Dashboard</h1>
-        <div class="sub">Platform-wide metrics from PostgreSQL.</div>
+      <div class="left-top">
+        <div class="title-row">
+          <h1>Admin Dashboard</h1>
+          <span class="pill">Platform Admin</span>
+        </div>
+        <div class="sub">You are viewing platform-wide controls and metrics.</div>
+        <div class="who"><span id="whoEmail">—</span> • <span id="whoRole">—</span></div>
       </div>
-      <button class="btn" onclick="loadAdmin()">Refresh</button>
+      <div class="nav">
+        <a class="btn2" href="/admin">Platform Admin Dashboard</a>
+        <a class="btn2" href="/dashboard">Company Dashboard</a>
+        <a class="btn2" href="/billing">Billing</a>
+        <a class="btn2" href="/social-accounts">Social Accounts</a>
+        <a class="btn2" href="/team">Team</a>
+        <button class="btn2" onclick="logout()">Logout</button>
+        <button class="btn" onclick="loadAdmin()">Refresh</button>
+      </div>
     </div>
 
     <div id="msg" class="msg">Loading admin metrics...</div>
@@ -140,6 +172,19 @@
   </div>
 
   <script>
+  const lsEmail = localStorage.getItem("ai_flow_email") || "";
+  const lsRole = localStorage.getItem("ai_flow_role") || "";
+  document.getElementById("whoEmail").innerText = lsEmail || "Unknown";
+  document.getElementById("whoRole").innerText = lsRole || "Unknown";
+
+  function logout(){
+    try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
+    localStorage.removeItem("ai_flow_email");
+    localStorage.removeItem("ai_flow_role");
+    localStorage.removeItem("ai_flow_company_id");
+    window.location.href = "/login";
+  }
+
   function setMsg(text){document.getElementById("msg").innerText = text;}
   function setText(id,val){document.getElementById(id).innerText = String(val);}
   function esc(s){
@@ -175,7 +220,7 @@
   async function loadAdmin(){
     setMsg("Loading admin metrics...");
     try{
-      const res = await fetch("/admin-data");
+      const res = await fetch("/admin-data", {credentials:"same-origin"});
       const data = await res.json();
       if(!res.ok || data.error){
         setMsg(data.error || "Admin data error.");

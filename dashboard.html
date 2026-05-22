@@ -263,6 +263,18 @@ td{
   display:inline-block;
 }
 
+.pill{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  color:#d7e6eb;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
 .new{background:#14532d;color:#4ade80}
 .in_progress{background:#3b0764;color:#c084fc}
 .converted{background:#1e3a8a;color:#60a5fa}
@@ -452,8 +464,11 @@ td{
 
     <div class="user-box">
       <div>
-        <div id="clientEmail" style="font-weight:800;">Client</div>
-        <div style="font-size:13px;color:#94a3b8;">Growth Studio Plan</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div id="clientEmail" style="font-weight:800;">Client</div>
+          <span id="roleBadge" class="pill" style="display:none;">Role</span>
+        </div>
+        <div id="clientMeta" style="font-size:13px;color:#94a3b8;">—</div>
       </div>
 
       <div class="avatar"></div>
@@ -468,6 +483,21 @@ td{
 
     <div class="subtitle">
       Real CRM data from PostgreSQL: leads, posts, bookings and Content Factory.
+    </div>
+
+    <div id="platformAdminCompanyBox" class="box" style="margin-top:16px;display:none;">
+      <h2 style="font-size:18px;margin-bottom:10px;">Platform Admin</h2>
+      <div style="color:var(--muted);margin-top:-2px;margin-bottom:12px;line-height:1.5;">
+        You are viewing a company dashboard. Select a company to load real data.
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <select id="platformCompanySelect" class="search" style="max-width:520px;">
+          <option value="">Loading companies...</option>
+        </select>
+        <button class="dark-btn" onclick="applyPlatformCompany()">View Company</button>
+        <button class="dark-btn" onclick="goAdmin()" id="goAdminBtn" style="display:none;">Platform Admin Dashboard</button>
+      </div>
+      <div id="platformAdminMsg" class="msg" style="margin-top:12px;"></div>
     </div>
 
     <div class="action-row">
@@ -563,13 +593,20 @@ td{
 
 <script>
 const email = localStorage.getItem("ai_flow_email");
-const companyId = localStorage.getItem("ai_flow_company_id");
+const role = localStorage.getItem("ai_flow_role") || "";
+let companyId = localStorage.getItem("ai_flow_company_id") || "";
 
-if (!email || !companyId) {
+if (!email) {
   window.location.href = "/login";
 }
 
 document.getElementById("clientEmail").innerText = email;
+document.getElementById("clientMeta").innerText = role ? ("Role: " + role) : "—";
+if(role){
+  const b = document.getElementById("roleBadge");
+  b.style.display = "inline-block";
+  b.innerText = (role === "platform_admin") ? "Platform Admin" : role;
+}
 
 function logout() {
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
@@ -577,6 +614,10 @@ function logout() {
   localStorage.removeItem("ai_flow_role");
   localStorage.removeItem("ai_flow_company_id");
   window.location.href = "/login";
+}
+
+function goAdmin(){
+  window.location.href = "/admin";
 }
 
 function goContentFactory() {
@@ -605,11 +646,76 @@ function shortDate(value) {
   return value.split("T")[0];
 }
 
+function setPlatformMsg(text){
+  const el = document.getElementById("platformAdminMsg");
+  if(el) el.innerText = text || "";
+}
+
+function showPlatformCompanyBox(){
+  const box = document.getElementById("platformAdminCompanyBox");
+  if(box) box.style.display = "block";
+  const btn = document.getElementById("goAdminBtn");
+  if(btn) btn.style.display = "inline-block";
+}
+
+async function loadCompaniesForPlatformAdmin(){
+  showPlatformCompanyBox();
+  setPlatformMsg("Loading companies...");
+  try{
+    const res = await fetch("/api/companies", {credentials:"same-origin"});
+    const data = await res.json();
+    if(!res.ok || data.error){
+      setPlatformMsg(data.error || "Companies load error.");
+      return;
+    }
+    const sel = document.getElementById("platformCompanySelect");
+    const items = data.companies || [];
+    sel.innerHTML = '<option value=\"\">Select a company...</option>';
+    items.forEach(c => {
+      const id = String(c.company_id || \"\");
+      const name = String(c.company_name || \"\");
+      const status = String(c.status || \"active\");
+      const label = (name ? (name + \" — \") : \"\") + id + (status !== \"active\" ? (\" (\" + status + \")\") : \"\");
+      const opt = document.createElement(\"option\");
+      opt.value = id;
+      opt.innerText = label;
+      if(companyId && id === companyId){
+        opt.selected = true;
+      }
+      sel.appendChild(opt);
+    });
+    setPlatformMsg(items.length ? \"Select a company and click View Company.\" : \"No companies found.\");
+  }catch(e){
+    setPlatformMsg(\"Connection error loading companies.\");
+  }
+}
+
+async function applyPlatformCompany(){
+  const sel = document.getElementById(\"platformCompanySelect\");
+  const id = (sel && sel.value) ? String(sel.value) : \"\";
+  if(!id){
+    setPlatformMsg(\"Select a company first.\");
+    return;
+  }
+  companyId = id;
+  localStorage.setItem(\"ai_flow_company_id\", companyId);
+  try{
+    await fetch(\"/api/set-active-company\", {
+      method:\"POST\",
+      credentials:\"same-origin\",
+      headers:{\"Content-Type\":\"application/json\"},
+      body:JSON.stringify({companyId: companyId})
+    });
+  }catch(e){}
+  setMessage(\"\");
+  loadDashboardData();
+}
+
 async function loadDashboardData() {
   setMessage("Loading dashboard data...");
 
   try {
-    const res = await fetch("/dashboard-data?companyId=" + encodeURIComponent(companyId));
+    const res = await fetch("/dashboard-data?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
     const data = await res.json();
 
     if (!res.ok || data.error) {
@@ -877,7 +983,7 @@ function renderSocialDraftHistory(history){
 
 async function loadSocialContent(){
   try{
-    const res = await fetch("/social-content-data?companyId=" + encodeURIComponent(companyId));
+    const res = await fetch("/social-content-data?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
     const data = await res.json();
     if(!res.ok || data.error){
       const el1 = document.getElementById("socialDraftsToday");
@@ -919,7 +1025,20 @@ async function loadDemoData() {
   }
 }
 
-loadDashboardData();
+if(role === "platform_admin"){
+  loadCompaniesForPlatformAdmin();
+  if(companyId){
+    loadDashboardData();
+  }else{
+    setMessage("Platform admin: select a company to view its dashboard.");
+  }
+}else{
+  if(!companyId){
+    window.location.href = "/login";
+  }else{
+    loadDashboardData();
+  }
+}
 </script>
 
 <script>

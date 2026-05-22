@@ -514,9 +514,11 @@ button:active{transform:translateY(0)}
 
 const email = localStorage.getItem("ai_flow_email");
 
-const companyId = localStorage.getItem("ai_flow_company_id");
+const role = localStorage.getItem("ai_flow_role") || "";
 
-if (!email || !companyId) {
+let companyId = localStorage.getItem("ai_flow_company_id") || "";
+
+if (!email) {
 
   window.location.href = "/login";
 
@@ -541,6 +543,14 @@ function setMsg(text){
 
   document.getElementById("msg").innerText = text;
 
+}
+
+if(role !== "platform_admin" && !companyId){
+  window.location.href = "/login";
+}
+
+if(role === "platform_admin" && !companyId){
+  setMsg("Platform admin: select a company on /dashboard first to manage Social Accounts.");
 }
 
 function setConnectedHtml(html){

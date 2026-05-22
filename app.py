@@ -222,7 +222,61 @@ def guard_page(request: Request, *roles: str):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     if roles and not is_role(user, *roles):
-        return RedirectResponse(url="/dashboard", status_code=302)
+        email = (user.get("email") or "").strip()
+        role = (user.get("role") or "").strip()
+        html = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI FLOW - Access Denied</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{
+      min-height:100vh;
+      background:
+        radial-gradient(980px 720px at 14% -10%, rgba(184,255,122,0.18), transparent 58%),
+        radial-gradient(900px 700px at 110% 10%, rgba(65,220,255,0.14), transparent 55%),
+        radial-gradient(760px 640px at 70% 120%, rgba(139,92,246,0.10), transparent 58%),
+        #061923;
+      color:#f7fbff;
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
+      display:flex;align-items:center;justify-content:center;padding:24px 16px;
+    }}
+    .box{{
+      width:520px;max-width:100%;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:32px;
+      padding:28px;
+      box-shadow:0 30px 80px rgba(0,0,0,.16);
+      backdrop-filter: blur(18px);
+    }}
+    .logo{{font-size:32px;font-weight:950;margin-bottom:8px}}
+    .logo span{{color:#b8ff7a}}
+    .sub{{color:#9fb7c3;line-height:1.5;margin-top:10px}}
+    .pill{{display:inline-block;margin-top:12px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-size:12px;font-weight:950;color:#d7e6eb}}
+    .row{{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}}
+    a.btn{{text-decoration:none;display:inline-block;padding:12px 14px;border-radius:14px;font-weight:950;background:linear-gradient(135deg, rgba(184,255,122,0.98) 0%, rgba(65,220,255,0.72) 100%);color:#071820;box-shadow:0 22px 70px rgba(184,255,122,0.14)}}
+    a.btn2{{text-decoration:none;display:inline-block;padding:12px 14px;border-radius:14px;font-weight:950;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#f7fbff}}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">AI <span>FLOW</span></div>
+    <div class="sub">Access denied for this page.</div>
+    <div class="sub" style="margin-top:8px;">Signed in as: <strong>{email or "unknown"}</strong></div>
+    <div class="pill">Role: {role or "unknown"}</div>
+    <div class="row">
+      <a class="btn" href="/dashboard">Go to Dashboard</a>
+      <a class="btn2" href="/settings">Settings</a>
+    </div>
+  </div>
+</body>
+</html>
+"""
+        return HTMLResponse(html, status_code=403)
     return None
 
 
@@ -1100,6 +1154,80 @@ async def logout_api(request: Request):
         pass
     return JSONResponse({"success": True})
 
+@app.get("/api/me")
+def api_me(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    return JSONResponse({"success": True, "user": user})
+
+
+@app.get("/api/companies")
+def api_companies(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    if not is_role(user, ROLE_PLATFORM_ADMIN):
+        return json_error("Forbidden", 403)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT company_id, company_name, owner_email, plan, status, created_at
+                FROM companies
+                ORDER BY created_at DESC NULLS LAST, company_id ASC
+                LIMIT 500
+                """
+            )
+            companies = cur.fetchall()
+        return JSONResponse({"success": True, "companies": companies})
+    except Exception as e:
+        print("API COMPANIES ERROR:", str(e))
+        return json_error("Companies data error", 500)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.post("/api/set-active-company")
+async def api_set_active_company(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    if not is_role(user, ROLE_PLATFORM_ADMIN):
+        return json_error("Forbidden", 403)
+
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    if not company_id:
+        return json_error("Missing companyId", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        if not _company_exists_and_active(conn, company_id):
+            return json_error("Unknown companyId", 404)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    try:
+        request.session["active_company_id"] = company_id
+    except Exception:
+        pass
+
+    return JSONResponse({"success": True, "companyId": company_id})
+
 
 # =========================================================
 # TEAM / INVITES
@@ -1394,18 +1522,25 @@ async def accept_invite_api(request: Request):
 
 @app.get("/dashboard-data")
 def dashboard_data(request: Request, companyId: str = ""):
-    company_id, user, err = resolve_company_id(
-        request,
-        companyId,
-        allow_public=False,
-        allow_platform_admin_any=True,
-    )
-    if err:
-        return err
-    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    if not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
         return json_error("Forbidden", 403)
 
-    companyId = company_id
+    provided = (companyId or "").strip()
+    if is_role(user, ROLE_PLATFORM_ADMIN):
+        if not provided:
+            provided = (request.session.get("active_company_id") or "").strip()
+        if not provided:
+            return json_error("Select a company to view its dashboard", 400)
+        companyId = provided
+    else:
+        companyId = (user.get("company_id") or "").strip()
+        if not companyId:
+            return json_error("Missing company access", 403)
+        if provided and provided != companyId:
+            return json_error("Forbidden company access", 403)
 
     conn = get_db_connection()
 

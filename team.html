@@ -243,9 +243,9 @@
 
   <script>
   const email = localStorage.getItem("ai_flow_email");
-  const role = localStorage.getItem("ai_flow_role");
-  const companyId = localStorage.getItem("ai_flow_company_id");
-  if(!email || !companyId){
+  const role = localStorage.getItem("ai_flow_role") || "";
+  let companyId = localStorage.getItem("ai_flow_company_id") || "";
+  if(!email){
     window.location.href = "/login";
   }
   document.getElementById("clientEmail").innerText = email;
@@ -267,6 +267,14 @@
     localStorage.removeItem("ai_flow_role");
     localStorage.removeItem("ai_flow_company_id");
     window.location.href="/login";
+  }
+
+  if(role !== "platform_admin" && !companyId){
+    window.location.href = "/login";
+  }
+
+  if(role === "platform_admin" && !companyId){
+    setMsg("Platform admin: select a company on /dashboard first to manage a company team.");
   }
 
   function renderUsers(items){
@@ -392,8 +400,9 @@
     }
   }
 
-  loadTeam();
+  if(companyId){
+    loadTeam();
+  }
   </script>
 </body>
 </html>
-

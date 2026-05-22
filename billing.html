@@ -427,13 +427,26 @@ button{
 
 <script>
 const email = localStorage.getItem("ai_flow_email");
-const companyId = localStorage.getItem("ai_flow_company_id");
+const role = localStorage.getItem("ai_flow_role") || "";
+let companyId = localStorage.getItem("ai_flow_company_id") || "";
 
-if (!email || !companyId) {
+if (!email) {
   window.location.href = "/login";
 }
 
 document.getElementById("clientEmail").innerText = email;
+
+function setMsg(text){
+  document.getElementById("msg").innerText = text;
+}
+
+if(role !== "platform_admin" && !companyId){
+  window.location.href = "/login";
+}
+
+if(role === "platform_admin" && !companyId){
+  setMsg("Platform admin: select a company on /dashboard first to manage billing.");
+}
 
 function logout(){
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
@@ -441,10 +454,6 @@ function logout(){
   localStorage.removeItem("ai_flow_role");
   localStorage.removeItem("ai_flow_company_id");
   window.location.href = "/login";
-}
-
-function setMsg(text){
-  document.getElementById("msg").innerText = text;
 }
 
 function contactSales(){

@@ -172,7 +172,11 @@ async function loginUser(){
 
     localStorage.setItem("ai_flow_email", result.email);
     localStorage.setItem("ai_flow_role", result.role);
-    localStorage.setItem("ai_flow_company_id", result.companyId);
+    if(result.companyId){
+      localStorage.setItem("ai_flow_company_id", result.companyId);
+    }else{
+      localStorage.removeItem("ai_flow_company_id");
+    }
 
     if(result.role === "platform_admin"){
       window.location.href = "/admin";
