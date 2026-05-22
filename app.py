@@ -3384,7 +3384,25 @@ async def stripe_create_checkout_session(request: Request):
     finally:
         conn.close()
 
-    return JSONResponse({"success": True, "url": session.get("url")})
+    checkout_url = ""
+    try:
+        checkout_url = getattr(session, "url", "") or ""
+    except Exception:
+        checkout_url = ""
+
+    if not checkout_url:
+        try:
+            checkout_url = session["url"]
+        except Exception:
+            checkout_url = ""
+
+    if not checkout_url:
+        return JSONResponse(
+            {"error": "Stripe session created but no checkout URL was returned. Check your Stripe API version/settings."},
+            status_code=500,
+        )
+
+    return JSONResponse({"success": True, "url": checkout_url})
 
 
 @app.post("/api/stripe/webhook")
