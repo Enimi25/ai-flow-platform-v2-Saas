@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI FLOW Invite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      min-height:100vh;
+      background:
+        radial-gradient(980px 720px at 14% -10%, rgba(184,255,122,0.18), transparent 58%),
+        radial-gradient(900px 700px at 110% 10%, rgba(65,220,255,0.14), transparent 55%),
+        radial-gradient(760px 640px at 70% 120%, rgba(139,92,246,0.10), transparent 58%),
+        #061923;
+      color:#f7fbff;
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px 16px;
+    }
+    .box{
+      width:460px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:32px;
+      padding:36px;
+      box-shadow:0 30px 80px rgba(0,0,0,.16);
+      backdrop-filter: blur(18px);
+    }
+    .logo{font-size:34px;font-weight:900;margin-bottom:8px}
+    .logo span{color:#b8ff7a}
+    .sub{color:#9fb7c3;margin-bottom:20px;line-height:1.5}
+    label{display:block;margin-bottom:8px;color:#d7e6eb;font-size:14px;font-weight:800}
+    input{
+      width:100%;
+      padding:15px;
+      margin-bottom:14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06);
+      color:#f7fbff;
+      font-size:15px;
+      outline:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    input:focus{
+      border-color:rgba(184,255,122,0.36);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 3px rgba(184,255,122,0.12);
+    }
+    .btn{
+      width:100%;
+      padding:15px;
+      border:0;
+      border-radius:14px;
+      font-weight:900;
+      cursor:pointer;
+      margin-top:4px;
+      transition:transform .12s ease, box-shadow .2s ease;
+      background:linear-gradient(135deg, rgba(184,255,122,0.98) 0%, rgba(65,220,255,0.72) 100%);
+      color:#071820;
+      box-shadow:0 22px 70px rgba(184,255,122,0.14);
+    }
+    .btn:hover{transform:translateY(-1px);box-shadow:0 26px 70px rgba(184,255,122,0.18)}
+    .btn:active{transform:translateY(0)}
+    .msg{margin-top:12px;color:#9fb7c3;min-height:22px}
+    .error{color:#fb7185}
+    .success{color:#b8ff7a}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">AI <span>FLOW</span></div>
+    <div class="sub">Set a password to accept the invite and access the workspace.</div>
+
+    <label>Password</label>
+    <input id="password" type="password" placeholder="Create a password (min 6 chars)">
+
+    <button class="btn" id="acceptBtn">Accept Invite</button>
+
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <script>
+  const msg = document.getElementById("msg");
+  const token = new URLSearchParams(window.location.search).get("token") || "";
+
+  function setMsg(t, isError){
+    msg.className = "msg" + (isError ? " error" : "");
+    msg.innerText = t || "";
+  }
+
+  async function acceptInvite(){
+    const password = document.getElementById("password").value.trim();
+    setMsg("Accepting invite...");
+    if(!token){
+      setMsg("Missing invite token.", true);
+      return;
+    }
+    if(!password || password.length < 6){
+      setMsg("Password must be at least 6 characters.", true);
+      return;
+    }
+    try{
+      const res = await fetch("/accept-invite-api",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({token: token, password: password})
+      });
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Accept invite error.", true);
+        return;
+      }
+      msg.className = "msg success";
+      msg.innerText = "Invite accepted. You can now login.";
+      setTimeout(() => { window.location.href = "/login"; }, 900);
+    }catch(e){
+      setMsg("Connection error.", true);
+    }
+  }
+
+  document.getElementById("acceptBtn").onclick = acceptInvite;
+  </script>
+</body>
+</html>
+

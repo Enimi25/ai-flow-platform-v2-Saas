@@ -445,6 +445,7 @@ button{
         <strong id="workspaceStatus" style="color:#4ade80;">—</strong>
       </div>
 
+      <button class="dark" onclick="goTeam()" style="margin-top:12px;">Manage Team</button>
       <button class="dark" onclick="resetSettings()" style="margin-top:18px;">Reset Demo Settings</button>
 
       <div id="workspaceMsg" class="msg"></div>
@@ -467,6 +468,7 @@ document.getElementById("workspaceEmail").innerText = email;
 document.getElementById("workspaceCompany").innerText = companyId;
 
 function logout(){
+  try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
   localStorage.removeItem("ai_flow_email");
   localStorage.removeItem("ai_flow_role");
   localStorage.removeItem("ai_flow_company_id");
@@ -477,6 +479,10 @@ function setAllMsgs(text){
   document.getElementById("profileMsg").innerText = text;
   document.getElementById("aiMsg").innerText = text;
   document.getElementById("notifyMsg").innerText = text;
+}
+
+function goTeam(){
+  window.location.href = "/team";
 }
 
 async function saveSettings(){

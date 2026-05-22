@@ -341,6 +341,7 @@ document.getElementById("clientEmail").innerText = email;
 let bookings = [];
 
 function logout(){
+  try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
   localStorage.removeItem("ai_flow_email");
   localStorage.removeItem("ai_flow_role");
   localStorage.removeItem("ai_flow_company_id");

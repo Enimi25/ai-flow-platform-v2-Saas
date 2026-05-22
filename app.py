@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from groq import Groq
 
 import os
 import hashlib
+import base64
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
@@ -16,6 +17,8 @@ import urllib.request
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import stripe
+
+from starlette.middleware.sessions import SessionMiddleware
 
 
 app = FastAPI()
@@ -29,6 +32,198 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_session_secret = (os.getenv("SESSION_SECRET") or "").strip()
+if not _session_secret:
+    # Avoid crashing deploys if env var is missing, but strongly recommend setting SESSION_SECRET in production.
+    _session_secret = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip() or secrets.token_hex(32)
+    print("WARNING: SESSION_SECRET is missing; using a fallback secret. Set SESSION_SECRET for stable sessions.")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_session_secret,
+    session_cookie="ai_flow_session",
+    same_site="lax",
+    https_only=True,
+)
+
+# =========================================================
+# AUTH / RBAC HELPERS
+# =========================================================
+
+ROLE_PLATFORM_ADMIN = "platform_admin"
+ROLE_COMPANY_ADMIN = "company_admin"
+ROLE_EMPLOYEE = "employee"
+ROLE_CLIENT = "client"
+
+USER_STATUS_ACTIVE = "active"
+USER_STATUS_INVITED = "invited"
+USER_STATUS_SUSPENDED = "suspended"
+
+
+def now_utc_iso() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def _b64e(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).decode("utf-8").rstrip("=")
+
+
+def _b64d(s: str) -> bytes:
+    pad = "=" * ((4 - (len(s) % 4)) % 4)
+    return base64.urlsafe_b64decode((s + pad).encode("utf-8"))
+
+
+def hash_password(password: str, iterations: int = 200_000) -> str:
+    password = (password or "").strip()
+    if not password:
+        return ""
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations, dklen=32)
+    return f"pbkdf2_sha256${iterations}${_b64e(salt)}${_b64e(dk)}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    password = (password or "").strip()
+    stored = (stored or "").strip()
+    if not password or not stored:
+        return False
+
+    # New format: pbkdf2_sha256$iterations$salt$hash
+    if stored.startswith("pbkdf2_sha256$"):
+        try:
+            parts = stored.split("$")
+            if len(parts) != 4:
+                return False
+            iterations = int(parts[1])
+            salt = _b64d(parts[2])
+            expected = _b64d(parts[3])
+            dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations, dklen=len(expected))
+            return secrets.compare_digest(dk, expected)
+        except Exception:
+            return False
+
+    # Legacy format: sha256 hex (64 chars)
+    if len(stored) == 64:
+        try:
+            int(stored, 16)
+        except Exception:
+            return False
+        legacy = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        return secrets.compare_digest(legacy, stored)
+
+    return False
+
+
+def get_session_user(request: Request) -> dict | None:
+    sess = getattr(request, "session", None)
+    if not sess:
+        return None
+    user_id = sess.get("user_id")
+    if not user_id:
+        return None
+    return {
+        "user_id": sess.get("user_id"),
+        "email": sess.get("email") or "",
+        "role": sess.get("role") or "",
+        "company_id": sess.get("company_id") or "",
+    }
+
+
+def require_login(request: Request) -> dict | None:
+    user = get_session_user(request)
+    if not user:
+        return None
+    return user
+
+
+def is_role(user: dict, *roles: str) -> bool:
+    return bool(user) and (user.get("role") in set(roles))
+
+
+def json_error(message: str, status_code: int = 400):
+    return JSONResponse({"error": message}, status_code=status_code)
+
+
+def _company_exists_and_active(conn, company_id: str) -> bool:
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT status FROM companies WHERE company_id = %s",
+                (company_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return False
+            status = (row.get("status") or "active").strip() or "active"
+            return status == "active"
+    except Exception:
+        return False
+
+
+def resolve_company_id(
+    request: Request,
+    provided_company_id: str,
+    *,
+    allow_public: bool = False,
+    allow_platform_admin_any: bool = True,
+):
+    """
+    Enforces that non-platform users can only act on their own company_id.
+    For public callers (widget), allow_public=True validates company exists and is active.
+    Returns: (company_id, user_dict_or_none, error_response_or_none)
+    """
+    provided_company_id = (provided_company_id or "").strip()
+    user = get_session_user(request)
+
+    if user:
+        role = (user.get("role") or "").strip()
+        user_company_id = (user.get("company_id") or "").strip()
+
+        if role == ROLE_PLATFORM_ADMIN and allow_platform_admin_any:
+            if not provided_company_id:
+                return "", user, json_error("Missing companyId", 400)
+            return provided_company_id, user, None
+
+        if not user_company_id:
+            return "", user, json_error("User has no company access", 403)
+
+        if provided_company_id and provided_company_id != user_company_id:
+            return "", user, json_error("Forbidden company access", 403)
+
+        return user_company_id, user, None
+
+    if not allow_public:
+        return "", None, json_error("Not logged in", 401)
+
+    if not provided_company_id:
+        return "", None, json_error("Missing companyId", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return "", None, json_error("Database error", 500)
+    try:
+        if not _company_exists_and_active(conn, provided_company_id):
+            return "", None, json_error("Unknown companyId", 404)
+        return provided_company_id, None, None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def guard_page(request: Request, *roles: str):
+    """
+    Server-side guard for static app pages. Keeps existing client-side localStorage checks,
+    but prevents direct access without a valid session cookie.
+    """
+    user = require_login(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    if roles and not is_role(user, *roles):
+        return RedirectResponse(url="/dashboard", status_code=302)
+    return None
 
 
 # =========================================================
@@ -78,6 +273,8 @@ def init_db():
             cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'")
             cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
             cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS owner_user_id INTEGER")
+            cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT ''")
 
             cur.execute(
                 """
@@ -85,12 +282,42 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     email TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
+                    password_hash TEXT DEFAULT '',
                     role TEXT DEFAULT 'client',
                     company_id TEXT DEFAULT '',
+                    status TEXT DEFAULT 'active',
                     created_at TEXT DEFAULT ''
                 );
                 """
             )
+
+            # Backward-compatible migrations for older DBs.
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'client'")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT ''")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
+
+            # Invite system (MVP): company admins can invite employees/clients.
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_invites (
+                    id SERIAL PRIMARY KEY,
+                    email TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    token TEXT UNIQUE NOT NULL,
+                    expires_at TEXT DEFAULT '',
+                    accepted_at TEXT DEFAULT '',
+                    created_at TEXT DEFAULT ''
+                );
+                """
+            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_invites_company_id ON v2_invites(company_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_invites_email ON v2_invites(email)")
 
             cur.execute(
                 """
@@ -341,6 +568,66 @@ def init_db():
 @app.on_event("startup")
 def startup_event():
     init_db()
+    bootstrap_platform_admin()
+
+
+def bootstrap_platform_admin():
+    """
+    Creates the platform admin user from env vars if missing.
+    Env:
+      PLATFORM_ADMIN_EMAIL
+      PLATFORM_ADMIN_PASSWORD
+    """
+    email = (os.getenv("PLATFORM_ADMIN_EMAIL") or "").strip().lower()
+    password = (os.getenv("PLATFORM_ADMIN_PASSWORD") or "").strip()
+
+    if not email or not password:
+        return
+
+    conn = get_db_connection()
+    if not conn:
+        return
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+            existing = cur.fetchone()
+
+            if existing:
+                # If a user exists but isn't platform_admin, do not auto-escalate privileges.
+                return
+
+            created_at = now_utc_iso()
+            pw = hash_password(password)
+            if not pw:
+                return
+
+            cur.execute(
+                """
+                INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    email,
+                    pw,
+                    pw,
+                    ROLE_PLATFORM_ADMIN,
+                    "",
+                    USER_STATUS_ACTIVE,
+                    created_at,
+                    created_at,
+                ),
+            )
+
+        conn.commit()
+        print("BOOTSTRAP: platform_admin created:", email)
+    except Exception as e:
+        print("BOOTSTRAP PLATFORM ADMIN ERROR:", str(e))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # =========================================================
@@ -362,53 +649,94 @@ def login_page():
 
 
 @app.get("/dashboard")
-def dashboard_page():
+def dashboard_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
+    if guard:
+        return guard
     return page_response("dashboard.html")
 
 
 @app.get("/leads-page")
-def leads_page():
+def leads_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
+    if guard:
+        return guard
     return page_response("leads.html")
 
 
 @app.get("/content-factory")
-def content_factory_page():
+def content_factory_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
+    if guard:
+        return guard
     return page_response("content.html")
 
 @app.get("/settings")
-def settings_page():
+def settings_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
+    if guard:
+        return guard
     return page_response("settings.html")
 
 @app.get("/social-accounts")
-def social_accounts_page():
+def social_accounts_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
+    if guard:
+        return guard
     return page_response("social.html")
 
 
 @app.get("/ai-replies")
-def ai_replies_page():
+def ai_replies_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
+    if guard:
+        return guard
     return page_response("replies.html")
 
 @app.get("/billing")
-def billing_page():
+def billing_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
+    if guard:
+        return guard
     return page_response("billing.html")
 
 @app.get("/analytics")
-def analytics_page():
+def analytics_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
+    if guard:
+        return guard
     return page_response("analytics.html")
 
 
 @app.get("/calendar")
-def calendar_page():
+def calendar_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
+    if guard:
+        return guard
     return page_response("calendar.html")
 
 
 @app.get("/admin")
-def admin_page():
+def admin_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN)
+    if guard:
+        return guard
     return page_response("admin.html")
 
 @app.get("/onboarding")
-def onboarding_page():
+def onboarding_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
+    if guard:
+        return guard
     return page_response("onboarding.html")
+
+
+@app.get("/team")
+def team_page(request: Request):
+    guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
+    if guard:
+        return guard
+    return page_response("team.html")
 
 
 @app.get("/payment/success")
@@ -421,7 +749,13 @@ def payment_cancel_page():
     return page_response("payment_cancel.html")
 
 @app.get("/admin-data")
-def admin_data():
+def admin_data(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    if not is_role(user, ROLE_PLATFORM_ADMIN):
+        return json_error("Forbidden", 403)
+
     conn = get_db_connection()
     if not conn:
         return JSONResponse({"error": "Database error"}, status_code=500)
@@ -532,9 +866,13 @@ async def register(request: Request):
             status_code=400,
         )
 
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    pw_hash = hash_password(password)
+    if not pw_hash:
+        return JSONResponse({"error": "Invalid password"}, status_code=400)
+
+    # New signups create their own company workspace. Keep company_id=email for backward compatibility.
     company_id = email
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at = now_utc_iso()
 
     conn = get_db_connection()
 
@@ -545,7 +883,7 @@ async def register(request: Request):
         )
 
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
             cur.execute(
                 """
@@ -575,20 +913,38 @@ async def register(request: Request):
                 INSERT INTO users (
                     email,
                     password,
+                    password_hash,
                     role,
                     company_id,
+                    status,
                     created_at
                 )
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
                 """,
                 (
                     email,
-                    hashed_password,
-                    "client",
+                    pw_hash,
+                    pw_hash,
+                    ROLE_COMPANY_ADMIN,
                     company_id,
+                    USER_STATUS_ACTIVE,
                     created_at,
                 ),
             )
+            user_row = cur.fetchone() or {}
+            user_id = user_row.get("id")
+
+            if user_id:
+                cur.execute(
+                    """
+                    UPDATE companies
+                    SET owner_user_id = %s,
+                        updated_at = %s
+                    WHERE company_id = %s
+                    """,
+                    (int(user_id), created_at, company_id),
+                )
 
         conn.commit()
 
@@ -619,8 +975,6 @@ async def login_api(request: Request):
     email = data.get("email", "").strip().lower()
     password = data.get("password", "").strip()
 
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-
     conn = get_db_connection()
 
     if not conn:
@@ -637,11 +991,9 @@ async def login_api(request: Request):
                 SELECT *
                 FROM users
                 WHERE email = %s
-                AND password = %s
                 """,
                 (
                     email,
-                    hashed_password,
                 ),
             )
 
@@ -653,12 +1005,78 @@ async def login_api(request: Request):
                     status_code=401,
                 )
 
+            # Status checks
+            status = (user.get("status") or USER_STATUS_ACTIVE).strip() or USER_STATUS_ACTIVE
+            if status == USER_STATUS_SUSPENDED:
+                return JSONResponse({"error": "Account suspended"}, status_code=403)
+
+            # Password check (supports legacy sha256 in users.password)
+            stored_hash = (user.get("password_hash") or "").strip() or (user.get("password") or "").strip()
+            if not verify_password(password, stored_hash):
+                return JSONResponse({"error": "Invalid credentials"}, status_code=401)
+
+            # If legacy SHA256 was used, upgrade to PBKDF2 on successful login.
+            if not (user.get("password_hash") or "").strip() and (user.get("password") or "").strip():
+                upgraded = hash_password(password)
+                if upgraded:
+                    try:
+                        cur.execute(
+                            """
+                            UPDATE users
+                            SET password_hash = %s,
+                                password = %s,
+                                updated_at = %s
+                            WHERE id = %s
+                            """,
+                            (upgraded, upgraded, now_utc_iso(), int(user["id"])),
+                        )
+                        conn.commit()
+                        user["password_hash"] = upgraded
+                        user["password"] = upgraded
+                    except Exception:
+                        # Do not fail login on upgrade problems.
+                        conn.rollback()
+
+            role = (user.get("role") or ROLE_CLIENT).strip() or ROLE_CLIENT
+            if role == "admin":
+                role = ROLE_PLATFORM_ADMIN
+            # Backward-compat: older signups used role="client" for the company owner.
+            if role == ROLE_CLIENT and (user.get("company_id") or "").strip():
+                role = ROLE_COMPANY_ADMIN
+                try:
+                    cur.execute(
+                        "UPDATE users SET role = %s, updated_at = %s WHERE id = %s",
+                        (ROLE_COMPANY_ADMIN, now_utc_iso(), int(user["id"])),
+                    )
+                    conn.commit()
+                    user["role"] = ROLE_COMPANY_ADMIN
+                except Exception:
+                    conn.rollback()
+
+            company_id = (user.get("company_id") or "").strip()
+            if role != ROLE_PLATFORM_ADMIN:
+                if not company_id:
+                    return JSONResponse({"error": "Account missing company access"}, status_code=403)
+                if not _company_exists_and_active(conn, company_id):
+                    return JSONResponse({"error": "Company suspended"}, status_code=403)
+
+            # Session (server-side signed cookie)
+            try:
+                request.session.clear()
+                request.session["user_id"] = int(user["id"])
+                request.session["email"] = user.get("email") or ""
+                request.session["role"] = role
+                request.session["company_id"] = company_id
+            except Exception as e:
+                print("SESSION SET ERROR:", str(e))
+
             return JSONResponse(
                 {
                     "success": True,
                     "email": user["email"],
-                    "role": user["role"],
-                    "companyId": user["company_id"],
+                    "role": role,
+                    "companyId": company_id,
+                    "userId": user.get("id"),
                 }
             )
 
@@ -674,17 +1092,320 @@ async def login_api(request: Request):
         conn.close()
 
 
+@app.post("/logout-api")
+async def logout_api(request: Request):
+    try:
+        request.session.clear()
+    except Exception:
+        pass
+    return JSONResponse({"success": True})
+
+
+# =========================================================
+# TEAM / INVITES
+# =========================================================
+
+@app.get("/team-data")
+def team_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, email, role, status, created_at, updated_at
+                FROM users
+                WHERE company_id = %s
+                ORDER BY id ASC
+                """,
+                (company_id,),
+            )
+            users = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT id, email, role, token, expires_at, accepted_at, created_at
+                FROM v2_invites
+                WHERE company_id = %s
+                AND (accepted_at IS NULL OR accepted_at = '')
+                ORDER BY id DESC
+                LIMIT 100
+                """,
+                (company_id,),
+            )
+            invites = cur.fetchall()
+
+        base = (os.getenv("APP_PUBLIC_URL") or "").strip().rstrip("/")
+        if not base:
+            base = str(request.base_url).rstrip("/")
+
+        for inv in invites:
+            tok = (inv.get("token") or "").strip()
+            inv["invite_url"] = f"{base}/accept-invite?token={urllib.parse.quote(tok)}" if tok else ""
+
+        return JSONResponse({"success": True, "users": users, "invites": invites})
+
+    except Exception as e:
+        print("TEAM DATA ERROR:", str(e))
+        return json_error("Team data error", 500)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.post("/invite-user")
+async def invite_user(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    role = (data.get("role") or ROLE_EMPLOYEE).strip() or ROLE_EMPLOYEE
+
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
+    if not email or "@" not in email:
+        return json_error("Invalid email", 400)
+
+    if role not in {ROLE_EMPLOYEE, ROLE_CLIENT}:
+        return json_error("Invalid role", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+            if cur.fetchone():
+                return json_error("User already exists", 400)
+
+            token = secrets.token_urlsafe(24)
+            expires_at = (datetime.utcnow() + timedelta(days=7)).isoformat() + "Z"
+            created_at = now_utc_iso()
+
+            cur.execute(
+                """
+                INSERT INTO v2_invites (email, role, company_id, token, expires_at, accepted_at, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (email, role, company_id, token, expires_at, "", created_at),
+            )
+
+        conn.commit()
+
+        base = (os.getenv("APP_PUBLIC_URL") or "").strip().rstrip("/")
+        if not base:
+            base = str(request.base_url).rstrip("/")
+
+        invite_url = f"{base}/accept-invite?token={urllib.parse.quote(token)}"
+        return JSONResponse({"success": True, "inviteUrl": invite_url})
+
+    except Exception as e:
+        print("INVITE USER ERROR:", str(e))
+        return json_error("Invite error", 500)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.post("/remove-user")
+async def remove_user(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    user_id = data.get("userId")
+
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
+    try:
+        user_id_int = int(user_id)
+    except Exception:
+        return json_error("Invalid userId", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, role, company_id, email FROM users WHERE id = %s",
+                (user_id_int,),
+            )
+            target = cur.fetchone()
+            if not target:
+                return json_error("User not found", 404)
+            if (target.get("company_id") or "") != company_id:
+                return json_error("Forbidden", 403)
+            if (target.get("role") or "") != ROLE_EMPLOYEE and not is_role(user, ROLE_PLATFORM_ADMIN):
+                return json_error("Only employees can be suspended in this MVP", 400)
+
+            cur.execute(
+                """
+                UPDATE users
+                SET status = %s, updated_at = %s
+                WHERE id = %s AND company_id = %s
+                """,
+                (USER_STATUS_SUSPENDED, now_utc_iso(), user_id_int, company_id),
+            )
+
+        conn.commit()
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        print("REMOVE USER ERROR:", str(e))
+        return json_error("Remove user error", 500)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.get("/accept-invite")
+def accept_invite_page(token: str = ""):
+    # Static page reads token from query and calls /accept-invite-api
+    return page_response("accept_invite.html")
+
+
+@app.post("/accept-invite-api")
+async def accept_invite_api(request: Request):
+    data = await request.json()
+    token = (data.get("token") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    if not token:
+        return json_error("Missing token", 400)
+    if not password or len(password) < 6:
+        return json_error("Password must be at least 6 characters", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_invites
+                WHERE token = %s
+                """,
+                (token,),
+            )
+            inv = cur.fetchone()
+            if not inv:
+                return json_error("Invalid invite token", 400)
+            if (inv.get("accepted_at") or "").strip():
+                return json_error("Invite already accepted", 400)
+            expires_at = (inv.get("expires_at") or "").strip()
+            if expires_at:
+                try:
+                    if datetime.utcnow() > datetime.fromisoformat(expires_at.replace("Z", "")):
+                        return json_error("Invite expired", 400)
+                except Exception:
+                    pass
+
+            email = (inv.get("email") or "").strip().lower()
+            role = (inv.get("role") or ROLE_EMPLOYEE).strip() or ROLE_EMPLOYEE
+            company_id = (inv.get("company_id") or "").strip()
+            if not email or not company_id:
+                return json_error("Invalid invite", 400)
+
+            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+            if cur.fetchone():
+                return json_error("User already exists", 400)
+
+            pw = hash_password(password)
+            if not pw:
+                return json_error("Invalid password", 400)
+
+            created_at = now_utc_iso()
+            cur.execute(
+                """
+                INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (email, pw, pw, role, company_id, USER_STATUS_ACTIVE, created_at, created_at),
+            )
+            user_id = (cur.fetchone() or {}).get("id")
+
+            cur.execute(
+                """
+                UPDATE v2_invites
+                SET accepted_at = %s
+                WHERE token = %s
+                """,
+                (created_at, token),
+            )
+
+        conn.commit()
+
+        # Do not auto-login invited users; they can login via /login.
+        return JSONResponse({"success": True, "email": email, "userId": user_id})
+
+    except Exception as e:
+        print("ACCEPT INVITE ERROR:", str(e))
+        return json_error("Accept invite error", 500)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 # =========================================================
 # DASHBOARD DATA
 # =========================================================
 
 @app.get("/dashboard-data")
-def dashboard_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse(
-            {"error": "Missing companyId"},
-            status_code=400,
-        )
+def dashboard_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
+    companyId = company_id
 
     conn = get_db_connection()
 
@@ -850,10 +1571,18 @@ async def create_lead(request: Request):
     status = (data.get("status") or "new").strip() or "new"
     message = (data.get("message") or "").strip()
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=True,  # website widget can create leads without login
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if user and not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = now_utc_iso()
 
     conn = get_db_connection()
     if not conn:
@@ -915,8 +1644,17 @@ async def update_lead(request: Request):
     company_id = (data.get("companyId") or "").strip()
     lead_id = data.get("id")
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
     if lead_id is None or str(lead_id).strip() == "":
         return JSONResponse({"error": "Missing id"}, status_code=400)
 
@@ -974,8 +1712,16 @@ async def delete_lead(request: Request):
     company_id = (data.get("companyId") or "").strip()
     lead_id = data.get("id")
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     try:
         lead_id_int = int(lead_id)
@@ -1822,9 +2568,19 @@ async def tiktok_disconnect(request: Request):
 # =========================================================
 
 @app.get("/bookings-data")
-def bookings_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+def bookings_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
+    companyId = company_id
 
     conn = get_db_connection()
     if not conn:
@@ -1865,15 +2621,24 @@ async def create_booking(request: Request):
     time_value = (data.get("time") or "").strip()
     meeting_type = (data.get("meetingType") or "").strip()
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
     if not client_name or not date_value or not time_value:
         return JSONResponse({"error": "Missing clientName, date, or time"}, status_code=400)
 
     meeting_time = f"{date_value} {time_value}"
     meeting_link = meeting_type or ""
     status = "booked"
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at = now_utc_iso()
 
     conn = get_db_connection()
     if not conn:
@@ -1927,8 +2692,16 @@ async def delete_booking(request: Request):
     company_id = (data.get("companyId") or "").strip()
     booking_id = data.get("id")
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     try:
         booking_id_int = int(booking_id)
@@ -2724,9 +3497,19 @@ async def social_content_publish(request: Request):
 # =========================================================
 
 @app.get("/analytics-data")
-def analytics_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+def analytics_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
+    companyId = company_id
 
     conn = get_db_connection()
     if not conn:
@@ -2863,9 +3646,19 @@ def analytics_data(companyId: str = ""):
 # =========================================================
 
 @app.get("/settings-data")
-def settings_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+def settings_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
+    companyId = company_id
 
     defaults = {
         "industry": "Beauty / Salon",
@@ -2964,8 +3757,16 @@ async def save_settings(request: Request):
     data = await request.json()
 
     company_id = (data.get("companyId") or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
 
     company_name = (data.get("companyName") or "").strip()
     industry = (data.get("industry") or "").strip()
@@ -2980,7 +3781,7 @@ async def save_settings(request: Request):
     email_notifications = (data.get("emailNotifications") or "Enabled").strip() or "Enabled"
     lead_alerts = (data.get("leadAlerts") or "Enabled").strip() or "Enabled"
     weekly_reports = (data.get("weeklyReports") or "Enabled").strip() or "Enabled"
-    updated_at = datetime.utcnow().isoformat() + "Z"
+    updated_at = now_utc_iso()
 
     conn = get_db_connection()
     if not conn:
@@ -3142,9 +3943,19 @@ def widget_settings(companyId: str = ""):
 # =========================================================
 
 @app.get("/billing-data")
-def billing_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+def billing_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
+    companyId = company_id
 
     conn = get_db_connection()
     if not conn:
@@ -3180,8 +3991,17 @@ async def update_plan(request: Request):
     company_id = (data.get("companyId") or "").strip()
     plan = (data.get("plan") or "").strip()
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
     if not plan:
         return JSONResponse({"error": "Missing plan"}, status_code=400)
 
@@ -3877,9 +4697,19 @@ Rules:
 # =========================================================
 
 @app.get("/replies-data")
-def replies_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+def replies_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request,
+        companyId,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
+    companyId = company_id
 
     conn = get_db_connection()
     if not conn:
@@ -3917,8 +4747,17 @@ async def create_ai_reply(request: Request):
     customer_message = (data.get("customerMessage") or "").strip()
     source = (data.get("source") or "Website").strip() or "Website"
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
+
     if not customer_message:
         return JSONResponse({"error": "Missing customerMessage"}, status_code=400)
 
@@ -3963,7 +4802,7 @@ Rules:
             ai_reply = fallback
 
     status = "draft"
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at = now_utc_iso()
 
     conn = get_db_connection()
     if not conn:
@@ -4030,8 +4869,16 @@ async def update_reply_status(request: Request):
     reply_id = data.get("id")
     status = (data.get("status") or "").strip()
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     try:
         reply_id_int = int(reply_id)
@@ -4076,8 +4923,16 @@ async def delete_reply(request: Request):
     company_id = (data.get("companyId") or "").strip()
     reply_id = data.get("id")
 
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    company_id, user, err = resolve_company_id(
+        request,
+        company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     try:
         reply_id_int = int(reply_id)

@@ -98,3 +98,29 @@ How to test:
 
 Notes:
 - The app does not trust the success URL to grant access. It only marks accounts as paid via Stripe webhooks.
+
+## Accounts, Roles, and RBAC (MVP)
+
+AI FLOW now uses server-side signed cookie sessions and role-based access control.
+
+### Required Environment Variables (Render)
+
+- `SESSION_SECRET` (random long string, required for stable signed sessions)
+- `PLATFORM_ADMIN_EMAIL` (bootstrap platform admin login)
+- `PLATFORM_ADMIN_PASSWORD` (bootstrap platform admin password)
+
+Notes:
+- On startup, if `PLATFORM_ADMIN_EMAIL` + `PLATFORM_ADMIN_PASSWORD` are set and the user does not exist, the app creates a `platform_admin` user.
+- Passwords are stored as PBKDF2 hashes. Legacy SHA256 passwords are upgraded to PBKDF2 on first successful login.
+
+### Roles
+
+- `platform_admin`: full access (admin area, all companies/users)
+- `company_admin`: manages only their company (billing, settings, social connections, team)
+- `employee`: company-scoped access to tools (no billing by default)
+- `client`: reserved for client-facing features (not used heavily in the MVP yet)
+
+### Team Invites
+
+- Company admins can open `/team` to generate an invite link for employees/clients.
+- Invited users accept the link at `/accept-invite?token=...`, set a password, then login via `/login`.

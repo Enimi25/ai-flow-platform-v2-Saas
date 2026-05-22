@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI FLOW Team</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#061923;
+      --bg2:#040f16;
+      --panel:rgba(255,255,255,0.06);
+      --panel2:rgba(255,255,255,0.04);
+      --text:#f7fbff;
+      --muted:#9fb7c3;
+      --border:rgba(255,255,255,0.12);
+      --border2:rgba(255,255,255,0.08);
+      --accent:#b8ff7a;
+      --accent2:#41dcff;
+      --shadow:0 30px 80px rgba(0,0,0,.16);
+      --shadowSm:0 18px 50px rgba(0,0,0,.18);
+    }
+    body{
+      min-height:100vh;
+      background:
+        radial-gradient(980px 720px at 14% -10%, rgba(184,255,122,0.18), transparent 58%),
+        radial-gradient(900px 700px at 110% 10%, rgba(65,220,255,0.14), transparent 55%),
+        radial-gradient(760px 640px at 70% 120%, rgba(139,92,246,0.10), transparent 58%),
+        var(--bg);
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans","Helvetica Neue",sans-serif;
+    }
+    .sidebar{
+      position:fixed;left:0;top:0;bottom:0;width:260px;
+      background:rgba(255,255,255,0.03);
+      border-right:1px solid rgba(255,255,255,0.10);
+      padding:22px 18px;
+      backdrop-filter: blur(16px);
+    }
+    .logo{font-size:30px;font-weight:950;margin-bottom:18px}
+    .logo span{color:var(--accent)}
+    .menu a{
+      display:block;
+      padding:12px 12px;
+      margin:6px 0;
+      border-radius:14px;
+      color:rgba(247,251,255,0.85);
+      text-decoration:none;
+      font-weight:850;
+      border:1px solid transparent;
+      transition:transform .12s ease, background .2s ease, border-color .2s ease;
+    }
+    .menu a:hover{
+      background:rgba(255,255,255,0.06);
+      border-color:rgba(255,255,255,0.10);
+      transform:translateY(-1px);
+    }
+    .menu a.active{
+      background:linear-gradient(135deg, rgba(184,255,122,0.22) 0%, rgba(65,220,255,0.14) 100%);
+      border-color:rgba(184,255,122,0.18);
+      color:var(--text);
+    }
+    .main{margin-left:260px;padding:22px 22px 60px}
+    .topbar{
+      display:flex;justify-content:space-between;align-items:center;
+      gap:16px;margin-bottom:18px;
+    }
+    .title{font-size:32px;font-weight:950;letter-spacing:-.2px}
+    .sub{color:var(--muted);margin-top:6px;line-height:1.4}
+    .user-box{
+      display:flex;align-items:center;gap:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:18px;
+      padding:10px 12px;
+      box-shadow:var(--shadowSm);
+      backdrop-filter: blur(18px);
+    }
+    .avatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg, rgba(184,255,122,0.38), rgba(65,220,255,0.22));border:1px solid rgba(255,255,255,0.14)}
+    .logout-btn{
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      font-weight:950;
+      cursor:pointer;
+    }
+    .logout-btn:hover{background:rgba(255,255,255,0.08)}
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:18px;
+      max-width:1120px;
+    }
+    .box{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:30px;
+      padding:18px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .box h2{font-size:18px;font-weight:950;margin-bottom:12px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+    label{display:block;font-size:13px;font-weight:900;color:#d7e6eb;margin-bottom:8px}
+    input{
+      width:340px;max-width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      outline:none;
+    }
+    input:focus{border-color:rgba(184,255,122,0.36);box-shadow:0 0 0 3px rgba(184,255,122,0.10)}
+    .btn{
+      border:0;
+      border-radius:14px;
+      padding:12px 14px;
+      font-weight:950;
+      cursor:pointer;
+      background:linear-gradient(135deg, rgba(184,255,122,0.98) 0%, rgba(65,220,255,0.72) 100%);
+      color:#071820;
+      box-shadow:0 22px 70px rgba(184,255,122,0.14);
+      transition:transform .12s ease, box-shadow .2s ease;
+      white-space:nowrap;
+    }
+    .btn:hover{transform:translateY(-1px);box-shadow:0 26px 70px rgba(184,255,122,0.18)}
+    .btn:active{transform:translateY(0)}
+    .btn.ghost{
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:none;
+    }
+    .btn.ghost:hover{background:rgba(255,255,255,0.08)}
+    .msg{color:var(--muted);margin-top:10px;min-height:20px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);font-size:14px;vertical-align:top}
+    th{color:#d7e6eb;font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+    .pill{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);
+      color:#d7e6eb;
+      font-size:12px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .small{font-size:12px;color:var(--muted)}
+    @media (max-width: 920px){
+      .sidebar{position:static;width:auto;border-right:0;border-bottom:1px solid rgba(255,255,255,0.10)}
+      .main{margin-left:0}
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">AI <span>FLOW</span></div>
+    <div class="menu">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/leads-page">Leads</a>
+      <a href="/content-factory">Content Factory</a>
+      <a href="/social-accounts">Social Accounts</a>
+      <a href="/ai-replies">AI Replies</a>
+      <a href="/analytics">Analytics</a>
+      <a href="/calendar">Calendar</a>
+      <a href="/billing">Billing</a>
+      <a href="/settings">Settings</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="title">Team</div>
+        <div class="sub">Invite employees and manage access for your company workspace.</div>
+      </div>
+      <div class="user-box">
+        <div>
+          <div id="clientEmail" style="font-weight:900;">User</div>
+          <div id="clientRole" class="small">role</div>
+        </div>
+        <div class="avatar"></div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <h2>Invite Employee</h2>
+        <div class="row">
+          <div>
+            <label>Email</label>
+            <input id="inviteEmail" type="email" placeholder="employee@company.com">
+          </div>
+          <button class="btn" onclick="invite()">Create Invite Link</button>
+          <button class="btn ghost" onclick="loadTeam()">Refresh</button>
+        </div>
+        <div id="msg" class="msg"></div>
+        <div id="inviteLink" class="small" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="box">
+        <h2>Users</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr><td colspan="4" class="small">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box">
+        <h2>Pending Invites</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Expires</th>
+              <th style="text-align:right;">Invite Link</th>
+            </tr>
+          </thead>
+          <tbody id="invitesBody">
+            <tr><td colspan="4" class="small">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  const email = localStorage.getItem("ai_flow_email");
+  const role = localStorage.getItem("ai_flow_role");
+  const companyId = localStorage.getItem("ai_flow_company_id");
+  if(!email || !companyId){
+    window.location.href = "/login";
+  }
+  document.getElementById("clientEmail").innerText = email;
+  document.getElementById("clientRole").innerText = role || "";
+
+  function setMsg(t){ document.getElementById("msg").innerText = t || ""; }
+  function esc(s){
+    return String(s||"")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll("\"","&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function logout(){
+    try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
+    localStorage.removeItem("ai_flow_email");
+    localStorage.removeItem("ai_flow_role");
+    localStorage.removeItem("ai_flow_company_id");
+    window.location.href="/login";
+  }
+
+  function renderUsers(items){
+    const body = document.getElementById("usersBody");
+    body.innerHTML = "";
+    if(!items || !items.length){
+      body.innerHTML = '<tr><td colspan="4" class="small">No users.</td></tr>';
+      return;
+    }
+    items.forEach(u => {
+      const canRemove = (u.role === "employee") && (u.status !== "suspended");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${esc(u.email)}</td>
+        <td><span class="pill">${esc(u.role)}</span></td>
+        <td>${esc(u.status || "")}</td>
+        <td style="text-align:right;">
+          ${canRemove ? `<button class="btn ghost" style="padding:9px 10px;border-radius:12px;" onclick="removeUser(${Number(u.id)})">Suspend</button>` : ``}
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function renderInvites(items){
+    const body = document.getElementById("invitesBody");
+    body.innerHTML = "";
+    if(!items || !items.length){
+      body.innerHTML = '<tr><td colspan="4" class="small">No pending invites.</td></tr>';
+      return;
+    }
+    items.forEach(i => {
+      const url = i.invite_url || "";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${esc(i.email)}</td>
+        <td><span class="pill">${esc(i.role)}</span></td>
+        <td>${esc((i.expires_at || "").split("T")[0] || "")}</td>
+        <td style="text-align:right;">
+          ${url ? `<button class="btn ghost" style="padding:9px 10px;border-radius:12px;" onclick="copyInvite('${esc(url)}')">Copy</button>` : ``}
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  async function copyInvite(url){
+    try{
+      await navigator.clipboard.writeText(url);
+      setMsg("Invite link copied.");
+    }catch(e){
+      setMsg("Copy failed. " + url);
+    }
+  }
+
+  async function loadTeam(){
+    setMsg("Loading team...");
+    document.getElementById("inviteLink").innerText = "";
+    try{
+      const res = await fetch("/team-data?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Team data error.");
+        return;
+      }
+      renderUsers(data.users || []);
+      renderInvites(data.invites || []);
+      setMsg("Team loaded.");
+    }catch(e){
+      setMsg("Connection error loading team.");
+    }
+  }
+
+  async function invite(){
+    const e = document.getElementById("inviteEmail").value.trim().toLowerCase();
+    setMsg("Creating invite...");
+    document.getElementById("inviteLink").innerText = "";
+    if(!e){
+      setMsg("Enter an email.");
+      return;
+    }
+    try{
+      const res = await fetch("/invite-user", {
+        method:"POST",
+        credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({companyId: companyId, email: e, role: "employee"})
+      });
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Invite error.");
+        return;
+      }
+      const url = data.inviteUrl || "";
+      document.getElementById("inviteLink").innerText = url ? ("Invite link: " + url) : "Invite created.";
+      setMsg("Invite created.");
+      document.getElementById("inviteEmail").value = "";
+      loadTeam();
+    }catch(e2){
+      setMsg("Connection error creating invite.");
+    }
+  }
+
+  async function removeUser(userId){
+    if(!confirm("Suspend this user?")) return;
+    setMsg("Suspending user...");
+    try{
+      const res = await fetch("/remove-user", {
+        method:"POST",
+        credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({companyId: companyId, userId: userId})
+      });
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "Remove user error.");
+        return;
+      }
+      setMsg("User suspended.");
+      loadTeam();
+    }catch(e){
+      setMsg("Connection error removing user.");
+    }
+  }
+
+  loadTeam();
+  </script>
+</body>
+</html>
+

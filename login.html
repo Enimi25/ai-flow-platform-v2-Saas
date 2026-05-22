@@ -157,6 +157,7 @@ async function loginUser(){
   try{
     const res = await fetch("/login-api",{
       method:"POST",
+      credentials:"same-origin",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(data)
     });
@@ -173,7 +174,7 @@ async function loginUser(){
     localStorage.setItem("ai_flow_role", result.role);
     localStorage.setItem("ai_flow_company_id", result.companyId);
 
-    if(result.role === "admin"){
+    if(result.role === "platform_admin"){
       window.location.href = "/admin";
       return;
     }
