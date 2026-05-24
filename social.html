@@ -347,6 +347,25 @@ button:active{transform:translateY(0)}
 
 }
 
+.pill{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  color:#d7e6eb;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.link{
+  color:var(--accent);
+  font-weight:900;
+  text-decoration:none;
+}
+.link:hover{ text-decoration:underline; }
+
 @media(max-width:900px){
 
   body{display:block}
@@ -412,11 +431,19 @@ button:active{transform:translateY(0)}
 
       <div class="sub">Connect Instagram, Facebook, WhatsApp and website chat channels.</div>
 
+      <div id="platformAdminCompanyRow" style="display:none;margin-top:12px;gap:10px;flex-wrap:wrap;align-items:center;">
+        <span class="pill">Platform Admin</span>
+        <span style="color:var(--muted);font-weight:800;">Company:</span>
+        <select id="platformCompanySelect" style="width:auto;min-width:260px;max-width:520px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:var(--text);outline:none;"></select>
+        <a class="link" href="/dashboard">Open Dashboard</a>
+      </div>
+
     </div>
 
     <div class="user">
 
       <div id="clientEmail">Client</div>
+      <div id="clientRole" class="pill" style="display:none;"></div>
 
       <button class="logout" onclick="logout()">Logout</button>
 
@@ -512,19 +539,12 @@ button:active{transform:translateY(0)}
 
 <script>
 
-const email = localStorage.getItem("ai_flow_email");
+let email = localStorage.getItem("ai_flow_email") || "";
+let role = localStorage.getItem("ai_flow_role") || "";
 
-const role = localStorage.getItem("ai_flow_role") || "";
-
-let companyId = localStorage.getItem("ai_flow_company_id") || "";
-
-if (!email) {
-
-  window.location.href = "/login";
-
-}
-
-document.getElementById("clientEmail").innerText = email;
+const qs = new URLSearchParams(window.location.search);
+const urlCompanyId = (qs.get("companyId") || "").trim();
+let companyId = urlCompanyId || (localStorage.getItem("ai_flow_company_id") || "");
 
 function logout(){
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
@@ -545,12 +565,89 @@ function setMsg(text){
 
 }
 
-if(role !== "platform_admin" && !companyId){
-  window.location.href = "/login";
+function setHeader(){
+  document.getElementById("clientEmail").innerText = email || "—";
+  const roleEl = document.getElementById("clientRole");
+  if(role){
+    roleEl.style.display = "inline-block";
+    roleEl.innerText = (role === "platform_admin") ? "Platform Admin" : role;
+  }else{
+    roleEl.style.display = "none";
+  }
 }
 
-if(role === "platform_admin" && !companyId){
-  setMsg("Platform admin: select a company on /dashboard first to manage Social Accounts.");
+async function fetchMe(){
+  try{
+    const res = await fetch("/api/me", {credentials:"same-origin"});
+    const data = await res.json();
+    if(!res.ok || data.error){
+      window.location.href = "/login";
+      return null;
+    }
+    return data;
+  }catch(e){
+    window.location.href = "/login";
+    return null;
+  }
+}
+
+async function loadCompaniesForPlatformAdmin(selectedId){
+  const row = document.getElementById("platformAdminCompanyRow");
+  const sel = document.getElementById("platformCompanySelect");
+  row.style.display = "flex";
+  sel.innerHTML = "";
+  try{
+    const res = await fetch("/api/companies", {credentials:"same-origin"});
+    const data = await res.json();
+    if(!res.ok || data.error){
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.innerText = "Companies load error";
+      sel.appendChild(opt);
+      return;
+    }
+    const items = data.companies || [];
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.innerText = "Select a company...";
+    sel.appendChild(opt0);
+    items.forEach(c => {
+      const id = String(c.company_id || "");
+      const name = String(c.company_name || "");
+      const status = String(c.status || "active");
+      const label = (name ? (name + " — ") : "") + id + (status !== "active" ? (" (" + status + ")") : "");
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.innerText = label;
+      if(selectedId && id === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }catch(e){
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.innerText = "Companies load error";
+    sel.appendChild(opt);
+  }
+
+  sel.onchange = async function(){
+    const id = String(sel.value || "");
+    companyId = id;
+    if(!companyId){
+      localStorage.removeItem("ai_flow_company_id");
+      setMsg("Please select a company on Dashboard first.");
+      return;
+    }
+    localStorage.setItem("ai_flow_company_id", companyId);
+    try{
+      await fetch("/api/set-active-company", {
+        method:"POST",
+        credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({companyId: companyId})
+      });
+    }catch(e2){}
+    loadSocialData();
+  };
 }
 
 function setConnectedHtml(html){
@@ -566,6 +663,11 @@ function setConnectedHtml(html){
 }
 
 function copyWidget(){
+
+  if(!companyId){
+    setMsg("Please select a company on Dashboard first.");
+    return;
+  }
 
   const code = '<scr' + 'ipt src="https://ai-flow-platform-v2-saas.onrender.com/widget.js" data-company-id="' + companyId + '"></scr' + 'ipt>';
 
@@ -595,7 +697,13 @@ async function loadSocialData(){
 
   try{
 
-    const res = await fetch("/social-data?companyId=" + encodeURIComponent(companyId));
+    if(!companyId){
+      setConnectedHtml("");
+      setMsg("Please select a company on Dashboard first.");
+      return;
+    }
+
+    const res = await fetch("/social-data?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
 
     const data = await res.json();
 
@@ -621,7 +729,7 @@ async function loadSocialData(){
 
     // Load Meta connected Pages / Instagram accounts (if configured).
     try{
-      const res2 = await fetch("/api/meta/accounts?companyId=" + encodeURIComponent(companyId));
+      const res2 = await fetch("/api/meta/accounts?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
       const data2 = await res2.json();
       if(res2.ok && data2 && data2.success){
         const pages = data2.pages || [];
@@ -660,7 +768,7 @@ async function loadSocialData(){
 
     // Load TikTok connected account (if configured).
     try{
-      const res3 = await fetch("/api/tiktok/account?companyId=" + encodeURIComponent(companyId));
+      const res3 = await fetch("/api/tiktok/account?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
       const data3 = await res3.json();
       if(res3.ok && data3 && data3.success && data3.account){
         const a = data3.account;
@@ -693,6 +801,11 @@ async function loadSocialData(){
 
 async function connectSocial(platform){
 
+  if(!companyId){
+    setMsg("Please select a company on Dashboard first.");
+    return;
+  }
+
   if(platform === "Facebook" || platform === "Instagram"){
     setMsg("Redirecting to Meta to connect " + platform + "...");
     window.location.href = "/api/meta/connect?companyId=" + encodeURIComponent(companyId);
@@ -710,6 +823,7 @@ async function connectSocial(platform){
   try{
     const res = await fetch("/connect-social-demo", {
       method:"POST",
+      credentials:"same-origin",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({ companyId, platform })
     });
@@ -740,6 +854,7 @@ async function disconnectMeta(){
   try{
     const res = await fetch("/api/meta/disconnect",{
       method:"POST",
+      credentials:"same-origin",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({companyId})
     });
@@ -768,6 +883,7 @@ async function disconnectTikTok(){
   try{
     const res = await fetch("/api/tiktok/disconnect",{
       method:"POST",
+      credentials:"same-origin",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({companyId})
     });
@@ -790,7 +906,55 @@ async function disconnectTikTok(){
   }
 }
 
-loadSocialData();
+async function initPage(){
+  setMsg("Loading social accounts...");
+  const me = await fetchMe();
+  if(!me) return;
+
+  const u = me.user || {};
+  email = String(u.email || "");
+  role = String(u.role || "");
+
+  // Keep localStorage in sync for UI only (server auth is cookie-based).
+  if(email) localStorage.setItem("ai_flow_email", email);
+  if(role) localStorage.setItem("ai_flow_role", role);
+
+  const activeCompanyId = String(me.activeCompanyId || "").trim();
+
+  if(role === "platform_admin"){
+    companyId = urlCompanyId || companyId || activeCompanyId || "";
+    await loadCompaniesForPlatformAdmin(companyId);
+
+    if(companyId){
+      localStorage.setItem("ai_flow_company_id", companyId);
+      try{
+        await fetch("/api/set-active-company", {
+          method:"POST",
+          credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({companyId: companyId})
+        });
+      }catch(e){}
+    }
+  }else{
+    companyId = String(u.company_id || "").trim();
+    if(companyId){
+      localStorage.setItem("ai_flow_company_id", companyId);
+    }
+  }
+
+  setHeader();
+
+  if(!companyId){
+    setConnectedHtml("");
+    setMsg("Please select a company on Dashboard first.");
+    return;
+  }
+
+  loadSocialData();
+}
+
+initPage();
 
 </script>
 

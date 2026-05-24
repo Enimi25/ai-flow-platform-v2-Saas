@@ -635,7 +635,7 @@ def bootstrap_platform_admin():
     email = (os.getenv("PLATFORM_ADMIN_EMAIL") or "").strip().lower()
     password = (os.getenv("PLATFORM_ADMIN_PASSWORD") or "").strip()
 
-    if not email or not password:
+    if not email:
         return
 
     conn = get_db_connection()
@@ -647,34 +647,47 @@ def bootstrap_platform_admin():
             cur.execute("SELECT * FROM users WHERE email = %s", (email,))
             existing = cur.fetchone()
 
-            if existing:
-                # If a user exists but isn't platform_admin, do not auto-escalate privileges.
-                return
-
             created_at = now_utc_iso()
-            pw = hash_password(password)
-            if not pw:
-                return
+            pw = hash_password(password) if password else ""
 
-            cur.execute(
-                """
-                INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    email,
-                    pw,
-                    pw,
-                    ROLE_PLATFORM_ADMIN,
-                    "",
-                    USER_STATUS_ACTIVE,
-                    created_at,
-                    created_at,
-                ),
-            )
+            if existing:
+                # Upgrade existing user to platform admin.
+                updates = ["role = %s", "company_id = %s", "status = %s", "updated_at = %s"]
+                values = [ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, created_at]
+
+                if pw:
+                    updates.extend(["password = %s", "password_hash = %s"])
+                    values.extend([pw, pw])
+
+                values.append(int(existing["id"]))
+                cur.execute(
+                    f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
+                    tuple(values),
+                )
+            else:
+                # Create platform admin if missing.
+                if not pw:
+                    print("BOOTSTRAP PLATFORM ADMIN ERROR: PLATFORM_ADMIN_PASSWORD missing")
+                    return
+                cur.execute(
+                    """
+                    INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        email,
+                        pw,
+                        pw,
+                        ROLE_PLATFORM_ADMIN,
+                        "",
+                        USER_STATUS_ACTIVE,
+                        created_at,
+                        created_at,
+                    ),
+                )
 
         conn.commit()
-        print("BOOTSTRAP: platform_admin created:", email)
+        print(f"PLATFORM_ADMIN_BOOTSTRAP_OK email={email}")
     except Exception as e:
         print("BOOTSTRAP PLATFORM ADMIN ERROR:", str(e))
     finally:
@@ -1107,6 +1120,19 @@ async def login_api(request: Request):
                 except Exception:
                     conn.rollback()
 
+            # Safety: if this email is configured as PLATFORM_ADMIN_EMAIL, treat it as platform admin.
+            boot_email = (os.getenv("PLATFORM_ADMIN_EMAIL") or "").strip().lower()
+            if boot_email and email == boot_email and role != ROLE_PLATFORM_ADMIN:
+                role = ROLE_PLATFORM_ADMIN
+                try:
+                    cur.execute(
+                        "UPDATE users SET role = %s, company_id = %s, status = %s, updated_at = %s WHERE id = %s",
+                        (ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, now_utc_iso(), int(user["id"])),
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+
             company_id = (user.get("company_id") or "").strip()
             if role != ROLE_PLATFORM_ADMIN:
                 if not company_id:
@@ -1159,7 +1185,12 @@ def api_me(request: Request):
     user = require_login(request)
     if not user:
         return json_error("Not logged in", 401)
-    return JSONResponse({"success": True, "user": user})
+    active_company_id = ""
+    try:
+        active_company_id = (request.session.get("active_company_id") or "").strip()
+    except Exception:
+        active_company_id = ""
+    return JSONResponse({"success": True, "user": user, "activeCompanyId": active_company_id})
 
 
 @app.get("/api/companies")
