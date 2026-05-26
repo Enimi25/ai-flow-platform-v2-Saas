@@ -2615,6 +2615,37 @@ def tiktok_connect_url(companyId: str = ""):
     return JSONResponse({"success": True, "url": auth_url})
 
 
+@app.get("/tiktok-oauth-preflight")
+def tiktok_oauth_preflight(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+
+    client_key, client_secret, redirect_uri = _tiktok_config()
+    config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
+
+    warnings = []
+    if not config_issue:
+        warnings.append("Ensure this exact redirect URI is configured in TikTok Developer Portal Login Kit.")
+        warnings.append("If app is in Development mode, login with a whitelisted test user.")
+        warnings.append("Use Client Key from the same TikTok app as this redirect URI.")
+
+    return JSONResponse(
+        {
+            "success": not bool(config_issue),
+            "configured": not bool(config_issue),
+            "detail": config_issue or "",
+            "client_key_present": bool(client_key),
+            "client_key_mask": _mask_value(client_key),
+            "redirect_uri": redirect_uri,
+            "warnings": warnings,
+        },
+        status_code=200 if not config_issue else 500,
+    )
+
+
 @app.get("/tiktok-oauth-callback")
 def tiktok_oauth_callback(code: str = "", state: str = ""):
     if not code or not state:

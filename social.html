@@ -840,6 +840,14 @@ async function connectSocial(platform){
   if(platform === "TikTok"){
     setMsg("Preparing TikTok connect...");
     try{
+      const pre = await fetch("/tiktok-oauth-preflight?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const preData = await pre.json();
+      if(!pre.ok || preData.error || preData.configured === false){
+        const detail = (preData && (preData.detail || preData.error)) ? (preData.detail || preData.error) : "TikTok OAuth config error.";
+        setMsg("TikTok config error: " + detail);
+        return;
+      }
+
       const res = await fetch("/tiktok-connect-url?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
       const data = await res.json();
       if(!res.ok || data.error){
