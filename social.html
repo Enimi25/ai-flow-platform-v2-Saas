@@ -518,7 +518,7 @@ button:active{transform:translateY(0)}
 
       <div id="tiktokStatus" class="status">Not Connected</div>
 
-      <button onclick="connectSocial('TikTok')">Connect TikTok</button>
+      <button id="tiktokConnectBtn" data-default-label="Connect TikTok" onclick="connectSocial('TikTok')">Connect TikTok</button>
 
     </div>
 
@@ -532,7 +532,7 @@ button:active{transform:translateY(0)}
 
       <div id="whatsappStatus" class="status">Not Connected</div>
 
-      <button onclick="connectSocial('WhatsApp')">Connect WhatsApp</button>
+      <button id="whatsappConnectBtn" data-default-label="Connect WhatsApp" onclick="connectSocial('WhatsApp')">Connect WhatsApp</button>
 
     </div>
 
@@ -704,6 +704,37 @@ function markConnected(platform){
 
 }
 
+function markDisconnected(platform, text){
+  const key = platform.toLowerCase();
+  const el = document.getElementById(key + "Status");
+  if (!el) return;
+  el.innerText = text || "Not Connected";
+  el.classList.remove("connected");
+}
+
+function setConnectButtonLabel(id, text){
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  btn.innerText = text;
+  btn.setAttribute("data-default-label", text);
+}
+
+function setButtonLoading(id, loading, loadingText){
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  if(loading){
+    btn.disabled = true;
+    btn.setAttribute("data-loading", "1");
+    btn.setAttribute("data-prev-label", btn.innerText || "");
+    btn.innerText = loadingText || "Connecting...";
+    return;
+  }
+  btn.disabled = false;
+  btn.removeAttribute("data-loading");
+  const prev = btn.getAttribute("data-prev-label") || btn.getAttribute("data-default-label") || "";
+  if(prev) btn.innerText = prev;
+}
+
 async function loadSocialData(){
 
   setMsg("Loading social accounts...");
@@ -729,6 +760,12 @@ async function loadSocialData(){
     }
 
     const accounts = data.accounts || [];
+    const whatsapp = data.whatsapp || {};
+
+    // Reset before applying backend statuses.
+    ["Facebook","Instagram","TikTok","WhatsApp"].forEach(p => markDisconnected(p, "Not Connected"));
+    setConnectButtonLabel("tiktokConnectBtn", "Connect TikTok");
+    setConnectButtonLabel("whatsappConnectBtn", "Connect WhatsApp");
 
     accounts.forEach(account => {
 
@@ -739,6 +776,29 @@ async function loadSocialData(){
       }
 
     });
+
+    // WhatsApp status from backend (DB/config-aware, not hardcoded).
+    if(whatsapp.status === "connected"){
+      const el = document.getElementById("whatsappStatus");
+      if(el){
+        el.innerText = "Connected";
+        el.classList.add("connected");
+      }
+      setConnectButtonLabel("whatsappConnectBtn", "Manage WhatsApp");
+    } else if(whatsapp.status === "configured"){
+      const el = document.getElementById("whatsappStatus");
+      if(el){
+        el.innerText = "Configured";
+        el.classList.add("connected");
+      }
+      setConnectButtonLabel("whatsappConnectBtn", "Reconnect WhatsApp");
+    } else if(whatsapp.status === "oauth_available"){
+      markDisconnected("WhatsApp", "Not Connected");
+      setConnectButtonLabel("whatsappConnectBtn", "Connect WhatsApp");
+    } else if(whatsapp.status === "not_configured"){
+      markDisconnected("WhatsApp", "Setup Required");
+      setConnectButtonLabel("whatsappConnectBtn", "Setup WhatsApp");
+    }
 
     // Load Meta connected Pages / Instagram accounts (if configured).
     try{
@@ -838,6 +898,12 @@ async function connectSocial(platform){
   }
 
   if(platform === "TikTok"){
+    const btnId = "tiktokConnectBtn";
+    const btn = document.getElementById(btnId);
+    if(btn && btn.getAttribute("data-loading") === "1"){
+      return;
+    }
+    setButtonLoading(btnId, true, "Connecting...");
     setMsg("Preparing TikTok connect...");
     try{
       const pre = await fetch("/tiktok-oauth-preflight?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
@@ -845,6 +911,7 @@ async function connectSocial(platform){
       if(!pre.ok || preData.error || preData.configured === false){
         const detail = (preData && (preData.detail || preData.error)) ? (preData.detail || preData.error) : "TikTok OAuth config error.";
         setMsg("TikTok config error: " + detail);
+        setButtonLoading(btnId, false);
         return;
       }
 
@@ -852,11 +919,60 @@ async function connectSocial(platform){
       const data = await res.json();
       if(!res.ok || data.error){
         setMsg(data.error || "TikTok connect error.");
+        setButtonLoading(btnId, false);
         return;
       }
-      window.location.href = data.url;
+      const authUrl = data.auth_url || data.url || "";
+      if(!authUrl){
+        setMsg("Connection URL not returned from server.");
+        setButtonLoading(btnId, false);
+        return;
+      }
+      window.location.href = authUrl;
     }catch(e){
-      setMsg("Connection error starting TikTok connect.");
+      setMsg("Could not start TikTok connection. Check server logs.");
+      setButtonLoading(btnId, false);
+    }
+    return;
+  }
+
+  if(platform === "WhatsApp"){
+    const btnId = "whatsappConnectBtn";
+    const btn = document.getElementById(btnId);
+    if(btn && btn.getAttribute("data-loading") === "1"){
+      return;
+    }
+    setButtonLoading(btnId, true, "Connecting...");
+    setMsg("Starting WhatsApp connection...");
+    try{
+      const res = await fetch("/whatsapp-connect-url?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const data = await res.json();
+      if(!res.ok || data.success === false || data.error){
+        const missing = Array.isArray(data.missing) ? data.missing.join(", ") : "";
+        const detail = data.detail ? (" " + data.detail) : "";
+        setMsg((data.error || "WhatsApp connection error.") + detail + (missing ? (" Missing: " + missing) : ""));
+        setButtonLoading(btnId, false);
+        return;
+      }
+
+      const authUrl = data.auth_url || "";
+      if(authUrl){
+        window.location.href = authUrl;
+        return;
+      }
+
+      if(data.mode === "manual_config" || data.configured === true){
+        setMsg(data.message || "WhatsApp configured.");
+        await loadSocialData();
+        setButtonLoading(btnId, false);
+        return;
+      }
+
+      setMsg("Connection URL not returned from server.");
+      setButtonLoading(btnId, false);
+    }catch(e){
+      setMsg("Could not start WhatsApp connection. Check server logs.");
+      setButtonLoading(btnId, false);
     }
     return;
   }

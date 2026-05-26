@@ -654,6 +654,7 @@ def init_db():
 def startup_event():
     init_db()
     bootstrap_platform_admin()
+    _log_social_env_debug()
 
 
 def bootstrap_platform_admin():
@@ -2140,6 +2141,23 @@ def _mask_value(v: str, keep: int = 4):
     return s[:keep] + ("*" * (len(s) - (keep * 2))) + s[-keep:]
 
 
+def _is_placeholder_value(v: str):
+    value = str(v or "").strip().lower()
+    return value in {
+        "",
+        "undefined",
+        "null",
+        "none",
+        "changeme",
+        "placeholder",
+        "your_token",
+        "your_access_token",
+        "your_verify_token",
+        "your_phone_number_id",
+        "your_business_account_id",
+    }
+
+
 def _tiktok_config_issue(client_key: str, client_secret: str, redirect_uri: str):
     missing = []
     if not client_key:
@@ -2176,6 +2194,79 @@ def _tiktok_config_issue(client_key: str, client_secret: str, redirect_uri: str)
         return uri_err
 
     return ""
+
+
+def _whatsapp_config_snapshot():
+    whatsapp_access_token = (os.getenv("WHATSAPP_ACCESS_TOKEN") or "").strip()
+    whatsapp_phone_number_id = (os.getenv("WHATSAPP_PHONE_NUMBER_ID") or "").strip()
+    whatsapp_business_account_id = (os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID") or "").strip()
+    whatsapp_verify_token = (os.getenv("WHATSAPP_VERIFY_TOKEN") or "").strip()
+    whatsapp_redirect_uri = (os.getenv("WHATSAPP_REDIRECT_URI") or "").strip()
+    meta_app_id = (os.getenv("META_APP_ID") or "").strip()
+    meta_app_secret = (os.getenv("META_APP_SECRET") or "").strip()
+    meta_redirect_uri = (os.getenv("META_REDIRECT_URI") or "").strip()
+
+    oauth_ready = (
+        not _is_placeholder_value(meta_app_id)
+        and not _is_placeholder_value(meta_app_secret)
+        and not _is_placeholder_value(meta_redirect_uri)
+    )
+    manual_ready = (
+        not _is_placeholder_value(whatsapp_access_token)
+        and not _is_placeholder_value(whatsapp_phone_number_id)
+    )
+
+    missing = []
+    if not oauth_ready and not manual_ready:
+        if _is_placeholder_value(meta_app_id):
+            missing.append("META_APP_ID")
+        if _is_placeholder_value(meta_app_secret):
+            missing.append("META_APP_SECRET")
+        if _is_placeholder_value(meta_redirect_uri):
+            missing.append("META_REDIRECT_URI")
+        if _is_placeholder_value(whatsapp_access_token):
+            missing.append("WHATSAPP_ACCESS_TOKEN")
+        if _is_placeholder_value(whatsapp_phone_number_id):
+            missing.append("WHATSAPP_PHONE_NUMBER_ID")
+
+    return {
+        "oauth_ready": oauth_ready,
+        "manual_ready": manual_ready,
+        "missing": missing,
+        "meta_app_id": meta_app_id,
+        "meta_app_secret": meta_app_secret,
+        "meta_redirect_uri": meta_redirect_uri,
+        "whatsapp_access_token": whatsapp_access_token,
+        "whatsapp_phone_number_id": whatsapp_phone_number_id,
+        "whatsapp_business_account_id": whatsapp_business_account_id,
+        "whatsapp_verify_token": whatsapp_verify_token,
+        "whatsapp_redirect_uri": whatsapp_redirect_uri,
+    }
+
+
+def _log_social_env_debug():
+    tiktok_key, tiktok_secret, tiktok_redirect = _tiktok_config()
+    wa = _whatsapp_config_snapshot()
+    print(
+        "SOCIAL ENV DEBUG:",
+        {
+            "tiktok_client_key_mask": _mask_value(tiktok_key),
+            "tiktok_client_secret_mask": _mask_value(tiktok_secret),
+            "tiktok_client_key_len": len(tiktok_key),
+            "tiktok_client_secret_len": len(tiktok_secret),
+            "tiktok_key_secret_equal": bool(tiktok_key and tiktok_secret and (tiktok_key == tiktok_secret)),
+            "tiktok_redirect_uri": tiktok_redirect,
+            "whatsapp_access_token_present": not _is_placeholder_value(wa["whatsapp_access_token"]),
+            "whatsapp_access_token_mask": _mask_value(wa["whatsapp_access_token"]),
+            "whatsapp_phone_number_id_present": not _is_placeholder_value(wa["whatsapp_phone_number_id"]),
+            "whatsapp_business_account_id_present": not _is_placeholder_value(wa["whatsapp_business_account_id"]),
+            "whatsapp_verify_token_present": not _is_placeholder_value(wa["whatsapp_verify_token"]),
+            "whatsapp_redirect_uri_present": not _is_placeholder_value(wa["whatsapp_redirect_uri"]),
+            "meta_app_id_present": not _is_placeholder_value(wa["meta_app_id"]),
+            "meta_app_secret_present": not _is_placeholder_value(wa["meta_app_secret"]),
+            "meta_redirect_uri_present": not _is_placeholder_value(wa["meta_redirect_uri"]),
+        },
+    )
 
 
 def _build_tiktok_authorize_url(client_key: str, redirect_uri: str, state: str, scope: str = "user.info.basic"):
@@ -2561,9 +2652,9 @@ async def meta_disconnect(request: Request):
 def tiktok_connect_url(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
     if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
@@ -2580,6 +2671,7 @@ def tiktok_connect_url(companyId: str = ""):
         )
         return JSONResponse(
             {
+                "success": False,
                 "error": "TikTok OAuth is not configured",
                 "detail": config_issue,
             },
@@ -2594,7 +2686,7 @@ def tiktok_connect_url(companyId: str = ""):
 
     conn = get_db_connection()
     if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
+        return JSONResponse({"success": False, "error": "Database error"}, status_code=500)
 
     try:
         with conn.cursor() as cur:
@@ -2612,16 +2704,16 @@ def tiktok_connect_url(companyId: str = ""):
 
     auth_url = _build_tiktok_authorize_url(client_key, redirect_uri, state, scope="user.info.basic")
 
-    return JSONResponse({"success": True, "url": auth_url})
+    return JSONResponse({"success": True, "auth_url": auth_url, "url": auth_url})
 
 
 @app.get("/tiktok-oauth-preflight")
 def tiktok_oauth_preflight(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
     if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
@@ -2639,6 +2731,11 @@ def tiktok_oauth_preflight(companyId: str = ""):
             "detail": config_issue or "",
             "client_key_present": bool(client_key),
             "client_key_mask": _mask_value(client_key),
+            "client_key_len": len(client_key),
+            "client_secret_present": bool(client_secret),
+            "client_secret_mask": _mask_value(client_secret),
+            "client_secret_len": len(client_secret),
+            "are_equal": bool(client_key and client_secret and (client_key == client_secret)),
             "redirect_uri": redirect_uri,
             "warnings": warnings,
         },
@@ -2889,9 +2986,9 @@ def tiktok_accounts(companyId: str = ""):
 def tiktok_connect(companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
     if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
@@ -2908,6 +3005,7 @@ def tiktok_connect(companyId: str = ""):
         )
         return JSONResponse(
             {
+                "success": False,
                 "error": "TikTok OAuth is not configured",
                 "detail": config_issue,
             },
@@ -2920,7 +3018,7 @@ def tiktok_connect(companyId: str = ""):
 
     conn = get_db_connection()
     if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
+        return JSONResponse({"success": False, "error": "Database error"}, status_code=500)
 
     try:
         with conn.cursor() as cur:
@@ -3391,10 +3489,33 @@ def social_data(companyId: str = ""):
 
             accounts = cur.fetchall()
 
+        wa_cfg = _whatsapp_config_snapshot()
+        wa_connected = any(
+            (str(a.get("platform") or "").strip().lower() == "whatsapp")
+            and (str(a.get("status") or "").strip().lower() == "connected")
+            for a in accounts
+        )
+        if wa_connected:
+            wa_status = "connected"
+        elif wa_cfg["oauth_ready"]:
+            wa_status = "oauth_available"
+        elif wa_cfg["manual_ready"]:
+            wa_status = "configured"
+        else:
+            wa_status = "not_configured"
+
         return JSONResponse(
             {
                 "success": True,
                 "accounts": accounts,
+                "whatsapp": {
+                    "status": wa_status,
+                    "oauth_ready": wa_cfg["oauth_ready"],
+                    "manual_ready": wa_cfg["manual_ready"],
+                    "missing": wa_cfg["missing"],
+                    "has_access_token": not _is_placeholder_value(wa_cfg["whatsapp_access_token"]),
+                    "has_phone_number_id": not _is_placeholder_value(wa_cfg["whatsapp_phone_number_id"]),
+                },
             }
         )
 
@@ -3408,6 +3529,74 @@ def social_data(companyId: str = ""):
 
     finally:
         conn.close()
+
+
+@app.get("/whatsapp-connect-url")
+def whatsapp_connect_url(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
+
+    cfg = _whatsapp_config_snapshot()
+
+    if cfg["oauth_ready"]:
+        auth_url = "/api/meta/connect?companyId=" + urllib.parse.quote(company_id, safe="")
+        return JSONResponse(
+            {
+                "success": True,
+                "mode": "oauth_meta",
+                "auth_url": auth_url,
+            }
+        )
+
+    if cfg["manual_ready"]:
+        now = datetime.utcnow().isoformat() + "Z"
+        account_id = (cfg["whatsapp_phone_number_id"] or "").strip() or "whatsapp_manual"
+        account_name = "WhatsApp Business"
+        conn = get_db_connection()
+        if not conn:
+            return JSONResponse({"success": False, "error": "Database error"}, status_code=500)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s",
+                    (company_id, "WhatsApp"),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO v2_social_accounts (company_id, platform, status, account_name, account_id, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (company_id, "WhatsApp", "connected", account_name, account_id, now, now),
+                )
+            conn.commit()
+        except Exception as e:
+            print("WHATSAPP MANUAL CONNECT ERROR:", type(e).__name__)
+            return JSONResponse({"success": False, "error": "WhatsApp manual setup save error"}, status_code=500)
+        finally:
+            conn.close()
+
+        return JSONResponse(
+            {
+                "success": True,
+                "mode": "manual_config",
+                "configured": True,
+                "message": "WhatsApp manual config detected and saved.",
+            }
+        )
+
+    missing = cfg["missing"] or ["META_APP_ID", "META_APP_SECRET", "META_REDIRECT_URI", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]
+    return JSONResponse(
+        {
+            "success": False,
+            "error": "WhatsApp is not configured.",
+            "detail": "WhatsApp requires Meta OAuth credentials or manual Cloud API setup.",
+            "missing": missing,
+        },
+        status_code=400,
+    )
 
 
 # =========================================================
