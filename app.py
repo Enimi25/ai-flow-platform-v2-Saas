@@ -921,6 +921,7 @@ def widget():
     return page_response("widget.js", media_type="application/javascript")
 
 
+@app.get("/privacy", response_class=HTMLResponse)
 @app.get("/privacy.html", response_class=HTMLResponse)
 def privacy_page():
     path = BASE_DIR / "privacy.html"
@@ -930,6 +931,7 @@ def privacy_page():
     return path.read_text(encoding="utf-8")
 
 
+@app.get("/terms", response_class=HTMLResponse)
 @app.get("/terms.html", response_class=HTMLResponse)
 def terms_page():
     path = BASE_DIR / "terms.html"
