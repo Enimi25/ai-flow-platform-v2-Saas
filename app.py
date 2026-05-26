@@ -2131,6 +2131,98 @@ def _tiktok_config():
     return client_key, client_secret, redirect_uri
 
 
+def _mask_value(v: str, keep: int = 4):
+    s = str(v or "")
+    if not s:
+        return ""
+    if len(s) <= keep * 2:
+        return "*" * len(s)
+    return s[:keep] + ("*" * (len(s) - (keep * 2))) + s[-keep:]
+
+
+def _tiktok_config_issue(client_key: str, client_secret: str, redirect_uri: str):
+    missing = []
+    if not client_key:
+        missing.append("TIKTOK_CLIENT_KEY")
+    if not client_secret:
+        missing.append("TIKTOK_CLIENT_SECRET")
+    if not redirect_uri:
+        missing.append("TIKTOK_REDIRECT_URI")
+    if missing:
+        return "Missing " + " / ".join(missing)
+
+    lower_key = client_key.lower()
+    bad_values = {
+        "undefined",
+        "null",
+        "none",
+        "client_key",
+        "your_client_key",
+        "your-client-key",
+        "changeme",
+        "placeholder",
+    }
+    if lower_key in bad_values:
+        return "TIKTOK_CLIENT_KEY is a placeholder value"
+
+    if any(ch.isspace() for ch in client_key):
+        return "TIKTOK_CLIENT_KEY contains whitespace"
+
+    if client_key == client_secret:
+        return "TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET cannot be equal"
+
+    uri_err = _validate_redirect_uri(redirect_uri, "tiktok")
+    if uri_err:
+        return uri_err
+
+    return ""
+
+
+def _build_tiktok_authorize_url(client_key: str, redirect_uri: str, state: str, scope: str = "user.info.basic"):
+    qs = urllib.parse.urlencode(
+        {
+            "client_key": client_key,
+            "response_type": "code",
+            "scope": scope,
+            "redirect_uri": redirect_uri,
+            "state": state,
+        }
+    )
+    auth_url = f"https://www.tiktok.com/v2/auth/authorize/?{qs}"
+
+    parsed = urllib.parse.urlparse(auth_url)
+    safe_query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    safe_pairs = []
+    for k, v in safe_query:
+        if k == "client_key":
+            safe_pairs.append((k, _mask_value(v)))
+        else:
+            safe_pairs.append((k, v))
+    safe_url = urllib.parse.urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            urllib.parse.urlencode(safe_pairs),
+            parsed.fragment,
+        )
+    )
+
+    # Safe debug log: confirms which key is used without exposing secrets.
+    print(
+        "TIKTOK OAUTH AUTHORIZE URL READY:",
+        {
+            "client_key_present": bool(client_key),
+            "client_key_mask": _mask_value(client_key),
+            "redirect_uri": redirect_uri,
+            "state_prefix": state[:20],
+            "authorize_url_safe": safe_url,
+        },
+    )
+    return auth_url
+
+
 def _validate_redirect_uri(uri: str, provider: str):
     u = (uri or "").strip()
     if not u:
@@ -2474,17 +2566,25 @@ def tiktok_connect_url(companyId: str = ""):
         return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
-    if not client_key or not client_secret or not redirect_uri:
+    config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
+    if config_issue:
+        print(
+            "TIKTOK OAUTH CONFIG ERROR:",
+            {
+                "issue": config_issue,
+                "client_key_present": bool(client_key),
+                "client_key_mask": _mask_value(client_key),
+                "client_secret_present": bool(client_secret),
+                "redirect_uri": redirect_uri,
+            },
+        )
         return JSONResponse(
             {
                 "error": "TikTok OAuth is not configured",
-                "detail": "Missing TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET / TIKTOK_REDIRECT_URI",
+                "detail": config_issue,
             },
             status_code=500,
         )
-    uri_err = _validate_redirect_uri(redirect_uri, "tiktok")
-    if uri_err:
-        return JSONResponse({"error": "TikTok OAuth redirect URI is invalid", "detail": uri_err}, status_code=500)
 
     # Include companyId in state (as requested) plus a random nonce.
     # Note: companyId is also stored server-side in v2_tiktok_oauth_states.
@@ -2510,17 +2610,7 @@ def tiktok_connect_url(companyId: str = ""):
     finally:
         conn.close()
 
-    scope = "user.info.basic"
-    qs = urllib.parse.urlencode(
-        {
-            "client_key": client_key,
-            "response_type": "code",
-            "scope": scope,
-            "redirect_uri": redirect_uri,
-            "state": state,
-        }
-    )
-    auth_url = f"https://www.tiktok.com/v2/auth/authorize/?{qs}"
+    auth_url = _build_tiktok_authorize_url(client_key, redirect_uri, state, scope="user.info.basic")
 
     return JSONResponse({"success": True, "url": auth_url})
 
@@ -2531,7 +2621,18 @@ def tiktok_oauth_callback(code: str = "", state: str = ""):
         return JSONResponse({"error": "Missing code/state"}, status_code=400)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
-    if not client_key or not client_secret or not redirect_uri:
+    config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
+    if config_issue:
+        print(
+            "TIKTOK OAUTH CALLBACK CONFIG ERROR:",
+            {
+                "issue": config_issue,
+                "client_key_present": bool(client_key),
+                "client_key_mask": _mask_value(client_key),
+                "client_secret_present": bool(client_secret),
+                "redirect_uri": redirect_uri,
+            },
+        )
         return JSONResponse({"error": "TikTok OAuth is not configured"}, status_code=500)
 
     # Resolve companyId from stored state.
@@ -2762,17 +2863,25 @@ def tiktok_connect(companyId: str = ""):
         return JSONResponse({"error": "Unknown companyId"}, status_code=404)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
-    if not client_key or not client_secret or not redirect_uri:
+    config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
+    if config_issue:
+        print(
+            "TIKTOK OAUTH CONFIG ERROR (LEGACY CONNECT):",
+            {
+                "issue": config_issue,
+                "client_key_present": bool(client_key),
+                "client_key_mask": _mask_value(client_key),
+                "client_secret_present": bool(client_secret),
+                "redirect_uri": redirect_uri,
+            },
+        )
         return JSONResponse(
             {
                 "error": "TikTok OAuth is not configured",
-                "detail": "Missing TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET / TIKTOK_REDIRECT_URI",
+                "detail": config_issue,
             },
             status_code=500,
         )
-    uri_err = _validate_redirect_uri(redirect_uri, "tiktok")
-    if uri_err:
-        return JSONResponse({"error": "TikTok OAuth redirect URI is invalid", "detail": uri_err}, status_code=500)
 
     state = secrets.token_urlsafe(32)
     now = _iso_z(datetime.utcnow())
@@ -2796,19 +2905,7 @@ def tiktok_connect(companyId: str = ""):
     finally:
         conn.close()
 
-    # Keep scopes minimal for MVP (connect + show account). Publishing scopes require TikTok review/audit.
-    scope = "user.info.basic"
-
-    qs = urllib.parse.urlencode(
-        {
-            "client_key": client_key,
-            "response_type": "code",
-            "scope": scope,
-            "redirect_uri": redirect_uri,
-            "state": state,
-        }
-    )
-    auth_url = f"https://www.tiktok.com/v2/auth/authorize/?{qs}"
+    auth_url = _build_tiktok_authorize_url(client_key, redirect_uri, state, scope="user.info.basic")
 
     return HTMLResponse(
         f"""<!doctype html>
@@ -2825,7 +2922,18 @@ def tiktok_callback(code: str = "", state: str = ""):
         return JSONResponse({"error": "Missing code/state"}, status_code=400)
 
     client_key, client_secret, redirect_uri = _tiktok_config()
-    if not client_key or not client_secret or not redirect_uri:
+    config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
+    if config_issue:
+        print(
+            "TIKTOK OAUTH CALLBACK CONFIG ERROR (LEGACY):",
+            {
+                "issue": config_issue,
+                "client_key_present": bool(client_key),
+                "client_key_mask": _mask_value(client_key),
+                "client_secret_present": bool(client_secret),
+                "redirect_uri": redirect_uri,
+            },
+        )
         return JSONResponse({"error": "TikTok OAuth is not configured"}, status_code=500)
 
     conn = get_db_connection()
