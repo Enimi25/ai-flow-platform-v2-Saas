@@ -503,6 +503,37 @@ def init_db():
                 """
             )
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_tiktok_accounts (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    tiktok_open_id TEXT DEFAULT '',
+                    username TEXT DEFAULT '',
+                    access_token TEXT DEFAULT '',
+                    refresh_token TEXT DEFAULT '',
+                    expires_in TEXT DEFAULT '',
+                    status TEXT DEFAULT 'connected',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_v2_tiktok_accounts_company
+                ON v2_tiktok_accounts (company_id);
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_tiktok_accounts_unique
+                ON v2_tiktok_accounts (company_id, tiktok_open_id);
+                """
+            )
+
             # Social content automation drafts (daily).
             cur.execute(
                 """
@@ -2434,6 +2465,294 @@ async def meta_disconnect(request: Request):
 # TIKTOK OAUTH (MVP)
 # =========================================================
 
+@app.get("/tiktok-connect-url")
+def tiktok_connect_url(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+
+    client_key, client_secret, redirect_uri = _tiktok_config()
+    if not client_key or not client_secret or not redirect_uri:
+        return JSONResponse(
+            {
+                "error": "TikTok OAuth is not configured",
+                "detail": "Missing TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET / TIKTOK_REDIRECT_URI",
+            },
+            status_code=500,
+        )
+    uri_err = _validate_redirect_uri(redirect_uri, "tiktok")
+    if uri_err:
+        return JSONResponse({"error": "TikTok OAuth redirect URI is invalid", "detail": uri_err}, status_code=500)
+
+    # Include companyId in state (as requested) plus a random nonce.
+    # Note: companyId is also stored server-side in v2_tiktok_oauth_states.
+    state = f"{company_id}.{secrets.token_urlsafe(24)}"
+    now = _iso_z(datetime.utcnow())
+    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE created_at < %s", (cutoff,))
+            cur.execute(
+                """
+                INSERT INTO v2_tiktok_oauth_states (state, company_id, created_at)
+                VALUES (%s, %s, %s)
+                """,
+                (state, company_id, now),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    scope = "user.info.basic"
+    qs = urllib.parse.urlencode(
+        {
+            "client_key": client_key,
+            "response_type": "code",
+            "scope": scope,
+            "redirect_uri": redirect_uri,
+            "state": state,
+        }
+    )
+    auth_url = f"https://www.tiktok.com/v2/auth/authorize/?{qs}"
+
+    return JSONResponse({"success": True, "url": auth_url})
+
+
+@app.get("/tiktok-oauth-callback")
+def tiktok_oauth_callback(code: str = "", state: str = ""):
+    if not code or not state:
+        return JSONResponse({"error": "Missing code/state"}, status_code=400)
+
+    client_key, client_secret, redirect_uri = _tiktok_config()
+    if not client_key or not client_secret or not redirect_uri:
+        return JSONResponse({"error": "TikTok OAuth is not configured"}, status_code=500)
+
+    # Resolve companyId from stored state.
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    company_id = ""
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT company_id, created_at FROM v2_tiktok_oauth_states WHERE state = %s",
+                (state,),
+            )
+            row = cur.fetchone()
+            if row:
+                if _oauth_state_is_fresh(row.get("created_at") or ""):
+                    company_id = (row.get("company_id") or "").strip()
+            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE state = %s", (state,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    if not company_id:
+        return JSONResponse({"error": "Invalid state"}, status_code=400)
+
+    token_url = "https://open.tiktokapis.com/v2/oauth/token/"
+    try:
+        token_data = _http_post_form_json(
+            token_url,
+            {
+                "client_key": client_key,
+                "client_secret": client_secret,
+                "code": urllib.parse.unquote(code),
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri,
+            },
+        )
+    except Exception as e:
+        print("TIKTOK TOKEN EXCHANGE ERROR:", type(e).__name__)
+        return JSONResponse({"error": "TikTok token exchange error"}, status_code=500)
+
+    access_token = (token_data.get("access_token") or "").strip()
+    refresh_token = (token_data.get("refresh_token") or "").strip()
+    open_id = (token_data.get("open_id") or "").strip()
+    scope = (token_data.get("scope") or "").strip()
+    expires_in = token_data.get("expires_in")
+    refresh_expires_in = token_data.get("refresh_expires_in")
+
+    if not access_token or not open_id:
+        detail = {
+            "error": token_data.get("error"),
+            "error_description": token_data.get("error_description"),
+            "log_id": token_data.get("log_id"),
+        }
+        return JSONResponse(
+            {"error": "TikTok token exchange failed", "detail": detail},
+            status_code=500,
+        )
+
+    expires_at = ""
+    refresh_expires_at = ""
+    try:
+        if expires_in is not None:
+            expires_at = _iso_z(datetime.utcnow() + timedelta(seconds=int(expires_in)))
+        if refresh_expires_in is not None:
+            refresh_expires_at = _iso_z(datetime.utcnow() + timedelta(seconds=int(refresh_expires_in)))
+    except Exception:
+        expires_at = ""
+        refresh_expires_at = ""
+
+    display_name = "TikTok Account"
+    try:
+        user_info_url = "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url"
+        req = urllib.request.Request(
+            user_info_url,
+            method="GET",
+            headers={"User-Agent": "AI-FLOW/1.0", "Authorization": f"Bearer {access_token}"},
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            user_data = json.loads(raw)
+            data_obj = user_data.get("data") or {}
+            user_obj = data_obj.get("user") or {}
+            display_name = (user_obj.get("display_name") or "").strip() or display_name
+    except Exception as e:
+        print("TIKTOK USER INFO ERROR:", type(e).__name__)
+
+    now = _iso_z(datetime.utcnow())
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor() as cur:
+            # Keep existing social account/token storage.
+            cur.execute(
+                "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s",
+                (company_id, "TikTok"),
+            )
+            cur.execute(
+                """
+                INSERT INTO v2_social_accounts (company_id, platform, status, account_name, account_id, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (company_id, "TikTok", "connected", display_name, open_id, now, now),
+            )
+
+            cur.execute(
+                """
+                INSERT INTO v2_social_tokens (company_id, provider, platform, account_id, access_token, token_expires_at, refresh_token, refresh_expires_at, scope, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (company_id, provider, platform, account_id)
+                DO UPDATE SET
+                    access_token = EXCLUDED.access_token,
+                    token_expires_at = EXCLUDED.token_expires_at,
+                    refresh_token = EXCLUDED.refresh_token,
+                    refresh_expires_at = EXCLUDED.refresh_expires_at,
+                    scope = EXCLUDED.scope,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    company_id,
+                    "tiktok",
+                    "TikTok",
+                    open_id,
+                    access_token,
+                    expires_at,
+                    refresh_token,
+                    refresh_expires_at,
+                    scope,
+                    now,
+                    now,
+                ),
+            )
+
+            # New dedicated TikTok account store (foundation for future publishing).
+            cur.execute(
+                """
+                INSERT INTO v2_tiktok_accounts (
+                    company_id,
+                    tiktok_open_id,
+                    username,
+                    access_token,
+                    refresh_token,
+                    expires_in,
+                    status,
+                    created_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (company_id, tiktok_open_id)
+                DO UPDATE SET
+                    username = EXCLUDED.username,
+                    access_token = EXCLUDED.access_token,
+                    refresh_token = EXCLUDED.refresh_token,
+                    expires_in = EXCLUDED.expires_in,
+                    status = EXCLUDED.status,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    company_id,
+                    open_id,
+                    display_name,
+                    access_token,
+                    refresh_token,
+                    str(expires_in) if expires_in is not None else "",
+                    "connected",
+                    now,
+                    now,
+                ),
+            )
+
+        conn.commit()
+
+    except Exception as e:
+        print("TIKTOK CALLBACK DB ERROR:", type(e).__name__)
+        return JSONResponse({"error": "TikTok callback save error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+    return RedirectResponse(url="/social-accounts?connected=tiktok", status_code=302)
+
+
+@app.get("/tiktok-accounts")
+def tiktok_accounts(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return JSONResponse({"error": "Missing companyId"}, status_code=400)
+    if not _company_exists(company_id):
+        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, company_id, tiktok_open_id, username, status, created_at, updated_at
+                FROM v2_tiktok_accounts
+                WHERE company_id = %s
+                ORDER BY id DESC
+                """,
+                (company_id,),
+            )
+            accounts = cur.fetchall()
+
+        return JSONResponse({"success": True, "accounts": accounts})
+
+    except Exception as e:
+        print("TIKTOK ACCOUNTS ERROR:", type(e).__name__)
+        return JSONResponse({"error": "TikTok accounts error"}, status_code=500)
+
+    finally:
+        conn.close()
+
+
 @app.get("/api/tiktok/connect")
 def tiktok_connect(companyId: str = ""):
     company_id = (companyId or "").strip()
@@ -2719,6 +3038,10 @@ async def tiktok_disconnect(request: Request):
             cur.execute(
                 "DELETE FROM v2_social_accounts WHERE company_id = %s AND platform = %s",
                 (company_id, "TikTok"),
+            )
+            cur.execute(
+                "DELETE FROM v2_tiktok_accounts WHERE company_id = %s",
+                (company_id,),
             )
         conn.commit()
         return JSONResponse({"success": True})

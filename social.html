@@ -777,26 +777,38 @@ async function loadSocialData(){
       }
     }catch(e){
       setConnectedHtml("");
-    }
-
-    // Load TikTok connected account (if configured).
+    }    // Load TikTok connected accounts (OAuth foundation).
     try{
-      const res3 = await fetch("/api/tiktok/account?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const res3 = await fetch("/tiktok-accounts?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
       const data3 = await res3.json();
-      if(res3.ok && data3 && data3.success && data3.account){
-        const a = data3.account;
-        const html2 = `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;">
-            <div style="font-weight:900;">TikTok Connected Account</div>
-            <button onclick="disconnectTikTok()" style="width:auto;padding:10px 14px;">Disconnect TikTok</button>
-          </div>
-          <div style="margin-top:12px;">
-            <div><strong>${esc(a.account_name || "TikTok")}</strong> <span style="opacity:.75">(${esc(a.account_id || "")})</span></div>
-          </div>
-        `;
-        const existing = document.getElementById("connectedAccounts")?.innerHTML || "";
-        setConnectedHtml((existing || "") + html2);
-        markConnected("TikTok");
+      if(res3.ok && data3 && data3.success){
+        const accs = data3.accounts || [];
+        if(accs.length){
+          const a = accs[0];
+          const name = a.username || "TikTok";
+          const status = a.status || "connected";
+
+          const el = document.getElementById("tiktokStatus");
+          if(el){
+            el.innerText = "Connected: " + name;
+            el.classList.add("connected");
+          }
+
+          const items = accs.map(x => `<li><strong>${esc(x.username || "TikTok")}</strong> <span style="opacity:.75">(${esc(x.tiktok_open_id || "")})</span> <span class="pill" style="margin-left:8px;">${esc(x.status || "connected")}</span></li>`).join("");
+          const html2 = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;">
+              <div style="font-weight:900;">TikTok Connected Account</div>
+              <button onclick="disconnectTikTok()" style="width:auto;padding:10px 14px;">Disconnect TikTok</button>
+            </div>
+            <div style="margin-top:12px;">
+              <ul style="margin-left:18px;line-height:1.7;">${items || "<li>None</li>"}</ul>
+            </div>
+          `;
+
+          const existing = document.getElementById("connectedAccounts")?.innerHTML || "";
+          setConnectedHtml((existing || "") + html2);
+          markConnected("TikTok");
+        }
       }
     }catch(e){
       // ignore
@@ -826,8 +838,18 @@ async function connectSocial(platform){
   }
 
   if(platform === "TikTok"){
-    setMsg("Redirecting to TikTok to connect...");
-    window.location.href = "/api/tiktok/connect?companyId=" + encodeURIComponent(companyId);
+    setMsg("Preparing TikTok connect...");
+    try{
+      const res = await fetch("/tiktok-connect-url?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const data = await res.json();
+      if(!res.ok || data.error){
+        setMsg(data.error || "TikTok connect error.");
+        return;
+      }
+      window.location.href = data.url;
+    }catch(e){
+      setMsg("Connection error starting TikTok connect.");
+    }
     return;
   }
 
