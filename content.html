@@ -401,14 +401,16 @@ textarea{
 </div>
 
 <script>
-const email = localStorage.getItem("ai_flow_email");
-const companyId = localStorage.getItem("ai_flow_company_id");
+let email = localStorage.getItem("ai_flow_email") || "";
+let role = localStorage.getItem("ai_flow_role") || "";
 
-if (!email || !companyId) {
-  window.location.href = "/login";
+const qs = new URLSearchParams(window.location.search);
+const urlCompanyId = (qs.get("companyId") || "").trim();
+let companyId = urlCompanyId || (localStorage.getItem("ai_flow_company_id") || "");
+
+function setClientHeader(){
+  document.getElementById("clientEmail").innerText = email || "Client";
 }
-
-document.getElementById("clientEmail").innerText = email;
 
 function logout(){
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
@@ -426,6 +428,83 @@ function setMsg(text){
   document.getElementById("msg").innerText = text;
 }
 
+function showAccessDenied(detail){
+  const msg = (detail || "").trim();
+  setMsg("403 Access Denied. " + (msg || "You do not have access to Content Factory for this company."));
+
+  // Disable actions without logging out or clearing session.
+  try{
+    document.querySelectorAll(".actions button, .card button").forEach(btn => {
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
+      btn.style.cursor = "not-allowed";
+    });
+  }catch(e){}
+}
+
+async function fetchMe(){
+  const res = await fetch("/api/me", {credentials:"same-origin"});
+  let data = {};
+  try{ data = await res.json(); }catch(e){ data = {}; }
+  return {res, data};
+}
+
+async function initPage(){
+  setMsg("Loading...");
+
+  const out = await fetchMe();
+  const res = out.res;
+  const data = out.data || {};
+
+  if(!res.ok || data.error){
+    // Separate auth (401) vs permission / other errors.
+    if(res && res.status === 401){
+      window.location.href = "/login";
+      return;
+    }
+    showAccessDenied(data.error || "Forbidden");
+    return;
+  }
+
+  const u = data.user || {};
+  email = String(u.email || email || "");
+  role = String(u.role || role || "");
+  const sessionActiveCompanyId = String(data.activeCompanyId || "").trim();
+
+  if(email) localStorage.setItem("ai_flow_email", email);
+  if(role) localStorage.setItem("ai_flow_role", role);
+
+  if(role === "platform_admin"){
+    companyId = urlCompanyId || companyId || sessionActiveCompanyId || "";
+    if(companyId){
+      localStorage.setItem("ai_flow_company_id", companyId);
+      try{
+        await fetch("/api/set-active-company", {
+          method:"POST",
+          credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({companyId: companyId})
+        });
+      }catch(e){}
+    }
+  }else{
+    companyId = String(u.company_id || companyId || "").trim();
+    if(companyId){
+      localStorage.setItem("ai_flow_company_id", companyId);
+    }
+  }
+
+  setClientHeader();
+
+  if(!companyId){
+    // Authenticated but no company context: treat as access denied (do not log out).
+    showAccessDenied("Select a company first (Dashboard -> Platform Admin -> View Company), then open Content Factory again.");
+    return;
+  }
+
+  loadPosts();
+}
+
 async function loadPosts(){
   setMsg("Loading posts...");
 
@@ -434,6 +513,14 @@ async function loadPosts(){
     const data = await res.json();
 
     if(!res.ok || data.error){
+      if(res.status === 401){
+        window.location.href = "/login";
+        return;
+      }
+      if(res.status === 403){
+        showAccessDenied(data.error || "Forbidden");
+        return;
+      }
       setMsg(data.error || "Error loading posts.");
       return;
     }
@@ -552,6 +639,14 @@ async function generatePost(){
     const data = await res.json();
 
     if(!res.ok || data.error){
+      if(res.status === 401){
+        window.location.href = "/login";
+        return;
+      }
+      if(res.status === 403){
+        showAccessDenied(data.error || "Forbidden");
+        return;
+      }
       setMsg(data.error || "Error generating post.");
       return;
     }
@@ -564,7 +659,8 @@ async function generatePost(){
   }
 }
 
-loadPosts();
+setClientHeader();
+initPage();
 </script>
 
 <script>
