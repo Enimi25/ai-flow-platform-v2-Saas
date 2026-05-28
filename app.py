@@ -2375,16 +2375,8 @@ def meta_connect(companyId: str = ""):
     finally:
         conn.close()
 
-    # Minimal scopes for Pages list + IG business account discovery.
-    scope = ",".join(
-        [
-            "public_profile",
-            "pages_show_list",
-            "pages_read_engagement",
-            "pages_manage_metadata",
-            "instagram_basic",
-        ]
-    )
+    # Development mode scopes (basic login). Keep this minimal until the Meta app is approved for advanced scopes.
+    scope = ",".join(["public_profile", "email"])
 
     qs = urllib.parse.urlencode(
         {
