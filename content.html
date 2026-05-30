@@ -301,6 +301,112 @@ textarea{
   border-color:rgba(248,113,113,.30);
 }
 
+.publisher-card{
+  margin-bottom:24px;
+  border-radius:20px;
+}
+
+.publisher-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  flex-wrap:wrap;
+}
+
+.publisher-card h2{
+  margin:12px 0 8px;
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 10px;
+  border-radius:999px;
+  background:rgba(65,220,255,0.10);
+  color:#c8f9ff;
+  border:1px solid rgba(65,220,255,0.18);
+  font-size:12px;
+  font-weight:950;
+}
+
+.pill.connected{
+  background:rgba(184,255,122,0.16);
+  color:var(--accent);
+  border-color:rgba(184,255,122,0.20);
+}
+
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+  margin-top:18px;
+}
+
+.field label{
+  font-weight:850;
+}
+
+.hint{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.5;
+}
+
+.publisher-card textarea{
+  min-height:96px;
+}
+
+.action-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.jobs-list{
+  margin-top:12px;
+  display:grid;
+  gap:10px;
+}
+
+.job-row{
+  background:rgba(17,25,54,.72);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:14px;
+}
+
+.job-top{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom:8px;
+}
+
+.job-meta{
+  color:#cbd5e1;
+  font-size:13px;
+  line-height:1.5;
+  word-break:break-word;
+}
+
+.job-actions{
+  margin-top:10px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.link{
+  color:var(--accent);
+  font-weight:950;
+  text-decoration:none;
+}
+
 .msg{
   color:var(--muted);
   margin-bottom:16px;
@@ -316,6 +422,7 @@ textarea{
   .sidebar{width:100%;height:auto;position:relative}
   .main > *{max-width:none}
   .grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -355,8 +462,90 @@ textarea{
 
   <div class="actions">
     <button class="green" onclick="generatePost()">Generate AI Post</button>
+    <button class="dark" onclick="openInstagramPublisher()">Instagram Publisher</button>
     <button class="dark" onclick="loadPosts()">Refresh Posts</button>
     <button class="dark" onclick="goDashboard()">Back to Dashboard</button>
+  </div>
+
+  <div class="card publisher-card" id="instagramPublisher">
+    <div class="publisher-head">
+      <div>
+        <span class="pill connected">Instagram Publisher v1</span>
+        <h2>Create Instagram Post</h2>
+        <div class="hint">Image/video URLs must be publicly accessible by Meta. Local files and private Google Drive links will not work yet.</div>
+      </div>
+      <span class="pill" id="instagramPublisherStatus">Loading</span>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="igAccountSelect">Instagram account</label>
+        <select id="igAccountSelect"></select>
+      </div>
+      <div class="field">
+        <label for="igPostType">Post type</label>
+        <select id="igPostType" onchange="updateInstagramMediaHint()">
+          <option value="image">Image</option>
+          <option value="carousel">Carousel</option>
+          <option value="reel">Reel</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:14px;">
+      <label for="igMediaUrls">Media URL</label>
+      <textarea id="igMediaUrls" placeholder="https://example.com/image.jpg"></textarea>
+      <div class="hint" id="igMediaHint">Use one public image URL.</div>
+    </div>
+
+    <div class="field" style="margin-top:14px;">
+      <label for="igCaption">Caption</label>
+      <textarea id="igCaption" placeholder="Write the Instagram caption..."></textarea>
+    </div>
+
+    <div style="margin-top:20px;font-weight:900;">Generate Creative for Instagram</div>
+    <div class="hint" style="margin-top:6px;">AI image generation is not connected yet. Use a public image URL for publishing.</div>
+
+    <div class="field" style="margin-top:14px;">
+      <label for="igCreativePrompt">Topic / prompt</label>
+      <textarea id="igCreativePrompt" placeholder="e.g. 5 tips to increase bookings using faster lead replies"></textarea>
+    </div>
+
+    <div class="form-grid" style="margin-top:10px;">
+      <div class="field">
+        <label for="igCreativeType">Creative type</label>
+        <select id="igCreativeType">
+          <option value="caption">Image caption</option>
+          <option value="carousel_outline">Carousel outline</option>
+          <option value="reel_script">Reel script</option>
+          <option value="reel_hooks">Reel hook ideas</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="dark" onclick="generateInstagramCreativeFromContent()">Generate</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:12px;">
+      <label for="igCreativeResult">Result</label>
+      <textarea id="igCreativeResult" placeholder="Generated text will appear here..."></textarea>
+    </div>
+
+    <div class="action-row">
+      <button class="dark" onclick="useGeneratedCreativeAsCaption()">Use as Caption</button>
+    </div>
+
+    <div class="action-row">
+      <button class="dark" onclick="saveInstagramDraftFromContent(false)">Save Draft</button>
+      <button class="green" onclick="publishInstagramFromContent()">Publish Now</button>
+      <button class="dark" onclick="loadInstagramJobsForContent()">Refresh Jobs</button>
+    </div>
+
+    <div class="hint" id="instagramPublishMessage" style="margin-top:14px;">Connect Instagram first in Social Accounts.</div>
+
+    <div style="margin-top:22px;font-weight:900;">Recent Instagram Jobs</div>
+    <div class="jobs-list" id="instagramJobsList"></div>
   </div>
 
   <div id="msg" class="msg">Loading...</div>
@@ -407,6 +596,8 @@ let role = localStorage.getItem("ai_flow_role") || "";
 const qs = new URLSearchParams(window.location.search);
 const urlCompanyId = (qs.get("companyId") || "").trim();
 let companyId = urlCompanyId || (localStorage.getItem("ai_flow_company_id") || "");
+let instagramAccounts = [];
+let instagramJobs = [];
 
 function setClientHeader(){
   document.getElementById("clientEmail").innerText = email || "Client";
@@ -424,8 +615,35 @@ function goDashboard(){
   window.location.href = "/dashboard";
 }
 
+function openInstagramPublisher(){
+  const el = document.getElementById("instagramPublisher");
+  if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
 function setMsg(text){
   document.getElementById("msg").innerText = text;
+}
+
+function esc(value){
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    "\"":"&quot;",
+    "'":"&#39;"
+  }[ch]));
+}
+
+async function readJsonSafe(res){
+  const text = await res.text();
+  if(!text){
+    return {data: {}, text: ""};
+  }
+  try{
+    return {data: JSON.parse(text), text};
+  }catch(e){
+    return {data: {}, text};
+  }
 }
 
 function showAccessDenied(detail){
@@ -440,6 +658,330 @@ function showAccessDenied(detail){
       btn.style.cursor = "not-allowed";
     });
   }catch(e){}
+}
+
+function setInstagramPublisherStatus(text, connected){
+  const el = document.getElementById("instagramPublisherStatus");
+  if(!el) return;
+  el.innerText = text;
+  if(connected) el.classList.add("connected");
+  else el.classList.remove("connected");
+}
+
+function setInstagramPublishMessage(text){
+  const el = document.getElementById("instagramPublishMessage");
+  if(el) el.innerText = text;
+}
+
+function updateInstagramMediaHint(){
+  const type = document.getElementById("igPostType")?.value || "image";
+  const media = document.getElementById("igMediaUrls");
+  const hint = document.getElementById("igMediaHint");
+  if(type === "carousel"){
+    if(media) media.placeholder = "https://example.com/image-1.jpg\nhttps://example.com/image-2.jpg";
+    if(hint) hint.innerText = "Use 2-10 public image URLs, one per line.";
+  }else if(type === "reel"){
+    if(media) media.placeholder = "https://example.com/video.mp4";
+    if(hint) hint.innerText = "Use one public video URL for the Reel.";
+  }else{
+    if(media) media.placeholder = "https://example.com/image.jpg";
+    if(hint) hint.innerText = "Use one public image URL.";
+  }
+}
+
+function parseInstagramMediaUrls(){
+  const raw = document.getElementById("igMediaUrls")?.value || "";
+  return raw
+    .split(/\n|,/)
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+function getInstagramMediaUrls(){
+  return parseInstagramMediaUrls();
+}
+
+function renderInstagramAccounts(){
+  const select = document.getElementById("igAccountSelect");
+  if(!select) return;
+  select.innerHTML = "";
+  if(!instagramAccounts.length){
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.innerText = "Connect Instagram first";
+    select.appendChild(opt);
+    setInstagramPublisherStatus("Not Connected", false);
+    return;
+  }
+  instagramAccounts.forEach(account => {
+    const opt = document.createElement("option");
+    opt.value = account.ig_user_id || account.account_id || "";
+    opt.innerText = (account.account_name || "Instagram") + " (" + (account.ig_user_id || account.account_id || "") + ")";
+    if(account.token_available === false){
+      opt.innerText += " - reconnect needed";
+    }
+    select.appendChild(opt);
+  });
+  setInstagramPublisherStatus("Ready", true);
+}
+
+function renderInstagramJobs(){
+  const box = document.getElementById("instagramJobsList");
+  if(!box) return;
+  if(!instagramJobs.length){
+    box.innerHTML = '<div class="hint">No Instagram publish jobs yet.</div>';
+    return;
+  }
+  box.innerHTML = instagramJobs.map(job => {
+    const urls = (job.media_urls || []).map(u => `<div>${esc(u)}</div>`).join("");
+    const caption = esc((job.caption || "").slice(0, 160));
+    const error = job.error_message ? `<div class="job-meta" style="color:#ffb4b4;">${esc(job.error_message)}</div>` : "";
+    const link = job.permalink ? `<a class="link" href="${esc(job.permalink)}" target="_blank" rel="noopener">View Post</a>` : "";
+    const canPublish = ["draft","failed"].includes(String(job.status || ""));
+    const publishBtn = canPublish ? `<button class="mini mini-green" onclick="publishInstagramFromContent(${Number(job.id)})">Publish Now</button>` : "";
+    return `
+      <div class="job-row">
+        <div class="job-top">
+          <div><strong>${esc(job.post_type || "post")}</strong> <span class="pill">${esc(job.status || "")}</span></div>
+          <div>${link}</div>
+        </div>
+        <div class="job-meta">${caption || "No caption"}</div>
+        <div class="job-meta">${urls}</div>
+        ${error}
+        <div class="job-actions">${publishBtn}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function loadInstagramAccountsForContent(){
+  if(!companyId){
+    instagramAccounts = [];
+    renderInstagramAccounts();
+    setInstagramPublishMessage("Select a company first.");
+    return;
+  }
+
+  try{
+    const res = await fetch("/api/instagram/accounts?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      instagramAccounts = [];
+      renderInstagramAccounts();
+      setInstagramPublishMessage(data.error || "Instagram accounts could not load.");
+      return;
+    }
+    instagramAccounts = data.accounts || [];
+    renderInstagramAccounts();
+    if(!instagramAccounts.length){
+      setInstagramPublishMessage("Connect Instagram first in Social Accounts.");
+    }else{
+      setInstagramPublishMessage("Ready to create Instagram image, carousel, or Reel drafts.");
+    }
+  }catch(e){
+    instagramAccounts = [];
+    renderInstagramAccounts();
+    setInstagramPublishMessage("Instagram accounts could not load.");
+  }
+}
+
+async function loadInstagramJobsForContent(){
+  const jobBox = document.getElementById("instagramJobsList");
+  if(!companyId){
+    instagramJobs = [];
+    if(jobBox) jobBox.innerHTML = '<div class="hint">Select a company first.</div>';
+    return;
+  }
+
+  try{
+    const resJobs = await fetch("/api/instagram/jobs?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+    const out = await readJsonSafe(resJobs);
+    const dataJobs = out.data || {};
+    if(!resJobs.ok || dataJobs.error){
+      instagramJobs = [];
+      renderInstagramJobs();
+      setInstagramPublishMessage(dataJobs.error || out.text || "Instagram jobs could not load.");
+      return;
+    }
+    instagramJobs = (dataJobs && dataJobs.success) ? (dataJobs.jobs || []) : [];
+    renderInstagramJobs();
+  }catch(e){
+    instagramJobs = [];
+    renderInstagramJobs();
+    setInstagramPublishMessage("Instagram jobs could not load.");
+  }
+}
+
+async function loadInstagramPublisher(){
+  await loadInstagramAccountsForContent();
+  await loadInstagramJobsForContent();
+}
+
+function validateInstagramDraftInputs(igUserId, postType, mediaUrls){
+  if(!igUserId){
+    return "Connect Instagram first in Social Accounts.";
+  }
+  if(!postType){
+    return "Select a post type.";
+  }
+  if(!mediaUrls.length){
+    return "Media URL is required.";
+  }
+  const invalid = mediaUrls.find(u => !/^https?:\/\//i.test(u));
+  if(invalid){
+    return "Media URLs must start with http(s).";
+  }
+  if(postType === "image"){
+    if(mediaUrls.length !== 1) return "Image requires exactly 1 public image URL.";
+    return "";
+  }
+  if(postType === "reel"){
+    if(mediaUrls.length !== 1) return "Reel requires exactly 1 public video URL.";
+    return "";
+  }
+  if(postType === "carousel"){
+    if(mediaUrls.length < 2 || mediaUrls.length > 10) return "Carousel requires 2-10 public image URLs (one per line).";
+    return "";
+  }
+  return "";
+}
+
+async function saveInstagramDraftFromContent(publishAfter){
+  if(!companyId){
+    setInstagramPublishMessage("Please select a company first.");
+    return;
+  }
+  const igUserId = document.getElementById("igAccountSelect")?.value || "";
+  if(!igUserId){
+    setInstagramPublishMessage("Connect Instagram first in Social Accounts.");
+    return;
+  }
+  const postType = document.getElementById("igPostType")?.value || "image";
+  const mediaUrls = parseInstagramMediaUrls();
+  const caption = document.getElementById("igCaption")?.value || "";
+
+  const v = validateInstagramDraftInputs(igUserId, postType, mediaUrls);
+  if(v){
+    setInstagramPublishMessage(v);
+    return;
+  }
+
+  setInstagramPublishMessage(publishAfter ? "Creating draft and publishing..." : "Saving Instagram draft...");
+  try{
+    const res = await fetch("/api/instagram/drafts", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId,
+        ig_user_id: igUserId,
+        post_type: postType,
+        media_urls: mediaUrls,
+        caption
+      })
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setInstagramPublishMessage(data.error || out.text || "Instagram draft save failed.");
+      await loadInstagramPublisher();
+      return;
+    }
+    const job = data.job || {};
+    if(publishAfter){
+      await publishInstagramFromContent(job.id);
+      return;
+    }
+    setInstagramPublishMessage("Instagram draft saved.");
+    await loadInstagramPublisher();
+  }catch(e){
+    setInstagramPublishMessage("Instagram draft save failed.");
+  }
+}
+
+async function publishInstagramFromContent(jobId){
+  if(!jobId) return await saveInstagramDraftFromContent(true);
+  setInstagramPublishMessage("Publishing Instagram post...");
+  try{
+    const res = await fetch("/api/instagram/publish", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, job_id: jobId})
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error || data.success === false){
+      setInstagramPublishMessage((data && data.error) ? data.error : (out.text || "Instagram publish failed."));
+      await loadInstagramPublisher();
+      return;
+    }
+    const permalink = data.permalink || (data.job && data.job.permalink) || "";
+    setInstagramPublishMessage(permalink ? ("Instagram post published successfully: " + permalink) : "Instagram post published successfully.");
+    await loadInstagramPublisher();
+  }catch(e){
+    setInstagramPublishMessage("Instagram publish failed.");
+    await loadInstagramPublisher();
+  }
+}
+
+async function generateInstagramCreativeFromContent(){
+  const prompt = (document.getElementById("igCreativePrompt")?.value || "").trim();
+  const creativeType = document.getElementById("igCreativeType")?.value || "caption";
+  const resultBox = document.getElementById("igCreativeResult");
+  if(resultBox) resultBox.value = "";
+
+  if(!companyId){
+    setInstagramPublishMessage("Please select a company first.");
+    return;
+  }
+  if(!prompt){
+    setInstagramPublishMessage("Enter a topic / prompt for creative generation.");
+    return;
+  }
+
+  let postType = "caption";
+  if(creativeType === "carousel_outline") postType = "carousel";
+  else if(creativeType === "reel_script") postType = "reel idea";
+  else if(creativeType === "reel_hooks") postType = "reel hook ideas";
+
+  setInstagramPublishMessage("Generating creative...");
+  try{
+    const res = await fetch("/create-content-post", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        companyId: companyId,
+        platform: "Instagram",
+        postType: postType,
+        topic: prompt
+      })
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setInstagramPublishMessage(data.error || out.text || "Creative generation failed.");
+      return;
+    }
+    const content = (data.post && data.post.content) ? String(data.post.content) : "";
+    if(resultBox) resultBox.value = content || "";
+    setInstagramPublishMessage("Creative generated.");
+    loadPosts();
+  }catch(e){
+    setInstagramPublishMessage("Creative generation failed.");
+  }
+}
+
+function useGeneratedCreativeAsCaption(){
+  const result = (document.getElementById("igCreativeResult")?.value || "").trim();
+  if(!result){
+    setInstagramPublishMessage("Generate creative first.");
+    return;
+  }
+  const captionBox = document.getElementById("igCaption");
+  if(captionBox) captionBox.value = result;
+  setInstagramPublishMessage("Caption updated from generated creative.");
 }
 
 async function fetchMe(){
@@ -503,6 +1045,7 @@ async function initPage(){
   }
 
   loadPosts();
+  loadInstagramPublisher();
 }
 
 async function loadPosts(){

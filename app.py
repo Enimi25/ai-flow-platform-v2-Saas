@@ -6,12 +6,14 @@ from groq import Groq
 
 import os
 import hashlib
+import hmac
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
 import secrets
 import urllib.parse
+import urllib.error
 import urllib.request
 
 import psycopg2
@@ -25,6 +27,42 @@ app = FastAPI()
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def _is_production_runtime() -> bool:
+    env_name = (
+        os.getenv("APP_ENV")
+        or os.getenv("FLASK_ENV")
+        or os.getenv("FASTAPI_ENV")
+        or os.getenv("ENVIRONMENT")
+        or ""
+    ).strip().lower()
+    if env_name in {"prod", "production"}:
+        return True
+    return any(
+        (os.getenv(name) or "").strip()
+        for name in ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
+    )
+
+
+def _load_secret_key() -> str:
+    secret_key = (os.getenv("SECRET_KEY") or "").strip()
+    if secret_key:
+        return secret_key
+
+    legacy_session_secret = (os.getenv("SESSION_SECRET") or "").strip()
+    if legacy_session_secret:
+        print("WARNING: SECRET_KEY is missing; using legacy SESSION_SECRET. Set SECRET_KEY on Render.")
+        return legacy_session_secret
+
+    if _is_production_runtime():
+        raise RuntimeError("SECRET_KEY must be set in production for stable signed sessions.")
+
+    print("WARNING: SECRET_KEY is missing; using local development fallback secret.")
+    return "dev-secret-change-this"
+
+
+_secret_key = _load_secret_key()
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,19 +71,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_session_secret = (os.getenv("SESSION_SECRET") or "").strip()
-if not _session_secret:
-    # Avoid crashing deploys if env var is missing, but strongly recommend setting SESSION_SECRET in production.
-    _session_secret = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip() or secrets.token_hex(32)
-    print("WARNING: SESSION_SECRET is missing; using a fallback secret. Set SESSION_SECRET for stable sessions.")
-
 app.add_middleware(
     SessionMiddleware,
-    secret_key=_session_secret,
+    secret_key=_secret_key,
     session_cookie="ai_flow_session",
     same_site="lax",
     https_only=True,
 )
+
+
+@app.middleware("http")
+async def meta_oauth_callback_400_redirect(request: Request, call_next):
+    if request.url.path != "/api/meta/callback":
+        return await call_next(request)
+
+    state = request.query_params.get("state", "")
+    state_hash = hashlib.sha256(state.encode("utf-8")).hexdigest()[:12] if state else ""
+
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        if getattr(e, "status_code", None) == 400:
+            print(
+                "META CALLBACK 400 SAFETY REDIRECT:",
+                {"source": "exception", "state_hash": state_hash, "error_type": type(e).__name__},
+            )
+            return RedirectResponse(url=META_OAUTH_INVALID_STATE_REDIRECT, status_code=302)
+        raise
+
+    if response.status_code == 400:
+        print(
+            "META CALLBACK 400 SAFETY REDIRECT:",
+            {"source": "response", "state_hash": state_hash},
+        )
+        return RedirectResponse(url=META_OAUTH_INVALID_STATE_REDIRECT, status_code=302)
+
+    return response
 
 # =========================================================
 # AUTH / RBAC HELPERS
@@ -481,16 +542,47 @@ def init_db():
                 """
             )
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_instagram_publish_jobs (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    provider TEXT DEFAULT 'instagram',
+                    post_type TEXT DEFAULT '',
+                    ig_user_id TEXT DEFAULT '',
+                    page_id TEXT DEFAULT '',
+                    media_urls TEXT DEFAULT '[]',
+                    caption TEXT DEFAULT '',
+                    status TEXT DEFAULT 'draft',
+                    creation_id TEXT DEFAULT '',
+                    media_id TEXT DEFAULT '',
+                    permalink TEXT DEFAULT '',
+                    error_message TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT '',
+                    published_at TEXT DEFAULT ''
+                );
+                """
+            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_instagram_publish_jobs_company ON v2_instagram_publish_jobs(company_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_instagram_publish_jobs_status ON v2_instagram_publish_jobs(status)")
+
             # Short-lived OAuth state store for Meta connect flow.
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS v2_meta_oauth_states (
                     state TEXT PRIMARY KEY,
                     company_id TEXT DEFAULT '',
-                    created_at TEXT DEFAULT ''
+                    created_at TEXT DEFAULT '',
+                    consumed_at TEXT DEFAULT '',
+                    success TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
                 );
                 """
             )
+            cur.execute("ALTER TABLE v2_meta_oauth_states ADD COLUMN IF NOT EXISTS consumed_at TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_meta_oauth_states ADD COLUMN IF NOT EXISTS success TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_meta_oauth_states ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT ''")
 
             # Short-lived OAuth state store for TikTok connect flow.
             cur.execute(
@@ -734,7 +826,11 @@ def bootstrap_platform_admin():
 # =========================================================
 
 def page_response(filename: str, media_type: str | None = None):
-    return FileResponse(BASE_DIR / filename, media_type=media_type)
+    return FileResponse(
+        BASE_DIR / filename,
+        media_type=media_type,
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/")
@@ -764,6 +860,7 @@ def leads_page(request: Request):
 
 
 @app.get("/content-factory")
+@app.get("/content")
 def content_factory_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
@@ -2127,6 +2224,486 @@ def _oauth_state_is_fresh(created_at: str, ttl_minutes: int = 20):
     return dt >= (datetime.utcnow() - timedelta(minutes=ttl_minutes))
 
 
+OAUTH_STATE_TTL_MINUTES = 20
+OAUTH_STATE_TABLES = {
+    "meta": "v2_meta_oauth_states",
+    "tiktok": "v2_tiktok_oauth_states",
+}
+META_OAUTH_SUCCESS_REDIRECT = "/social-accounts?meta_connected=1"
+META_OAUTH_ALREADY_CONNECTED_REDIRECT = "/social-accounts?meta_status=already_connected"
+META_OAUTH_INVALID_STATE_REDIRECT = "/social-accounts?meta_error=invalid_state"
+META_OAUTH_MISSING_PARAMS_REDIRECT = "/social-accounts?meta_error=missing_callback_params"
+META_OAUTH_CONFIG_ERROR_REDIRECT = "/social-accounts?meta_error=config"
+META_OAUTH_TOKEN_ERROR_REDIRECT = "/social-accounts?meta_error=token_exchange"
+META_OAUTH_SAVE_ERROR_REDIRECT = "/social-accounts?meta_error=save_failed"
+META_OAUTH_STATE_ERROR_REDIRECT = "/social-accounts?meta_error=state_lookup"
+
+
+def _oauth_state_table(provider: str) -> str:
+    table = OAUTH_STATE_TABLES.get((provider or "").strip().lower())
+    if not table:
+        raise ValueError("Unknown OAuth provider")
+    return table
+
+
+def _oauth_state_signature(payload: str) -> str:
+    digest = hmac.new(
+        _secret_key.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return _b64e(digest)
+
+
+def _create_oauth_state(provider: str, company_id: str, *, include_company_prefix: bool = False) -> str:
+    payload = _b64e(
+        json.dumps(
+            {
+                "provider": (provider or "").strip().lower(),
+                "company_id": (company_id or "").strip(),
+                "issued_at": int(datetime.utcnow().timestamp()),
+                "nonce": secrets.token_urlsafe(24),
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    )
+    token = f"{payload}.{_oauth_state_signature(payload)}"
+    if include_company_prefix:
+        return f"{company_id}.{token}"
+    return token
+
+
+def _verify_signed_oauth_state(state: str, provider: str, ttl_minutes: int = OAUTH_STATE_TTL_MINUTES):
+    parts = (state or "").strip().split(".")
+    if len(parts) < 2:
+        return "", "unsigned"
+
+    payload = parts[-2]
+    provided_sig = parts[-1]
+    expected_sig = _oauth_state_signature(payload)
+    if not hmac.compare_digest(provided_sig, expected_sig):
+        return "", "bad_signature"
+
+    try:
+        data = json.loads(_b64d(payload).decode("utf-8"))
+    except Exception:
+        return "", "bad_payload"
+
+    expected_provider = (provider or "").strip().lower()
+    if (data.get("provider") or "").strip().lower() != expected_provider:
+        return "", "wrong_provider"
+
+    company_id = (data.get("company_id") or "").strip()
+    try:
+        issued_at = int(data.get("issued_at") or 0)
+    except Exception:
+        return "", "bad_issued_at"
+
+    now_ts = int(datetime.utcnow().timestamp())
+    if not company_id or not issued_at:
+        return "", "bad_payload"
+    if issued_at > now_ts + 300:
+        return "", "issued_in_future"
+    if issued_at < now_ts - (ttl_minutes * 60):
+        return "", "expired"
+
+    return company_id, ""
+
+
+def _store_oauth_state_in_session(request: Request, provider: str, state: str, company_id: str):
+    try:
+        current_states = request.session.get("oauth_states") or {}
+        if not isinstance(current_states, dict):
+            current_states = {}
+
+        current_states[state] = {
+            "provider": (provider or "").strip().lower(),
+            "company_id": (company_id or "").strip(),
+            "created_at": _iso_z(datetime.utcnow()),
+        }
+        newest_states = sorted(
+            current_states.items(),
+            key=lambda item: (item[1] or {}).get("created_at", ""),
+            reverse=True,
+        )[:5]
+        request.session["oauth_states"] = dict(newest_states)
+    except Exception as e:
+        print("OAUTH SESSION STATE STORE ERROR:", type(e).__name__)
+
+
+def _consume_oauth_state_from_session(request: Request, provider: str, state: str) -> str:
+    try:
+        current_states = request.session.get("oauth_states") or {}
+        if not isinstance(current_states, dict):
+            return ""
+
+        entry = current_states.pop(state, None)
+        request.session["oauth_states"] = current_states
+        if not isinstance(entry, dict):
+            return ""
+
+        if (entry.get("provider") or "").strip().lower() != (provider or "").strip().lower():
+            return ""
+        if not _oauth_state_is_fresh(entry.get("created_at") or "", OAUTH_STATE_TTL_MINUTES):
+            return ""
+        return (entry.get("company_id") or "").strip()
+    except Exception as e:
+        print("OAUTH SESSION STATE CONSUME ERROR:", type(e).__name__)
+        return ""
+
+
+def _store_oauth_state_in_db(provider: str, state: str, company_id: str) -> str:
+    table = _oauth_state_table(provider)
+    now = _iso_z(datetime.utcnow())
+    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
+
+    conn = get_db_connection()
+    if not conn:
+        return "Database error"
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"DELETE FROM {table} WHERE created_at < %s", (cutoff,))
+            cur.execute(
+                f"""
+                INSERT INTO {table} (state, company_id, created_at)
+                VALUES (%s, %s, %s)
+                """,
+                (state, company_id, now),
+            )
+        conn.commit()
+        return ""
+    except Exception as e:
+        print(f"{provider.upper()} OAUTH STATE STORE ERROR:", type(e).__name__)
+        return "OAuth state store error"
+    finally:
+        conn.close()
+
+
+def _consume_oauth_state_from_db(provider: str, state: str):
+    table = _oauth_state_table(provider)
+    conn = get_db_connection()
+    if not conn:
+        return "", "Database error"
+
+    company_id = ""
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                f"SELECT company_id, created_at FROM {table} WHERE state = %s",
+                (state,),
+            )
+            row = cur.fetchone()
+            if row and _oauth_state_is_fresh(row.get("created_at") or "", OAUTH_STATE_TTL_MINUTES):
+                company_id = (row.get("company_id") or "").strip()
+            cur.execute(f"DELETE FROM {table} WHERE state = %s", (state,))
+        conn.commit()
+        return company_id, ""
+    except Exception as e:
+        print(f"{provider.upper()} OAUTH STATE CONSUME ERROR:", type(e).__name__)
+        return "", "OAuth state lookup error"
+    finally:
+        conn.close()
+
+
+def _resolve_oauth_company_from_state_with_source(request: Request, provider: str, state: str):
+    company_id, lookup_error = _consume_oauth_state_from_db(provider, state)
+    if lookup_error:
+        return "", lookup_error, "db_error"
+    if company_id:
+        return company_id, "", "db"
+
+    company_id = _consume_oauth_state_from_session(request, provider, state)
+    if company_id:
+        return company_id, "", "session"
+
+    company_id, verify_error = _verify_signed_oauth_state(state, provider)
+    if company_id and _company_exists(company_id):
+        print(f"{provider.upper()} OAUTH STATE RECOVERED FROM SIGNED STATE")
+        return company_id, "", "signed"
+
+    print(
+        f"{provider.upper()} OAUTH INVALID STATE:",
+        {"reason": verify_error or "not_found", "state_length": len(state or "")},
+    )
+    return "", "Invalid state", verify_error or "not_found"
+
+
+def _resolve_oauth_company_from_state(request: Request, provider: str, state: str):
+    company_id, state_error, _source = _resolve_oauth_company_from_state_with_source(request, provider, state)
+    return company_id, state_error
+
+
+def _meta_connection_exists(company_id: str) -> bool:
+    company_id = (company_id or "").strip()
+    if not company_id:
+        return False
+
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM v2_social_tokens
+                WHERE company_id = %s
+                AND provider = %s
+                LIMIT 1
+                """,
+                (company_id, "meta"),
+            )
+            if cur.fetchone() is not None:
+                return True
+
+            cur.execute(
+                """
+                SELECT 1
+                FROM v2_social_accounts
+                WHERE company_id = %s
+                AND platform IN ('Facebook', 'Instagram')
+                LIMIT 1
+                """,
+                (company_id,),
+            )
+            return cur.fetchone() is not None
+    except Exception as e:
+        print("META CONNECTION CHECK ERROR:", type(e).__name__)
+        return False
+    finally:
+        conn.close()
+
+
+def _oauth_value_hash(value: str) -> str:
+    value = str(value or "")
+    if not value:
+        return ""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+
+def _meta_oauth_redirect(url: str, reason: str, state: str = "", company_id: str = ""):
+    print(
+        "META OAUTH REDIRECT:",
+        {
+            "reason": reason,
+            "target": url,
+            "company_id": (company_id or "").strip(),
+            "state_hash": _oauth_value_hash(state),
+        },
+    )
+    return RedirectResponse(url=url, status_code=302)
+
+
+def _meta_oauth_success_value(success) -> bool:
+    return str(success or "").strip().lower() in {"1", "true", "yes", "success"}
+
+
+def _mark_meta_oauth_state_result(state: str, success: bool):
+    state = (state or "").strip()
+    if not state:
+        return
+
+    conn = get_db_connection()
+    if not conn:
+        print("META OAUTH STATE RESULT UPDATE SKIPPED: database unavailable")
+        return
+
+    now = _iso_z(datetime.utcnow())
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE v2_meta_oauth_states
+                SET
+                    success = %s,
+                    consumed_at = CASE
+                        WHEN COALESCE(consumed_at, '') = '' THEN %s
+                        ELSE consumed_at
+                    END,
+                    updated_at = %s
+                WHERE state = %s
+                """,
+                ("1" if success else "0", now, now, state),
+            )
+        conn.commit()
+    except Exception as e:
+        print("META OAUTH STATE RESULT UPDATE ERROR:", type(e).__name__)
+    finally:
+        conn.close()
+
+
+def _consumed_meta_state_result(row: dict, state: str):
+    company_id = (row.get("company_id") or "").strip()
+    success = _meta_oauth_success_value(row.get("success"))
+    print(
+        "META OAUTH STATE ALREADY CONSUMED:",
+        {
+            "company_id": company_id,
+            "success": success,
+            "state_hash": _oauth_value_hash(state),
+        },
+    )
+    return {
+        "status": "consumed",
+        "company_id": company_id,
+        "success": success,
+        "source": "db",
+    }
+
+
+def _claim_meta_oauth_state(request: Request, state: str):
+    """
+    Claim a Meta OAuth state exactly once before exchanging the single-use code.
+    Duplicate callbacks see the consumed state and never retry token exchange.
+    """
+    state = (state or "").strip()
+    now = _iso_z(datetime.utcnow())
+
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error", "reason": "database_unavailable"}
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT company_id, created_at, consumed_at, success
+                FROM v2_meta_oauth_states
+                WHERE state = %s
+                """,
+                (state,),
+            )
+            row = cur.fetchone()
+
+            if row:
+                company_id = (row.get("company_id") or "").strip()
+                consumed_at = (row.get("consumed_at") or "").strip()
+                if consumed_at:
+                    return _consumed_meta_state_result(row, state)
+
+                if not _oauth_state_is_fresh(row.get("created_at") or "", OAUTH_STATE_TTL_MINUTES):
+                    print(
+                        "META OAUTH STATE EXPIRED:",
+                        {"company_id": company_id, "state_hash": _oauth_value_hash(state)},
+                    )
+                    return {"status": "invalid", "reason": "expired", "company_id": company_id}
+
+                cur.execute(
+                    """
+                    UPDATE v2_meta_oauth_states
+                    SET consumed_at = %s, updated_at = %s
+                    WHERE state = %s
+                    AND COALESCE(consumed_at, '') = ''
+                    RETURNING company_id
+                    """,
+                    (now, now, state),
+                )
+                claimed = cur.fetchone()
+                conn.commit()
+
+                if claimed:
+                    print(
+                        "META OAUTH STATE VALID:",
+                        {"company_id": company_id, "source": "db", "state_hash": _oauth_value_hash(state)},
+                    )
+                    return {"status": "claimed", "company_id": company_id, "source": "db"}
+
+                cur.execute(
+                    """
+                    SELECT company_id, created_at, consumed_at, success
+                    FROM v2_meta_oauth_states
+                    WHERE state = %s
+                    """,
+                    (state,),
+                )
+                row = cur.fetchone()
+                if row and (row.get("consumed_at") or "").strip():
+                    return _consumed_meta_state_result(row, state)
+
+                return {"status": "invalid", "reason": "claim_race", "company_id": company_id}
+
+        company_id = _consume_oauth_state_from_session(request, "meta", state)
+        source = "session" if company_id else ""
+        verify_error = ""
+
+        if not company_id:
+            company_id, verify_error = _verify_signed_oauth_state(state, "meta")
+            if company_id and _company_exists(company_id):
+                source = "signed"
+            else:
+                company_id = ""
+
+        if not company_id:
+            print(
+                "META OAUTH STATE NOT FOUND:",
+                {"reason": verify_error or "not_found", "state_hash": _oauth_value_hash(state)},
+            )
+            return {"status": "invalid", "reason": verify_error or "not_found"}
+
+        if _meta_connection_exists(company_id):
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO v2_meta_oauth_states (state, company_id, created_at, consumed_at, success, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (state) DO NOTHING
+                    """,
+                    (state, company_id, now, now, "1", now),
+                )
+            conn.commit()
+            print(
+                "META OAUTH STATE RECOVERED FOR EXISTING CONNECTION:",
+                {"company_id": company_id, "source": source, "state_hash": _oauth_value_hash(state)},
+            )
+            return {"status": "consumed", "company_id": company_id, "success": True, "source": source}
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_meta_oauth_states (state, company_id, created_at, consumed_at, success, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (state) DO NOTHING
+                """,
+                (state, company_id, now, now, "", now),
+            )
+            inserted = cur.rowcount > 0
+            conn.commit()
+
+            if inserted:
+                print(
+                    "META OAUTH STATE VALID:",
+                    {"company_id": company_id, "source": source, "state_hash": _oauth_value_hash(state)},
+                )
+                return {"status": "claimed", "company_id": company_id, "source": source}
+
+            cur.execute(
+                """
+                SELECT company_id, created_at, consumed_at, success
+                FROM v2_meta_oauth_states
+                WHERE state = %s
+                """,
+                (state,),
+            )
+            row = cur.fetchone()
+            if row and (row.get("consumed_at") or "").strip():
+                return _consumed_meta_state_result(row, state)
+
+            return {"status": "invalid", "reason": "claim_conflict", "company_id": company_id}
+
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print("META OAUTH STATE CLAIM ERROR:", type(e).__name__)
+        return {"status": "error", "reason": "claim_error"}
+    finally:
+        conn.close()
+
+
 def _tiktok_config():
     client_key = (os.getenv("TIKTOK_CLIENT_KEY") or "").strip()
     client_secret = (os.getenv("TIKTOK_CLIENT_SECRET") or "").strip()
@@ -2332,7 +2909,7 @@ def _validate_redirect_uri(uri: str, provider: str):
 
 
 @app.get("/api/meta/connect")
-def meta_connect(companyId: str = ""):
+def meta_connect(request: Request, companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"error": "Missing companyId"}, status_code=400)
@@ -2352,28 +2929,11 @@ def meta_connect(companyId: str = ""):
     if uri_err:
         return JSONResponse({"error": "Meta OAuth redirect URI is invalid", "detail": uri_err}, status_code=500)
 
-    state = secrets.token_urlsafe(32)
-    now = _iso_z(datetime.utcnow())
-    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
-
-    conn = get_db_connection()
-    if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
-
-    try:
-        with conn.cursor() as cur:
-            # Cleanup old states to avoid DB growth
-            cur.execute("DELETE FROM v2_meta_oauth_states WHERE created_at < %s", (cutoff,))
-            cur.execute(
-                """
-                INSERT INTO v2_meta_oauth_states (state, company_id, created_at)
-                VALUES (%s, %s, %s)
-                """,
-                (state, company_id, now),
-            )
-        conn.commit()
-    finally:
-        conn.close()
+    state = _create_oauth_state("meta", company_id)
+    state_error = _store_oauth_state_in_db("meta", state, company_id)
+    if state_error:
+        return JSONResponse({"error": state_error}, status_code=500)
+    _store_oauth_state_in_session(request, "meta", state, company_id)
 
     # Development mode scopes (basic login). Keep this minimal until the Meta app is approved for advanced scopes.
     scope = ",".join(["public_profile", "email"])
@@ -2399,36 +2959,59 @@ Redirecting to Meta OAuth...
 
 
 @app.get("/api/meta/callback")
-def meta_callback(code: str = "", state: str = ""):
+def meta_callback(request: Request, code: str = "", state: str = ""):
+    print(
+        "META CALLBACK RECEIVED:",
+        {
+            "code_present": bool(code),
+            "state_present": bool(state),
+            "state_hash": _oauth_value_hash(state),
+            "state_length": len(state or ""),
+        },
+    )
+
     if not code or not state:
-        return JSONResponse({"error": "Missing code/state"}, status_code=400)
+        return _meta_oauth_redirect(META_OAUTH_MISSING_PARAMS_REDIRECT, "missing_code_or_state", state)
 
     app_id, app_secret, redirect_uri = _meta_config()
     if not app_id or not app_secret or not redirect_uri:
-        return JSONResponse({"error": "Meta OAuth is not configured"}, status_code=500)
+        print("META OAUTH CALLBACK CONFIG ERROR: missing Meta OAuth env")
+        return _meta_oauth_redirect(META_OAUTH_CONFIG_ERROR_REDIRECT, "config_error", state)
 
-    conn = get_db_connection()
-    if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
+    state_claim = _claim_meta_oauth_state(request, state)
+    claim_status = state_claim.get("status") or ""
+    company_id = (state_claim.get("company_id") or "").strip()
 
-    company_id = ""
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT company_id, created_at FROM v2_meta_oauth_states WHERE state = %s",
-                (state,),
+    if claim_status == "consumed":
+        if state_claim.get("success") or _meta_connection_exists(company_id):
+            return _meta_oauth_redirect(
+                META_OAUTH_ALREADY_CONNECTED_REDIRECT,
+                "state_already_consumed_connection_exists",
+                state,
+                company_id,
             )
-            row = cur.fetchone()
-            if row:
-                if _oauth_state_is_fresh(row.get("created_at") or ""):
-                    company_id = row.get("company_id") or ""
-            cur.execute("DELETE FROM v2_meta_oauth_states WHERE state = %s", (state,))
-        conn.commit()
-    finally:
-        conn.close()
+        return _meta_oauth_redirect(
+            META_OAUTH_INVALID_STATE_REDIRECT,
+            "state_already_consumed_without_connection",
+            state,
+            company_id,
+        )
 
-    if not company_id:
-        return JSONResponse({"error": "Invalid state"}, status_code=400)
+    if claim_status == "error":
+        return _meta_oauth_redirect(
+            META_OAUTH_STATE_ERROR_REDIRECT,
+            state_claim.get("reason") or "state_lookup_error",
+            state,
+            company_id,
+        )
+
+    if claim_status != "claimed" or not company_id:
+        return _meta_oauth_redirect(
+            META_OAUTH_INVALID_STATE_REDIRECT,
+            state_claim.get("reason") or "invalid_state",
+            state,
+            company_id,
+        )
 
     # Exchange code -> user access token (avoid logging any secrets)
     token_qs = urllib.parse.urlencode(
@@ -2447,10 +3030,13 @@ def meta_callback(code: str = "", state: str = ""):
         expires_in = token_data.get("expires_in")
     except Exception as e:
         print("META TOKEN EXCHANGE ERROR:", type(e).__name__)
-        return JSONResponse({"error": "Meta token exchange error"}, status_code=500)
+        _mark_meta_oauth_state_result(state, False)
+        return _meta_oauth_redirect(META_OAUTH_TOKEN_ERROR_REDIRECT, "token_exchange_error", state, company_id)
 
     if not user_token:
-        return JSONResponse({"error": "Meta token exchange failed"}, status_code=500)
+        print("META TOKEN EXCHANGE FAILED: no access token returned")
+        _mark_meta_oauth_state_result(state, False)
+        return _meta_oauth_redirect(META_OAUTH_TOKEN_ERROR_REDIRECT, "token_exchange_failed", state, company_id)
 
     expires_at = ""
     try:
@@ -2480,8 +3066,11 @@ def meta_callback(code: str = "", state: str = ""):
     now = _iso_z(datetime.utcnow())
     conn = get_db_connection()
     if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
+        _mark_meta_oauth_state_result(state, False)
+        return _meta_oauth_redirect(META_OAUTH_SAVE_ERROR_REDIRECT, "database_unavailable", state, company_id)
 
+    saved_pages = 0
+    saved_instagrams = 0
     try:
         with conn.cursor() as cur:
             # Store user token (company-level) for future calls (not exposed to frontend).
@@ -2513,6 +3102,7 @@ def meta_callback(code: str = "", state: str = ""):
                         """,
                         (company_id, "Facebook", "connected", page_name, page_id, now, now),
                     )
+                    saved_pages += 1
 
                     # Store page token
                     if page_token:
@@ -2541,6 +3131,7 @@ def meta_callback(code: str = "", state: str = ""):
                         """,
                         (company_id, "Instagram", "connected", ig_name, ig_id, now, now),
                     )
+                    saved_instagrams += 1
                     if page_token:
                         cur.execute(
                             """
@@ -2556,18 +3147,22 @@ def meta_callback(code: str = "", state: str = ""):
     except Exception as e:
         # Avoid logging token contents; keep logs minimal.
         print("META CALLBACK DB ERROR:", type(e).__name__)
-        return JSONResponse({"error": "Meta callback save error"}, status_code=500)
+        _mark_meta_oauth_state_result(state, False)
+        return _meta_oauth_redirect(META_OAUTH_SAVE_ERROR_REDIRECT, "connection_save_error", state, company_id)
     finally:
         conn.close()
 
-    # Redirect back to Social Accounts page
-    return HTMLResponse(
-        """<!doctype html><html><head><meta charset="utf-8"></head>
-<body style="font-family:Arial,sans-serif;background:#061923;color:#f7fbff;padding:24px;">
-Connected. You can close this tab.
-<script>window.location.href='/social-accounts?meta=connected';</script>
-</body></html>"""
+    _mark_meta_oauth_state_result(state, True)
+    print(
+        "META CONNECTION SAVED:",
+        {
+            "company_id": company_id,
+            "pages": saved_pages,
+            "instagrams": saved_instagrams,
+            "state_hash": _oauth_value_hash(state),
+        },
     )
+    return _meta_oauth_redirect(META_OAUTH_SUCCESS_REDIRECT, "connection_saved", state, company_id)
 
 
 @app.get("/api/meta/accounts")
@@ -2639,11 +3234,638 @@ async def meta_disconnect(request: Request):
 
 
 # =========================================================
+# INSTAGRAM PUBLISHING
+# =========================================================
+
+def _instagram_graph_version():
+    return (os.getenv("META_GRAPH_VERSION") or "v20.0").strip() or "v20.0"
+
+
+def _resolve_instagram_company(request: Request, provided_company_id: str):
+    company_id, user, err = resolve_company_id(
+        request,
+        provided_company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return "", err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return "", json_error("Forbidden", 403)
+    return company_id, None
+
+
+def _safe_instagram_error(message: str) -> str:
+    msg = str(message or "Instagram publish error").strip()
+    if not msg:
+        msg = "Instagram publish error"
+    if len(msg) > 500:
+        msg = msg[:500].rstrip() + "..."
+    return msg
+
+
+def _instagram_graph_error(data: dict, fallback: str = "Instagram Graph API error") -> str:
+    err = data.get("error") if isinstance(data, dict) else None
+    if isinstance(err, dict):
+        msg = (err.get("message") or fallback).strip()
+        code = err.get("code")
+        subcode = err.get("error_subcode")
+        if code or subcode:
+            suffix = " / ".join(str(x) for x in (code, subcode) if x)
+            msg = f"{msg} ({suffix})"
+        return _safe_instagram_error(msg)
+    if isinstance(err, str) and err.strip():
+        return _safe_instagram_error(err)
+    return _safe_instagram_error(fallback)
+
+
+def _http_post_form_json_graph(url: str, form_data: dict, timeout_sec: int = 30):
+    body = urllib.parse.urlencode(form_data).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "User-Agent": "AI-FLOW/1.0",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict) and data.get("error"):
+                return data, _instagram_graph_error(data)
+            return data, ""
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return data, _instagram_graph_error(data, f"Instagram API HTTP {e.code}")
+    except Exception as e:
+        return {}, _safe_instagram_error(f"Instagram API request error: {type(e).__name__}")
+
+
+def _http_get_json_graph(url: str, timeout_sec: int = 20):
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"User-Agent": "AI-FLOW/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict) and data.get("error"):
+                return data, _instagram_graph_error(data)
+            return data, ""
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return data, _instagram_graph_error(data, f"Instagram API HTTP {e.code}")
+    except Exception as e:
+        return {}, _safe_instagram_error(f"Instagram API request error: {type(e).__name__}")
+
+
+def _parse_instagram_media_urls(value):
+    if isinstance(value, list):
+        urls = value
+    elif isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            urls = parsed if isinstance(parsed, list) else [value]
+        except Exception:
+            urls = value.replace(",", "\n").splitlines()
+    else:
+        urls = []
+    return [str(u or "").strip() for u in urls if str(u or "").strip()]
+
+
+def _validate_instagram_public_urls(media_urls: list[str]) -> str:
+    for url in media_urls:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return "Image/video URLs must be publicly accessible http(s) URLs."
+    return ""
+
+
+def _validate_instagram_draft_payload(post_type: str, media_urls: list[str]) -> str:
+    if post_type not in {"image", "carousel", "reel"}:
+        return "post_type must be image, carousel, or reel"
+    url_err = _validate_instagram_public_urls(media_urls)
+    if url_err:
+        return url_err
+    if post_type == "image" and len(media_urls) != 1:
+        return "Image posts require exactly 1 image URL."
+    if post_type == "reel" and len(media_urls) != 1:
+        return "Reels require exactly 1 public video URL."
+    if post_type == "carousel" and not (2 <= len(media_urls) <= 10):
+        return "Carousel posts require 2-10 image URLs."
+    return ""
+
+
+def _instagram_job_to_public(row: dict) -> dict:
+    media_urls = _parse_instagram_media_urls(row.get("media_urls") or "[]")
+    return {
+        "id": row.get("id"),
+        "company_id": row.get("company_id") or "",
+        "provider": row.get("provider") or "instagram",
+        "post_type": row.get("post_type") or "",
+        "ig_user_id": row.get("ig_user_id") or "",
+        "page_id": row.get("page_id") or "",
+        "media_urls": media_urls,
+        "caption": row.get("caption") or "",
+        "status": row.get("status") or "",
+        "creation_id": row.get("creation_id") or "",
+        "media_id": row.get("media_id") or "",
+        "permalink": row.get("permalink") or "",
+        "error_message": row.get("error_message") or "",
+        "created_at": row.get("created_at") or "",
+        "updated_at": row.get("updated_at") or "",
+        "published_at": row.get("published_at") or "",
+    }
+
+
+def _update_instagram_job(company_id: str, job_id: int, **fields):
+    allowed = {
+        "status",
+        "creation_id",
+        "media_id",
+        "permalink",
+        "error_message",
+        "updated_at",
+        "published_at",
+    }
+    updates = []
+    values = []
+    for key, value in fields.items():
+        if key in allowed:
+            updates.append(f"{key} = %s")
+            values.append(value)
+    if not updates:
+        return
+
+    values.extend([company_id, job_id])
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE v2_instagram_publish_jobs
+                SET {", ".join(updates)}
+                WHERE company_id = %s AND id = %s
+                """,
+                tuple(values),
+            )
+        conn.commit()
+    except Exception as e:
+        print("INSTAGRAM JOB UPDATE ERROR:", type(e).__name__)
+    finally:
+        conn.close()
+
+
+def _instagram_fail_job(company_id: str, job_id: int, message: str, *, status_code: int = 400):
+    safe_message = _safe_instagram_error(message)
+    now = _iso_z(datetime.utcnow())
+    _update_instagram_job(
+        company_id,
+        job_id,
+        status="failed",
+        error_message=safe_message,
+        updated_at=now,
+    )
+    print(
+        "INSTAGRAM PUBLISH FAILED:",
+        {"company_id": company_id, "job_id": job_id, "status": "failed", "error": safe_message[:160]},
+    )
+    return JSONResponse({"success": False, "error": safe_message}, status_code=status_code)
+
+
+def _instagram_token_for_account(company_id: str, ig_user_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return None, "", "Database error"
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, account_name, account_id, status
+                FROM v2_social_accounts
+                WHERE company_id = %s
+                AND platform = %s
+                AND account_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (company_id, "Instagram", ig_user_id),
+            )
+            account = cur.fetchone()
+            if not account:
+                return None, "", "Instagram account is not connected."
+
+            cur.execute(
+                """
+                SELECT access_token
+                FROM v2_social_tokens
+                WHERE company_id = %s
+                AND provider = %s
+                AND platform = %s
+                AND account_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (company_id, "meta", "Instagram", ig_user_id),
+            )
+            token_row = cur.fetchone()
+            token = (token_row.get("access_token") or "").strip() if token_row else ""
+            if not token:
+                return account, "", "Instagram token missing. Reconnect Meta to refresh access."
+            return account, token, ""
+    except Exception as e:
+        print("INSTAGRAM TOKEN LOOKUP ERROR:", type(e).__name__)
+        return None, "", "Instagram token lookup error"
+    finally:
+        conn.close()
+
+
+def _instagram_create_container(ig_user_id: str, access_token: str, params: dict):
+    url = f"https://graph.facebook.com/{_instagram_graph_version()}/{urllib.parse.quote(ig_user_id, safe='')}/media"
+    data, err = _http_post_form_json_graph(url, {**params, "access_token": access_token}, timeout_sec=45)
+    if err:
+        return "", err
+    creation_id = (data.get("id") or "").strip()
+    if not creation_id:
+        return "", "Instagram media container returned no creation id."
+    return creation_id, ""
+
+
+def _instagram_publish_container(ig_user_id: str, access_token: str, creation_id: str):
+    url = f"https://graph.facebook.com/{_instagram_graph_version()}/{urllib.parse.quote(ig_user_id, safe='')}/media_publish"
+    data, err = _http_post_form_json_graph(
+        url,
+        {"creation_id": creation_id, "access_token": access_token},
+        timeout_sec=45,
+    )
+    if err:
+        return "", err
+    media_id = (data.get("id") or "").strip()
+    if not media_id:
+        return "", "Instagram media publish returned no media id."
+    return media_id, ""
+
+
+def _instagram_permalink(media_id: str, access_token: str) -> str:
+    if not media_id:
+        return ""
+    qs = urllib.parse.urlencode({"fields": "permalink", "access_token": access_token})
+    url = f"https://graph.facebook.com/{_instagram_graph_version()}/{urllib.parse.quote(media_id, safe='')}?{qs}"
+    data, err = _http_get_json_graph(url, timeout_sec=20)
+    if err:
+        print("INSTAGRAM PERMALINK FETCH ERROR:", err[:160])
+        return ""
+    return (data.get("permalink") or "").strip()
+
+
+@app.get("/api/instagram/accounts")
+def instagram_accounts(request: Request, companyId: str = ""):
+    company_id, err = _resolve_instagram_company(request, companyId)
+    if err:
+        return err
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, account_name, account_id, status, created_at, updated_at
+                FROM v2_social_accounts
+                WHERE company_id = %s
+                AND platform = %s
+                ORDER BY id DESC
+                """,
+                (company_id, "Instagram"),
+            )
+            accounts = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT account_id
+                FROM v2_social_tokens
+                WHERE company_id = %s
+                AND provider = %s
+                AND platform = %s
+                AND COALESCE(access_token, '') <> ''
+                """,
+                (company_id, "meta", "Instagram"),
+            )
+            token_ids = {str(r.get("account_id") or "") for r in cur.fetchall()}
+
+        public_accounts = []
+        for account in accounts:
+            account_id = str(account.get("account_id") or "")
+            public_accounts.append(
+                {
+                    "id": account.get("id"),
+                    "ig_user_id": account_id,
+                    "account_id": account_id,
+                    "account_name": account.get("account_name") or "Instagram",
+                    "status": account.get("status") or "",
+                    "token_available": account_id in token_ids,
+                    "created_at": account.get("created_at") or "",
+                    "updated_at": account.get("updated_at") or "",
+                }
+            )
+
+        return JSONResponse({"success": True, "accounts": public_accounts})
+    except Exception as e:
+        print("INSTAGRAM ACCOUNTS ERROR:", type(e).__name__)
+        return JSONResponse({"error": "Instagram accounts error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/api/instagram/drafts")
+async def instagram_create_draft(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_instagram_company(request, (data.get("companyId") or "").strip())
+    if err:
+        return err
+
+    ig_user_id = (data.get("ig_user_id") or data.get("igUserId") or "").strip()
+    post_type = (data.get("post_type") or data.get("postType") or "").strip().lower()
+    media_urls = _parse_instagram_media_urls(data.get("media_urls") or data.get("mediaUrls") or [])
+    caption = (data.get("caption") or "").strip()
+
+    if not ig_user_id:
+        return JSONResponse({"error": "ig_user_id is required"}, status_code=400)
+
+    validation_error = _validate_instagram_draft_payload(post_type, media_urls)
+    if validation_error:
+        return JSONResponse({"error": validation_error}, status_code=400)
+
+    _account, _token, token_err = _instagram_token_for_account(company_id, ig_user_id)
+    if token_err:
+        return JSONResponse({"error": token_err}, status_code=400)
+
+    now = _iso_z(datetime.utcnow())
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_instagram_publish_jobs (
+                    company_id, provider, post_type, ig_user_id, page_id, media_urls,
+                    caption, status, creation_id, media_id, permalink, error_message,
+                    created_at, updated_at, published_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING *
+                """,
+                (
+                    company_id,
+                    "instagram",
+                    post_type,
+                    ig_user_id,
+                    "",
+                    json.dumps(media_urls),
+                    caption,
+                    "draft",
+                    "",
+                    "",
+                    "",
+                    "",
+                    now,
+                    now,
+                    "",
+                ),
+            )
+            job = cur.fetchone()
+        conn.commit()
+        print(
+            "INSTAGRAM DRAFT CREATED:",
+            {"company_id": company_id, "job_id": job.get("id"), "ig_user_id": ig_user_id, "post_type": post_type},
+        )
+        return JSONResponse({"success": True, "job": _instagram_job_to_public(job)})
+    except Exception as e:
+        print("INSTAGRAM DRAFT CREATE ERROR:", type(e).__name__)
+        return JSONResponse({"error": "Instagram draft create error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.get("/api/instagram/jobs")
+def instagram_jobs(request: Request, companyId: str = ""):
+    company_id, err = _resolve_instagram_company(request, companyId)
+    if err:
+        return err
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_instagram_publish_jobs
+                WHERE company_id = %s
+                ORDER BY id DESC
+                LIMIT 50
+                """,
+                (company_id,),
+            )
+            rows = cur.fetchall()
+        return JSONResponse({"success": True, "jobs": [_instagram_job_to_public(r) for r in rows]})
+    except Exception as e:
+        print("INSTAGRAM JOBS ERROR:", type(e).__name__)
+        return JSONResponse({"error": "Instagram jobs error"}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.post("/api/instagram/publish")
+async def instagram_publish(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_instagram_company(request, (data.get("companyId") or "").strip())
+    if err:
+        return err
+
+    try:
+        job_id = int(data.get("job_id") or data.get("jobId") or 0)
+    except Exception:
+        job_id = 0
+    if not job_id:
+        return JSONResponse({"error": "job_id is required"}, status_code=400)
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"error": "Database error"}, status_code=500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_instagram_publish_jobs
+                WHERE company_id = %s AND id = %s
+                """,
+                (company_id, job_id),
+            )
+            job = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not job:
+        return JSONResponse({"error": "Instagram publish job not found"}, status_code=404)
+
+    public_job = _instagram_job_to_public(job)
+    if public_job["status"] == "published":
+        return JSONResponse({"success": True, "already_published": True, "job": public_job})
+
+    ig_user_id = public_job["ig_user_id"]
+    post_type = public_job["post_type"]
+    media_urls = public_job["media_urls"]
+    caption = public_job["caption"]
+
+    validation_error = _validate_instagram_draft_payload(post_type, media_urls)
+    if validation_error:
+        return _instagram_fail_job(company_id, job_id, validation_error, status_code=400)
+
+    _account, access_token, token_err = _instagram_token_for_account(company_id, ig_user_id)
+    if token_err:
+        return _instagram_fail_job(company_id, job_id, token_err, status_code=400)
+
+    now = _iso_z(datetime.utcnow())
+    _update_instagram_job(
+        company_id,
+        job_id,
+        status="uploading",
+        error_message="",
+        updated_at=now,
+    )
+    print(
+        "INSTAGRAM PUBLISH START:",
+        {"company_id": company_id, "job_id": job_id, "ig_user_id": ig_user_id, "post_type": post_type},
+    )
+
+    if post_type == "image":
+        creation_id, create_err = _instagram_create_container(
+            ig_user_id,
+            access_token,
+            {"image_url": media_urls[0], "caption": caption},
+        )
+        if create_err:
+            return _instagram_fail_job(company_id, job_id, create_err, status_code=400)
+
+    elif post_type == "carousel":
+        child_ids = []
+        for media_url in media_urls:
+            child_id, child_err = _instagram_create_container(
+                ig_user_id,
+                access_token,
+                {"image_url": media_url, "is_carousel_item": "true"},
+            )
+            if child_err:
+                return _instagram_fail_job(company_id, job_id, child_err, status_code=400)
+            child_ids.append(child_id)
+
+        creation_id, create_err = _instagram_create_container(
+            ig_user_id,
+            access_token,
+            {"media_type": "CAROUSEL", "children": ",".join(child_ids), "caption": caption},
+        )
+        if create_err:
+            return _instagram_fail_job(company_id, job_id, create_err, status_code=400)
+
+    elif post_type == "reel":
+        creation_id, create_err = _instagram_create_container(
+            ig_user_id,
+            access_token,
+            {"media_type": "REELS", "video_url": media_urls[0], "caption": caption},
+        )
+        if create_err:
+            return _instagram_fail_job(company_id, job_id, create_err, status_code=400)
+
+    else:
+        return _instagram_fail_job(company_id, job_id, "Unsupported Instagram post type.", status_code=400)
+
+    now = _iso_z(datetime.utcnow())
+    _update_instagram_job(
+        company_id,
+        job_id,
+        status="processing",
+        creation_id=creation_id,
+        updated_at=now,
+    )
+
+    media_id, publish_err = _instagram_publish_container(ig_user_id, access_token, creation_id)
+    if publish_err:
+        return _instagram_fail_job(company_id, job_id, publish_err, status_code=400)
+
+    permalink = _instagram_permalink(media_id, access_token)
+    now = _iso_z(datetime.utcnow())
+    _update_instagram_job(
+        company_id,
+        job_id,
+        status="published",
+        media_id=media_id,
+        permalink=permalink,
+        error_message="",
+        updated_at=now,
+        published_at=now,
+    )
+    print(
+        "INSTAGRAM PUBLISH SUCCESS:",
+        {"company_id": company_id, "job_id": job_id, "ig_user_id": ig_user_id, "post_type": post_type, "status": "published"},
+    )
+
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"success": True, "media_id": media_id, "permalink": permalink})
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_instagram_publish_jobs
+                WHERE company_id = %s AND id = %s
+                """,
+                (company_id, job_id),
+            )
+            saved_job = cur.fetchone()
+        return JSONResponse(
+            {
+                "success": True,
+                "message": "Instagram post published successfully",
+                "media_id": media_id,
+                "permalink": permalink,
+                "job": _instagram_job_to_public(saved_job or public_job),
+            }
+        )
+    finally:
+        conn.close()
+
+
+# =========================================================
 # TIKTOK OAUTH (MVP)
 # =========================================================
 
 @app.get("/tiktok-connect-url")
-def tiktok_connect_url(companyId: str = ""):
+def tiktok_connect_url(request: Request, companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
@@ -2672,29 +3894,12 @@ def tiktok_connect_url(companyId: str = ""):
             status_code=500,
         )
 
-    # Include companyId in state (as requested) plus a random nonce.
-    # Note: companyId is also stored server-side in v2_tiktok_oauth_states.
-    state = f"{company_id}.{secrets.token_urlsafe(24)}"
-    now = _iso_z(datetime.utcnow())
-    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
-
-    conn = get_db_connection()
-    if not conn:
-        return JSONResponse({"success": False, "error": "Database error"}, status_code=500)
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE created_at < %s", (cutoff,))
-            cur.execute(
-                """
-                INSERT INTO v2_tiktok_oauth_states (state, company_id, created_at)
-                VALUES (%s, %s, %s)
-                """,
-                (state, company_id, now),
-            )
-        conn.commit()
-    finally:
-        conn.close()
+    # Prefix companyId for older TikTok diagnostics; signed payload remains the trusted source.
+    state = _create_oauth_state("tiktok", company_id, include_company_prefix=True)
+    state_error = _store_oauth_state_in_db("tiktok", state, company_id)
+    if state_error:
+        return JSONResponse({"success": False, "error": state_error}, status_code=500)
+    _store_oauth_state_in_session(request, "tiktok", state, company_id)
 
     auth_url = _build_tiktok_authorize_url(client_key, redirect_uri, state, scope="user.info.basic")
 
@@ -2738,7 +3943,7 @@ def tiktok_oauth_preflight(companyId: str = ""):
 
 
 @app.get("/tiktok-oauth-callback")
-def tiktok_oauth_callback(code: str = "", state: str = ""):
+def tiktok_oauth_callback(request: Request, code: str = "", state: str = ""):
     if not code or not state:
         return JSONResponse({"error": "Missing code/state"}, status_code=400)
 
@@ -2757,27 +3962,9 @@ def tiktok_oauth_callback(code: str = "", state: str = ""):
         )
         return JSONResponse({"error": "TikTok OAuth is not configured"}, status_code=500)
 
-    # Resolve companyId from stored state.
-    conn = get_db_connection()
-    if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
-
-    company_id = ""
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT company_id, created_at FROM v2_tiktok_oauth_states WHERE state = %s",
-                (state,),
-            )
-            row = cur.fetchone()
-            if row:
-                if _oauth_state_is_fresh(row.get("created_at") or ""):
-                    company_id = (row.get("company_id") or "").strip()
-            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE state = %s", (state,))
-        conn.commit()
-    finally:
-        conn.close()
-
+    company_id, state_error = _resolve_oauth_company_from_state(request, "tiktok", state)
+    if state_error and state_error != "Invalid state":
+        return JSONResponse({"error": state_error}, status_code=500)
     if not company_id:
         return JSONResponse({"error": "Invalid state"}, status_code=400)
 
@@ -2977,7 +4164,7 @@ def tiktok_accounts(companyId: str = ""):
 
 
 @app.get("/api/tiktok/connect")
-def tiktok_connect(companyId: str = ""):
+def tiktok_connect(request: Request, companyId: str = ""):
     company_id = (companyId or "").strip()
     if not company_id:
         return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
@@ -3006,27 +4193,11 @@ def tiktok_connect(companyId: str = ""):
             status_code=500,
         )
 
-    state = secrets.token_urlsafe(32)
-    now = _iso_z(datetime.utcnow())
-    cutoff = _iso_z(datetime.utcnow() - timedelta(minutes=30))
-
-    conn = get_db_connection()
-    if not conn:
-        return JSONResponse({"success": False, "error": "Database error"}, status_code=500)
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE created_at < %s", (cutoff,))
-            cur.execute(
-                """
-                INSERT INTO v2_tiktok_oauth_states (state, company_id, created_at)
-                VALUES (%s, %s, %s)
-                """,
-                (state, company_id, now),
-            )
-        conn.commit()
-    finally:
-        conn.close()
+    state = _create_oauth_state("tiktok", company_id, include_company_prefix=True)
+    state_error = _store_oauth_state_in_db("tiktok", state, company_id)
+    if state_error:
+        return JSONResponse({"success": False, "error": state_error}, status_code=500)
+    _store_oauth_state_in_session(request, "tiktok", state, company_id)
 
     auth_url = _build_tiktok_authorize_url(client_key, redirect_uri, state, scope="user.info.basic")
 
@@ -3040,7 +4211,7 @@ Redirecting to TikTok OAuth...
 
 
 @app.get("/api/tiktok/callback")
-def tiktok_callback(code: str = "", state: str = ""):
+def tiktok_callback(request: Request, code: str = "", state: str = ""):
     if not code or not state:
         return JSONResponse({"error": "Missing code/state"}, status_code=400)
 
@@ -3059,26 +4230,9 @@ def tiktok_callback(code: str = "", state: str = ""):
         )
         return JSONResponse({"error": "TikTok OAuth is not configured"}, status_code=500)
 
-    conn = get_db_connection()
-    if not conn:
-        return JSONResponse({"error": "Database error"}, status_code=500)
-
-    company_id = ""
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT company_id, created_at FROM v2_tiktok_oauth_states WHERE state = %s",
-                (state,),
-            )
-            row = cur.fetchone()
-            if row:
-                if _oauth_state_is_fresh(row.get("created_at") or ""):
-                    company_id = (row.get("company_id") or "").strip()
-            cur.execute("DELETE FROM v2_tiktok_oauth_states WHERE state = %s", (state,))
-        conn.commit()
-    finally:
-        conn.close()
-
+    company_id, state_error = _resolve_oauth_company_from_state(request, "tiktok", state)
+    if state_error and state_error != "Invalid state":
+        return JSONResponse({"error": state_error}, status_code=500)
     if not company_id:
         return JSONResponse({"error": "Invalid state"}, status_code=400)
 
