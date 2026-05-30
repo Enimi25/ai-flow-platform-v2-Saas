@@ -8,6 +8,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
+  color-scheme: dark;
   --bg:#061923;
   --bg2:#040f16;
   --sidebarA:rgba(6, 25, 35, 0.92);
@@ -222,9 +223,24 @@ input, select, textarea{
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
   transition:border-color .15s ease, box-shadow .15s ease;
 }
+
+/* Keep native <select> dropdowns readable in dark UI */
+select{
+  background-color:#14252d;
+  color:#ffffff;
+  color-scheme: dark;
+}
+select option{
+  background-color:#14252d;
+  color:#ffffff;
+}
 input:focus,select:focus,textarea:focus{
   border-color:rgba(184,255,122,0.36);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(184,255,122,0.12);
+}
+select:focus{
+  border-color:#8efc6a;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(142, 252, 106, 0.22);
 }
 
 textarea{
@@ -346,6 +362,85 @@ textarea{
 
 .field label{
   font-weight:850;
+}
+
+.dd{
+  position:relative;
+}
+
+.dd-btn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;
+  padding:14px;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  transition:border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+
+.dd-btn:hover{
+  border-color:rgba(255,255,255,0.18);
+  box-shadow:var(--shadowSm);
+  transform:translateY(-1px);
+}
+.dd-btn:active{transform:translateY(0)}
+.dd-btn:focus{
+  outline:none;
+  border-color:#8efc6a;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 3px rgba(142, 252, 106, 0.22);
+}
+
+.dd-caret{
+  opacity:0.85;
+  font-size:12px;
+  line-height:1;
+}
+
+.dd-menu{
+  position:absolute;
+  left:0;
+  right:0;
+  top:calc(100% + 8px);
+  background:#14252d;
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:14px;
+  box-shadow:0 26px 70px rgba(0,0,0,.28);
+  z-index:50;
+  padding:8px;
+}
+
+.dd-item{
+  width:100%;
+  text-align:left;
+  background:transparent;
+  color:#ffffff;
+  border:1px solid transparent;
+  border-radius:12px;
+  padding:12px 12px;
+  font-weight:950;
+  cursor:pointer;
+  box-shadow:none;
+}
+.dd-item:hover{
+  background:rgba(65,220,255,0.10);
+  border-color:rgba(65,220,255,0.18);
+}
+.dd-item.is-active{
+  background:rgba(184,255,122,0.16);
+  border-color:rgba(184,255,122,0.22);
+  color:var(--accent);
+}
+.dd-item:focus{
+  outline:none;
+  background:rgba(184,255,122,0.16);
+  border-color:rgba(184,255,122,0.28);
 }
 
 .hint{
@@ -483,12 +578,19 @@ textarea{
         <select id="igAccountSelect"></select>
       </div>
       <div class="field">
-        <label for="igPostType">Post type</label>
-        <select id="igPostType" onchange="updateInstagramMediaHint()">
-          <option value="image">Image</option>
-          <option value="carousel">Carousel</option>
-          <option value="reel">Reel</option>
-        </select>
+        <label for="igPostTypeBtn">Post type</label>
+        <div class="dd" id="igPostTypeDropdown">
+          <button type="button" class="dd-btn" id="igPostTypeBtn" aria-haspopup="listbox" aria-expanded="false" onclick="toggleIgPostTypeMenu()">
+            <span id="igPostTypeLabel">Image</span>
+            <span class="dd-caret">▼</span>
+          </button>
+          <div class="dd-menu" id="igPostTypeMenu" role="listbox" aria-label="Instagram post type" style="display:none;">
+            <button type="button" class="dd-item is-active" role="option" aria-selected="true" data-value="image" onclick="selectIgPostType('image')">Image</button>
+            <button type="button" class="dd-item" role="option" aria-selected="false" data-value="carousel" onclick="selectIgPostType('carousel')">Carousel</button>
+            <button type="button" class="dd-item" role="option" aria-selected="false" data-value="reel" onclick="selectIgPostType('reel')">Reel</button>
+          </div>
+          <input type="hidden" id="igPostTypeValue" value="image">
+        </div>
       </div>
     </div>
 
@@ -673,8 +775,65 @@ function setInstagramPublishMessage(text){
   if(el) el.innerText = text;
 }
 
+function getSelectedInstagramPostType(){
+  const v = (document.getElementById("igPostTypeValue")?.value || "").trim();
+  if(v === "carousel" || v === "reel" || v === "image") return v;
+  return "image";
+}
+
+function setSelectedInstagramPostType(value){
+  const v = (value === "carousel" || value === "reel" || value === "image") ? value : "image";
+  const hidden = document.getElementById("igPostTypeValue");
+  if(hidden) hidden.value = v;
+
+  const label = document.getElementById("igPostTypeLabel");
+  if(label){
+    label.innerText = (v === "carousel") ? "Carousel" : (v === "reel" ? "Reel" : "Image");
+  }
+
+  const menu = document.getElementById("igPostTypeMenu");
+  if(menu){
+    menu.querySelectorAll(".dd-item").forEach(btn => {
+      const bv = (btn.getAttribute("data-value") || "").trim();
+      const active = bv === v;
+      if(active) btn.classList.add("is-active");
+      else btn.classList.remove("is-active");
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+  }
+
+  updateInstagramMediaHint();
+}
+
+function closeIgPostTypeMenu(){
+  const menu = document.getElementById("igPostTypeMenu");
+  const btn = document.getElementById("igPostTypeBtn");
+  if(menu) menu.style.display = "none";
+  if(btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function openIgPostTypeMenu(){
+  const menu = document.getElementById("igPostTypeMenu");
+  const btn = document.getElementById("igPostTypeBtn");
+  if(menu) menu.style.display = "block";
+  if(btn) btn.setAttribute("aria-expanded", "true");
+}
+
+function toggleIgPostTypeMenu(forceOpen){
+  const btn = document.getElementById("igPostTypeBtn");
+  const expanded = (btn?.getAttribute("aria-expanded") || "false") === "true";
+  const wantOpen = (typeof forceOpen === "boolean") ? forceOpen : !expanded;
+  if(wantOpen) openIgPostTypeMenu();
+  else closeIgPostTypeMenu();
+}
+
+function selectIgPostType(value){
+  setSelectedInstagramPostType(value);
+  closeIgPostTypeMenu();
+}
+
 function updateInstagramMediaHint(){
-  const type = document.getElementById("igPostType")?.value || "image";
+  const type = getSelectedInstagramPostType();
   const media = document.getElementById("igMediaUrls");
   const hint = document.getElementById("igMediaHint");
   if(type === "carousel"){
@@ -857,7 +1016,7 @@ async function saveInstagramDraftFromContent(publishAfter){
     setInstagramPublishMessage("Connect Instagram first in Social Accounts.");
     return;
   }
-  const postType = document.getElementById("igPostType")?.value || "image";
+  const postType = getSelectedInstagramPostType();
   const mediaUrls = parseInstagramMediaUrls();
   const caption = document.getElementById("igCaption")?.value || "";
 
@@ -1204,6 +1363,22 @@ async function generatePost(){
 
 setClientHeader();
 initPage();
+
+// Close custom dropdown when clicking outside or pressing Escape.
+document.addEventListener("pointerdown", (e) => {
+  try{
+    const root = document.getElementById("igPostTypeDropdown");
+    if(!root) return;
+    if(root.contains(e.target)) return;
+    closeIgPostTypeMenu();
+  }catch(err){}
+});
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape") closeIgPostTypeMenu();
+});
+
+// Ensure hint matches default selection.
+setSelectedInstagramPostType(getSelectedInstagramPostType());
 </script>
 
 <script>
