@@ -15,6 +15,7 @@ import secrets
 import urllib.parse
 import urllib.error
 import urllib.request
+import uuid
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -25,6 +26,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI()
 BASE_DIR = Path(__file__).resolve().parent
+MEDIA_DIR = BASE_DIR / "media"
 
 
 def _is_production_runtime() -> bool:
@@ -567,6 +569,32 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_instagram_publish_jobs_company ON v2_instagram_publish_jobs(company_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_instagram_publish_jobs_status ON v2_instagram_publish_jobs(status)")
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_ai_media_jobs (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    media_type TEXT DEFAULT '',
+                    prompt TEXT DEFAULT '',
+                    style TEXT DEFAULT '',
+                    format TEXT DEFAULT '',
+                    provider TEXT DEFAULT '',
+                    provider_job_id TEXT DEFAULT '',
+                    status TEXT DEFAULT 'queued',
+                    public_urls TEXT DEFAULT '[]',
+                    preview_urls TEXT DEFAULT '[]',
+                    caption TEXT DEFAULT '',
+                    reel_script TEXT DEFAULT '',
+                    error_message TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+            cur.execute("ALTER TABLE v2_ai_media_jobs ADD COLUMN IF NOT EXISTS provider_job_id TEXT DEFAULT ''")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_ai_media_jobs_company ON v2_ai_media_jobs(company_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_ai_media_jobs_status ON v2_ai_media_jobs(status)")
+
             # Short-lived OAuth state store for Meta connect flow.
             cur.execute(
                 """
@@ -828,6 +856,34 @@ def bootstrap_platform_admin():
 def page_response(filename: str, media_type: str | None = None):
     return FileResponse(
         BASE_DIR / filename,
+        media_type=media_type,
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+@app.get("/media/{path:path}")
+def media_response(path: str):
+    base = MEDIA_DIR.resolve()
+    target = (MEDIA_DIR / (path or "")).resolve()
+
+    # Disallow traversal and only serve files under MEDIA_DIR.
+    if base != target and base not in target.parents:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    if not target.is_file():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    suffix = target.suffix.lower()
+    media_type = None
+    if suffix == ".png":
+        media_type = "image/png"
+    elif suffix in {".jpg", ".jpeg"}:
+        media_type = "image/jpeg"
+    elif suffix == ".webp":
+        media_type = "image/webp"
+    elif suffix == ".mp4":
+        media_type = "video/mp4"
+
+    return FileResponse(
+        target,
         media_type=media_type,
         headers={"Cache-Control": "no-store, max-age=0"},
     )
@@ -3858,6 +3914,828 @@ async def instagram_publish(request: Request):
         )
     finally:
         conn.close()
+
+
+# =========================================================
+# AI MEDIA STUDIO (MVP)
+# =========================================================
+
+def _resolve_ai_media_company(request: Request, provided_company_id: str):
+    company_id, user, err = resolve_company_id(
+        request,
+        provided_company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return "", err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return "", json_error("Forbidden", 403)
+    return company_id, None
+
+
+def _parse_json_list(value: str):
+    if not value:
+        return []
+    try:
+        obj = json.loads(value)
+        if isinstance(obj, list):
+            return obj
+    except Exception:
+        return []
+    return []
+
+
+def _ai_media_job_to_public(row: dict):
+    if not isinstance(row, dict):
+        return {}
+    return {
+        "id": row.get("id"),
+        "company_id": row.get("company_id") or "",
+        "media_type": row.get("media_type") or "",
+        "prompt": row.get("prompt") or "",
+        "style": row.get("style") or "",
+        "format": row.get("format") or "",
+        "provider": row.get("provider") or "",
+        "provider_job_id": row.get("provider_job_id") or "",
+        "status": row.get("status") or "",
+        "public_urls": _parse_json_list(row.get("public_urls") or "[]"),
+        "preview_urls": _parse_json_list(row.get("preview_urls") or "[]"),
+        "caption": row.get("caption") or "",
+        "reel_script": row.get("reel_script") or "",
+        "error_message": row.get("error_message") or "",
+        "created_at": row.get("created_at") or "",
+        "updated_at": row.get("updated_at") or "",
+    }
+
+
+def _ai_media_base_url(request: Request) -> str:
+    base = (os.getenv("APP_PUBLIC_URL") or "").strip().rstrip("/")
+    if base:
+        return base
+    return str(request.base_url).rstrip("/")
+
+
+def _ai_media_store_bytes(request: Request, company_id: str, ext: str, data: bytes) -> tuple[str, str]:
+    ext = (ext or "").strip().lower()
+    if not ext.startswith("."):
+        ext = "." + (ext or "bin")
+
+    rel = Path("ai") / company_id / f"{uuid.uuid4().hex}{ext}"
+    abs_path = (MEDIA_DIR / rel).resolve()
+    abs_path.parent.mkdir(parents=True, exist_ok=True)
+    abs_path.write_bytes(data)
+
+    public_url = _ai_media_base_url(request) + "/media/" + urllib.parse.quote(rel.as_posix(), safe="/")
+    return public_url, rel.as_posix()
+
+
+def _openai_api_key() -> str:
+    return (os.getenv("OPENAI_API_KEY") or "").strip()
+
+
+def _openai_err(data: dict, fallback: str) -> str:
+    if isinstance(data, dict):
+        err = data.get("error")
+        if isinstance(err, dict):
+            msg = (err.get("message") or fallback).strip()
+            if msg:
+                return msg[:500]
+        if isinstance(err, str) and err.strip():
+            return err.strip()[:500]
+    return (fallback or "OpenAI API error").strip()[:500]
+
+
+def _http_post_json_openai(url: str, payload: dict, timeout_sec: int = 90):
+    key = _openai_api_key()
+    if not key:
+        return {}, "OPENAI_API_KEY is not configured."
+
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "AI-FLOW/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict) and data.get("error"):
+                return data, _openai_err(data, "OpenAI API error")
+            return data, ""
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return data, _openai_err(data, f"OpenAI API HTTP {e.code}")
+    except Exception as e:
+        return {}, f"OpenAI API request error: {type(e).__name__}"
+
+
+def _multipart_form_data(fields: dict[str, str], boundary: str) -> bytes:
+    lines: list[bytes] = []
+    for key, value in fields.items():
+        lines.append(f"--{boundary}".encode("utf-8"))
+        lines.append(f'Content-Disposition: form-data; name="{key}"'.encode("utf-8"))
+        lines.append(b"")
+        lines.append(str(value).encode("utf-8"))
+    lines.append(f"--{boundary}--".encode("utf-8"))
+    lines.append(b"")
+    return b"\r\n".join(lines)
+
+
+def _http_post_multipart_openai(url: str, fields: dict[str, str], timeout_sec: int = 120):
+    key = _openai_api_key()
+    if not key:
+        return {}, "OPENAI_API_KEY is not configured."
+
+    boundary = "----AI-FLOW-" + uuid.uuid4().hex
+    body = _multipart_form_data(fields, boundary)
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "User-Agent": "AI-FLOW/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict) and data.get("error"):
+                return data, _openai_err(data, "OpenAI API error")
+            return data, ""
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return data, _openai_err(data, f"OpenAI API HTTP {e.code}")
+    except Exception as e:
+        return {}, f"OpenAI API request error: {type(e).__name__}"
+
+
+def _http_get_json_openai(url: str, timeout_sec: int = 30):
+    key = _openai_api_key()
+    if not key:
+        return {}, "OPENAI_API_KEY is not configured."
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {key}", "User-Agent": "AI-FLOW/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict) and data.get("error"):
+                return data, _openai_err(data, "OpenAI API error")
+            return data, ""
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return data, _openai_err(data, f"OpenAI API HTTP {e.code}")
+    except Exception as e:
+        return {}, f"OpenAI API request error: {type(e).__name__}"
+
+
+def _http_get_bytes_openai(url: str, timeout_sec: int = 180):
+    key = _openai_api_key()
+    if not key:
+        return b"", "OPENAI_API_KEY is not configured."
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {key}", "User-Agent": "AI-FLOW/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            return resp.read(), ""
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return b"", _openai_err(data, f"OpenAI API HTTP {e.code}")
+    except Exception as e:
+        return b"", f"OpenAI API request error: {type(e).__name__}"
+
+
+def _ai_media_format_to_openai_size(fmt: str) -> str:
+    fmt = (fmt or "").strip()
+    if fmt == "1:1":
+        return "1024x1024"
+    if fmt in {"4:5", "9:16"}:
+        return "1024x1536"
+    return "1024x1024"
+
+
+def _ai_media_style_to_prompt(style: str) -> str:
+    s = (style or "").strip().lower()
+    if not s:
+        return ""
+    mapping = {
+        "cinematic": "cinematic lighting, dramatic composition, shallow depth of field",
+        "luxury": "luxury brand aesthetic, premium look, glossy highlights, minimal clutter",
+        "viral tiktok/reels": "viral short-form style, punchy visuals, high contrast, bold text areas",
+        "tech/ai": "futuristic tech/AI aesthetic, neon accents, clean UI-like shapes",
+        "realistic": "photorealistic, natural textures, realistic lighting",
+        "minimal": "minimalist design, clean negative space, simple shapes",
+        "bold advertisement": "bold ad creative, product-focused, strong CTA space, high contrast",
+    }
+    return mapping.get(s, s)
+
+
+def _generate_ai_caption(company_id: str, media_type: str, prompt: str, style: str) -> str:
+    api_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    if not api_key:
+        return ""
+    try:
+        client = Groq(api_key=api_key)
+        sys = "You write short, high-converting Instagram captions. Output plain text only."
+        user = f"""
+Create an Instagram caption for:
+Media type: {media_type}
+Prompt: {prompt}
+Style: {style}
+
+Rules:
+- write in English
+- 1-3 short paragraphs
+- include 3-8 hashtags at the end
+- avoid emojis
+"""
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": sys}, {"role": "user", "content": user}],
+            temperature=0.7,
+            max_tokens=260,
+        )
+        return (completion.choices[0].message.content or "").strip()
+    except Exception:
+        return ""
+
+
+def _generate_reel_package(company_id: str, prompt: str, style: str, duration_seconds: int) -> str:
+    api_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    if not api_key:
+        return ""
+    try:
+        client = Groq(api_key=api_key)
+        sys = "You write short Reel scripts and shot lists. Output plain text only."
+        user = f"""
+Create a Reel package for Instagram.
+
+Prompt: {prompt}
+Style: {style}
+Duration seconds: {duration_seconds}
+
+Return:
+- Hook (1 line)
+- Script (short, with timestamps or beats)
+- Scene-by-scene plan (3-8 scenes)
+- Suggested on-screen text
+- Suggested audio/mood
+- 3 image prompts for key frames
+
+Rules:
+- write in English
+- avoid emojis
+"""
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": sys}, {"role": "user", "content": user}],
+            temperature=0.7,
+            max_tokens=520,
+        )
+        return (completion.choices[0].message.content or "").strip()
+    except Exception:
+        return ""
+
+
+def _ai_media_insert_job(
+    company_id: str,
+    media_type: str,
+    prompt: str,
+    style: str,
+    fmt: str,
+    provider: str,
+    status: str,
+):
+    now = now_utc_iso()
+    conn = get_db_connection()
+    if not conn:
+        return None, "Database error"
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_ai_media_jobs (
+                    company_id, media_type, prompt, style, format, provider, status,
+                    provider_job_id, public_urls, preview_urls, caption, reel_script, error_message,
+                    created_at, updated_at
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING *
+                """,
+                (
+                    company_id,
+                    media_type,
+                    prompt,
+                    style,
+                    fmt,
+                    provider,
+                    status,
+                    "",
+                    "[]",
+                    "[]",
+                    "",
+                    "",
+                    "",
+                    now,
+                    now,
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return row, ""
+    except Exception:
+        return None, "AI media job create error"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _ai_media_update_job(company_id: str, job_id: int, **fields):
+    if not fields:
+        return
+    fields = {k: v for k, v in fields.items() if v is not None}
+    fields["updated_at"] = now_utc_iso()
+
+    sets = []
+    values = []
+    for k, v in fields.items():
+        sets.append(f"{k}=%s")
+        values.append(v)
+    values.extend([company_id, job_id])
+
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE v2_ai_media_jobs SET {', '.join(sets)} WHERE company_id=%s AND id=%s",
+                tuple(values),
+            )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _ai_media_get_job(company_id: str, job_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return None
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM v2_ai_media_jobs WHERE company_id = %s AND id = %s",
+                (company_id, job_id),
+            )
+            return cur.fetchone()
+    except Exception:
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.get("/api/ai-media/jobs")
+def ai_media_jobs(request: Request, companyId: str = ""):
+    company_id, err = _resolve_ai_media_company(request, companyId)
+    if err:
+        return err
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM v2_ai_media_jobs
+                WHERE company_id = %s
+                ORDER BY id DESC
+                LIMIT 30
+                """,
+                (company_id,),
+            )
+            rows = cur.fetchall()
+
+        # Best-effort refresh for in-progress OpenAI Reel video jobs (keep it bounded to avoid timeouts).
+        refreshed = 0
+        for row in rows or []:
+            if refreshed >= 2:
+                break
+            if (row.get("media_type") or "") != "reel":
+                continue
+            if (row.get("provider") or "") != "openai":
+                continue
+            status = (row.get("status") or "").strip()
+            if status not in {"queued", "generating", "in_progress"}:
+                continue
+            provider_job_id = (row.get("provider_job_id") or "").strip()
+            if not provider_job_id:
+                continue
+
+            meta, meta_err = _http_get_json_openai(f"https://api.openai.com/v1/videos/{provider_job_id}", timeout_sec=25)
+            if meta_err:
+                continue
+            v_status = (meta.get("status") or "").strip()
+            if v_status in {"queued", "in_progress"}:
+                _ai_media_update_job(company_id, int(row.get("id") or 0), status="generating")
+                row["status"] = "generating"
+                refreshed += 1
+                continue
+            if v_status == "failed":
+                err_obj = meta.get("error") if isinstance(meta, dict) else None
+                msg = ""
+                if isinstance(err_obj, dict):
+                    msg = (err_obj.get("message") or "").strip()
+                msg = (msg or "Video generation failed.").strip()[:500]
+                _ai_media_update_job(company_id, int(row.get("id") or 0), status="failed", error_message=msg)
+                row["status"] = "failed"
+                row["error_message"] = msg
+                refreshed += 1
+                continue
+            if v_status == "completed":
+                video_bytes, dl_err = _http_get_bytes_openai(
+                    f"https://api.openai.com/v1/videos/{provider_job_id}/content",
+                    timeout_sec=180,
+                )
+                if dl_err or not video_bytes:
+                    _ai_media_update_job(company_id, int(row.get("id") or 0), status="failed", error_message=(dl_err or "Video download failed.")[:500])
+                    row["status"] = "failed"
+                    row["error_message"] = (dl_err or "Video download failed.")[:500]
+                    refreshed += 1
+                    continue
+
+                public_url, _rel = _ai_media_store_bytes(request, company_id, ".mp4", video_bytes)
+                caption = row.get("caption") or ""
+                if not caption:
+                    caption = _generate_ai_caption(company_id, "reel", row.get("prompt") or "", row.get("style") or "") or ""
+
+                _ai_media_update_job(
+                    company_id,
+                    int(row.get("id") or 0),
+                    status="completed",
+                    public_urls=json.dumps([public_url]),
+                    preview_urls=json.dumps([public_url]),
+                    caption=caption,
+                    error_message="",
+                )
+                row["status"] = "completed"
+                row["public_urls"] = json.dumps([public_url])
+                row["preview_urls"] = json.dumps([public_url])
+                row["caption"] = caption
+                row["error_message"] = ""
+                refreshed += 1
+        return JSONResponse({"success": True, "jobs": [_ai_media_job_to_public(r) for r in rows]})
+    except Exception:
+        return json_error("AI media jobs error", 500)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.post("/api/ai-media/generate-image")
+async def ai_media_generate_image(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_ai_media_company(request, (data.get("companyId") or "").strip())
+    if err:
+        return err
+
+    prompt = (data.get("prompt") or "").strip()
+    style = (data.get("style") or "").strip()
+    fmt = (data.get("format") or "").strip()
+    if not prompt:
+        return json_error("prompt is required", 400)
+    if fmt not in {"1:1", "4:5", "9:16"}:
+        return json_error("format must be 1:1, 4:5, or 9:16", 400)
+
+    provider = "openai" if _openai_api_key() else ""
+    job, job_err = _ai_media_insert_job(company_id, "image", prompt, style, fmt, provider, "generating")
+    if job_err or not job:
+        return json_error(job_err or "AI media job create error", 500)
+    job_id = int(job.get("id") or 0)
+
+    if not _openai_api_key():
+        _ai_media_update_job(company_id, job_id, status="failed", provider="", error_message="AI image generation provider is not configured yet.")
+        return JSONResponse({"success": False, "error": "AI image generation provider is not configured yet.", "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+    size = _ai_media_format_to_openai_size(fmt)
+    style_hint = _ai_media_style_to_prompt(style)
+    full_prompt = prompt if not style_hint else (prompt + "\nStyle: " + style_hint)
+    model = (os.getenv("OPENAI_IMAGE_MODEL") or "gpt-image-1").strip() or "gpt-image-1"
+    quality = (os.getenv("OPENAI_IMAGE_QUALITY") or "medium").strip() or "medium"
+
+    data_img, img_err = _http_post_json_openai(
+        "https://api.openai.com/v1/images/generations",
+        {"model": model, "prompt": full_prompt, "n": 1, "size": size, "quality": quality, "output_format": "png"},
+        timeout_sec=120,
+    )
+    if img_err:
+        _ai_media_update_job(company_id, job_id, status="failed", error_message=img_err)
+        print("AI_MEDIA_IMAGE_FAILED:", {"company_id": company_id, "job_id": job_id, "provider": provider})
+        return JSONResponse({"success": False, "error": img_err, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+    items = data_img.get("data") if isinstance(data_img, dict) else None
+    b64 = ""
+    if isinstance(items, list) and items:
+        b64 = (items[0] or {}).get("b64_json") or ""
+    if not b64:
+        err_msg = "Image generation returned no image data."
+        _ai_media_update_job(company_id, job_id, status="failed", error_message=err_msg)
+        return JSONResponse({"success": False, "error": err_msg, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+    try:
+        img_bytes = base64.b64decode(b64)
+    except Exception:
+        err_msg = "Image decode failed."
+        _ai_media_update_job(company_id, job_id, status="failed", error_message=err_msg)
+        return JSONResponse({"success": False, "error": err_msg, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+    public_url, _rel = _ai_media_store_bytes(request, company_id, ".png", img_bytes)
+    caption = _generate_ai_caption(company_id, "image", prompt, style) or ""
+    _ai_media_update_job(
+        company_id,
+        job_id,
+        status="completed",
+        provider=provider,
+        public_urls=json.dumps([public_url]),
+        preview_urls=json.dumps([public_url]),
+        caption=caption,
+        error_message="",
+    )
+    print("AI_MEDIA_IMAGE_OK:", {"company_id": company_id, "job_id": job_id, "provider": provider, "status": "completed"})
+    saved = _ai_media_get_job(company_id, job_id) or job
+    return JSONResponse({"success": True, "job": _ai_media_job_to_public(saved)})
+
+
+@app.post("/api/ai-media/generate-carousel")
+async def ai_media_generate_carousel(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_ai_media_company(request, (data.get("companyId") or "").strip())
+    if err:
+        return err
+
+    prompt = (data.get("prompt") or "").strip()
+    style = (data.get("style") or "").strip()
+    fmt = (data.get("format") or "").strip()
+    slide_count = data.get("slide_count") or data.get("slideCount") or 5
+    try:
+        slide_count = int(slide_count)
+    except Exception:
+        slide_count = 5
+    slide_count = max(3, min(10, slide_count))
+
+    if not prompt:
+        return json_error("prompt is required", 400)
+    if fmt not in {"1:1", "4:5"}:
+        return json_error("format must be 1:1 or 4:5", 400)
+
+    provider = "openai" if _openai_api_key() else ""
+    job, job_err = _ai_media_insert_job(company_id, "carousel", prompt, style, fmt, provider, "generating")
+    if job_err or not job:
+        return json_error(job_err or "AI media job create error", 500)
+    job_id = int(job.get("id") or 0)
+
+    if not _openai_api_key():
+        _ai_media_update_job(company_id, job_id, status="failed", provider="", error_message="AI image generation provider is not configured yet.")
+        return JSONResponse({"success": False, "error": "AI image generation provider is not configured yet.", "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+    size = _ai_media_format_to_openai_size(fmt)
+    style_hint = _ai_media_style_to_prompt(style)
+    model = (os.getenv("OPENAI_IMAGE_MODEL") or "gpt-image-1").strip() or "gpt-image-1"
+    quality = (os.getenv("OPENAI_IMAGE_QUALITY") or "medium").strip() or "medium"
+
+    public_urls = []
+    for i in range(slide_count):
+        slide_prompt = f"{prompt}\nSlide {i+1} of {slide_count}.\nKeep consistent visual style.\n"
+        if style_hint:
+            slide_prompt += "Style: " + style_hint
+
+        data_img, img_err = _http_post_json_openai(
+            "https://api.openai.com/v1/images/generations",
+            {"model": model, "prompt": slide_prompt, "n": 1, "size": size, "quality": quality, "output_format": "png"},
+            timeout_sec=140,
+        )
+        if img_err:
+            _ai_media_update_job(company_id, job_id, status="failed", error_message=img_err)
+            print("AI_MEDIA_CAROUSEL_FAILED:", {"company_id": company_id, "job_id": job_id, "provider": provider})
+            return JSONResponse({"success": False, "error": img_err, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+        items = data_img.get("data") if isinstance(data_img, dict) else None
+        b64 = ""
+        if isinstance(items, list) and items:
+            b64 = (items[0] or {}).get("b64_json") or ""
+        if not b64:
+            img_err = "Image generation returned no image data."
+            _ai_media_update_job(company_id, job_id, status="failed", error_message=img_err)
+            return JSONResponse({"success": False, "error": img_err, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+        try:
+            img_bytes = base64.b64decode(b64)
+        except Exception:
+            img_err = "Image decode failed."
+            _ai_media_update_job(company_id, job_id, status="failed", error_message=img_err)
+            return JSONResponse({"success": False, "error": img_err, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
+
+        url, _rel = _ai_media_store_bytes(request, company_id, ".png", img_bytes)
+        public_urls.append(url)
+
+    caption = _generate_ai_caption(company_id, "carousel", prompt, style) or ""
+    _ai_media_update_job(
+        company_id,
+        job_id,
+        status="completed",
+        provider=provider,
+        public_urls=json.dumps(public_urls),
+        preview_urls=json.dumps(public_urls),
+        caption=caption,
+        error_message="",
+    )
+    print("AI_MEDIA_CAROUSEL_OK:", {"company_id": company_id, "job_id": job_id, "provider": provider, "status": "completed"})
+    saved = _ai_media_get_job(company_id, job_id) or job
+    return JSONResponse({"success": True, "job": _ai_media_job_to_public(saved)})
+
+
+@app.post("/api/ai-media/generate-reel")
+async def ai_media_generate_reel(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_ai_media_company(request, (data.get("companyId") or "").strip())
+    if err:
+        return err
+
+    prompt = (data.get("prompt") or "").strip()
+    style = (data.get("style") or "").strip()
+    fmt = (data.get("format") or "").strip()
+    duration_seconds = data.get("duration_seconds") or data.get("durationSeconds") or 8
+    try:
+        duration_seconds = int(duration_seconds)
+    except Exception:
+        duration_seconds = 8
+    duration_seconds = max(5, min(30, duration_seconds))
+
+    if not prompt:
+        return json_error("prompt is required", 400)
+    if fmt != "9:16":
+        return json_error("format must be 9:16", 400)
+
+    provider = "openai" if _openai_api_key() else ""
+    job, job_err = _ai_media_insert_job(company_id, "reel", prompt, style, fmt, provider, "generating")
+    if job_err or not job:
+        return json_error(job_err or "AI media job create error", 500)
+    job_id = int(job.get("id") or 0)
+
+    # If OpenAI is configured, attempt real video generation. Otherwise, generate a Reel package only.
+    if not _openai_api_key():
+        script = _generate_reel_package(company_id, prompt, style, duration_seconds) or ""
+        msg = "AI Reel video generation provider is not configured yet. Connect a video generation provider to generate MP4 files."
+        _ai_media_update_job(
+            company_id,
+            job_id,
+            status="completed",
+            provider="",
+            public_urls="[]",
+            preview_urls="[]",
+            reel_script=(script + ("\n\n" + msg if msg else "")),
+            error_message="",
+        )
+        return JSONResponse({"success": True, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job), "warning": msg})
+
+    # OpenAI Sora video generation (best-effort, may remain in_progress and require polling).
+    model = (os.getenv("OPENAI_VIDEO_MODEL") or "sora-2").strip() or "sora-2"
+    size = (os.getenv("OPENAI_VIDEO_SIZE") or "720x1280").strip() or "720x1280"
+    # Map requested duration to supported values (4/8/12).
+    if duration_seconds <= 6:
+        seconds = "4"
+    elif duration_seconds <= 10:
+        seconds = "8"
+    else:
+        seconds = "12"
+
+    video_job, v_err = _http_post_multipart_openai(
+        "https://api.openai.com/v1/videos",
+        {"model": model, "prompt": prompt, "seconds": seconds, "size": size},
+        timeout_sec=120,
+    )
+    if v_err:
+        script = _generate_reel_package(company_id, prompt, style, duration_seconds) or ""
+        _ai_media_update_job(company_id, job_id, status="completed", provider="openai", reel_script=script, error_message=v_err)
+        print("AI_MEDIA_REEL_VIDEO_FAILED:", {"company_id": company_id, "job_id": job_id, "provider": provider})
+        return JSONResponse({"success": True, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job), "warning": v_err})
+
+    openai_video_id = (video_job.get("id") or "").strip()
+    if not openai_video_id:
+        script = _generate_reel_package(company_id, prompt, style, duration_seconds) or ""
+        msg = "Video generation did not return a video id."
+        _ai_media_update_job(company_id, job_id, status="completed", provider="openai", reel_script=script, error_message=msg)
+        return JSONResponse({"success": True, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job), "warning": msg})
+
+    _ai_media_update_job(company_id, job_id, provider="openai", provider_job_id=openai_video_id)
+
+    # Poll briefly for completion (so users sometimes get instant preview); otherwise rely on /api/ai-media/jobs polling.
+    status = (video_job.get("status") or "").strip()
+    for _ in range(10):
+        if status == "completed":
+            break
+        if status in {"failed", "canceled"}:
+            break
+        meta, meta_err = _http_get_json_openai(f"https://api.openai.com/v1/videos/{openai_video_id}", timeout_sec=30)
+        if meta_err:
+            break
+        status = (meta.get("status") or "").strip()
+        if status in {"queued", "in_progress"}:
+            try:
+                import time
+                time.sleep(2)
+            except Exception:
+                break
+
+    if status != "completed":
+        script = _generate_reel_package(company_id, prompt, style, duration_seconds) or ""
+        _ai_media_update_job(
+            company_id,
+            job_id,
+            status="generating",
+            provider="openai",
+            provider_job_id=openai_video_id,
+            reel_script=script,
+            error_message="",
+        )
+        return JSONResponse(
+            {
+                "success": True,
+                "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job),
+                "video_status": status or "generating",
+                "openai_video_id": openai_video_id,
+                "warning": "Video generation is in progress. Refresh AI Media Studio jobs to fetch the MP4 when ready.",
+            }
+        )
+
+    video_bytes, dl_err = _http_get_bytes_openai(f"https://api.openai.com/v1/videos/{openai_video_id}/content", timeout_sec=240)
+    if dl_err or not video_bytes:
+        script = _generate_reel_package(company_id, prompt, style, duration_seconds) or ""
+        _ai_media_update_job(company_id, job_id, status="completed", provider="openai", reel_script=script, error_message=dl_err or "Video download failed.")
+        return JSONResponse({"success": True, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job), "warning": dl_err or "Video download failed."})
+
+    public_url, _rel = _ai_media_store_bytes(request, company_id, ".mp4", video_bytes)
+    caption = _generate_ai_caption(company_id, "reel", prompt, style) or ""
+    script = _generate_reel_package(company_id, prompt, style, duration_seconds) or ""
+    _ai_media_update_job(
+        company_id,
+        job_id,
+        status="completed",
+        provider="openai",
+        provider_job_id=openai_video_id,
+        public_urls=json.dumps([public_url]),
+        preview_urls=json.dumps([public_url]),
+        caption=caption,
+        reel_script=script,
+        error_message="",
+    )
+    print("AI_MEDIA_REEL_OK:", {"company_id": company_id, "job_id": job_id, "provider": provider, "status": "completed"})
+    return JSONResponse({"success": True, "job": _ai_media_job_to_public(_ai_media_get_job(company_id, job_id) or job)})
 
 
 # =========================================================

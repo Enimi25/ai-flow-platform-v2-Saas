@@ -322,6 +322,100 @@ textarea{
   border-radius:20px;
 }
 
+.media-studio-card{
+  margin-bottom:24px;
+  border-radius:20px;
+}
+
+.segmented{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.seg{
+  flex:1;
+  min-width:160px;
+  padding:12px 12px;
+  border-radius:14px;
+  font-weight:950;
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  cursor:pointer;
+  transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+}
+.seg:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,255,255,0.18);
+  box-shadow:var(--shadowSm);
+}
+.seg:active{transform:translateY(0)}
+.seg.is-active{
+  background:linear-gradient(135deg, rgba(184,255,122,0.95) 0%, rgba(65,220,255,0.72) 100%);
+  color:#071820;
+  border-color:rgba(0,0,0,.12);
+  box-shadow:0 22px 70px rgba(184,255,122,0.12);
+}
+
+.preview-grid{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+
+.preview-card{
+  background:rgba(17,25,54,.72);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:12px;
+}
+.preview-card img,.preview-card video{
+  width:100%;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.10);
+  display:block;
+  background:rgba(0,0,0,0.25);
+}
+.preview-meta{
+  margin-top:10px;
+  color:#cbd5e1;
+  font-size:13px;
+  line-height:1.5;
+  word-break:break-word;
+}
+.mono{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+  font-size:12px;
+}
+
+.jobs-grid{
+  margin-top:12px;
+  display:grid;
+  gap:10px;
+}
+
+.job-row .thumbs{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.job-row .thumbs img,.job-row .thumbs video{
+  width:100%;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(0,0,0,0.25);
+}
+
+.job-row .row-actions{
+  margin-top:10px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
 .publisher-head{
   display:flex;
   justify-content:space-between;
@@ -518,6 +612,7 @@ textarea{
   .main > *{max-width:none}
   .grid{grid-template-columns:1fr}
   .form-grid{grid-template-columns:1fr}
+  .preview-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -560,6 +655,83 @@ textarea{
     <button class="dark" onclick="openInstagramPublisher()">Instagram Publisher</button>
     <button class="dark" onclick="loadPosts()">Refresh Posts</button>
     <button class="dark" onclick="goDashboard()">Back to Dashboard</button>
+  </div>
+
+  <div class="card media-studio-card" id="aiMediaStudio">
+    <div class="publisher-head">
+      <div>
+        <span class="pill connected">AI Media Studio v1</span>
+        <h2 style="margin:12px 0 8px;">Generate Visual Media</h2>
+        <div class="hint">When generation succeeds, you can send the media directly to Instagram Publisher below (no copy/paste).</div>
+      </div>
+      <span class="pill" id="aiMediaStudioStatus">Idle</span>
+    </div>
+
+    <div class="field" style="margin-top:16px;">
+      <label>Media type</label>
+      <div class="segmented">
+        <button type="button" class="seg is-active" id="aiMediaTypeImage" onclick="setAiMediaType('image')">Instagram Image</button>
+        <button type="button" class="seg" id="aiMediaTypeCarousel" onclick="setAiMediaType('carousel')">Carousel Images</button>
+        <button type="button" class="seg" id="aiMediaTypeReel" onclick="setAiMediaType('reel')">Reel Video</button>
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top:14px;">
+      <div class="field">
+        <label for="aiMediaStyle">Style</label>
+        <select id="aiMediaStyle">
+          <option>Cinematic</option>
+          <option>Luxury</option>
+          <option>Viral TikTok/Reels</option>
+          <option>Tech/AI</option>
+          <option>Realistic</option>
+          <option>Minimal</option>
+          <option>Bold advertisement</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="aiMediaFormat">Format</label>
+        <select id="aiMediaFormat" onchange="onAiMediaFormatChanged()">
+          <option value="1:1">Square 1:1</option>
+          <option value="4:5">Portrait 4:5</option>
+          <option value="9:16">Reel 9:16</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top:10px;">
+      <div class="field" id="aiMediaSlideCountField">
+        <label for="aiMediaSlideCount">Slide count</label>
+        <input id="aiMediaSlideCount" type="number" min="3" max="10" step="1" value="5">
+      </div>
+      <div class="field" id="aiMediaDurationField" style="display:none;">
+        <label for="aiMediaDuration">Duration seconds</label>
+        <input id="aiMediaDuration" type="number" min="5" max="30" step="1" value="8">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:10px;">
+      <label for="aiMediaPrompt">Prompt</label>
+      <textarea id="aiMediaPrompt" placeholder="Describe the image or Reel you want to create..."></textarea>
+      <div class="hint">Instagram requires public image/video URLs. Generated files will be hosted at a public URL if storage is configured.</div>
+    </div>
+
+    <div class="action-row">
+      <button class="green" onclick="generateAiImage()">Generate Image</button>
+      <button class="green" onclick="generateAiCarousel()">Generate Carousel</button>
+      <button class="green" onclick="generateAiReel()">Generate Reel</button>
+      <button class="dark" onclick="useAiMediaInInstagramPublisher()">Use in Instagram Publisher</button>
+      <button class="dark" onclick="loadAiMediaJobs()">Refresh Jobs</button>
+    </div>
+
+    <div class="hint" id="aiMediaStudioMessage" style="margin-top:12px;">Configure an AI image/video provider to generate media (e.g. set `OPENAI_API_KEY`).</div>
+
+    <div style="margin-top:22px;font-weight:900;">Preview</div>
+    <div class="preview-grid" id="aiMediaPreview"></div>
+    <div class="preview-meta" id="aiMediaPreviewMeta"></div>
+
+    <div style="margin-top:22px;font-weight:900;">Recent AI Media Jobs</div>
+    <div class="jobs-grid" id="aiMediaJobsList"></div>
   </div>
 
   <div class="card publisher-card" id="instagramPublisher">
@@ -606,7 +778,7 @@ textarea{
     </div>
 
     <div style="margin-top:20px;font-weight:900;">Generate Creative for Instagram</div>
-    <div class="hint" style="margin-top:6px;">AI image generation is not connected yet. Use a public image URL for publishing.</div>
+    <div class="hint" style="margin-top:6px;">Generate images/video in AI Media Studio above, then publish here. Instagram requires public URLs.</div>
 
     <div class="field" style="margin-top:14px;">
       <label for="igCreativePrompt">Topic / prompt</label>
@@ -700,6 +872,9 @@ const urlCompanyId = (qs.get("companyId") || "").trim();
 let companyId = urlCompanyId || (localStorage.getItem("ai_flow_company_id") || "");
 let instagramAccounts = [];
 let instagramJobs = [];
+let aiMediaType = "image";
+let aiMediaJobs = [];
+let aiMediaLastJob = null;
 
 function setClientHeader(){
   document.getElementById("clientEmail").innerText = email || "Client";
@@ -746,6 +921,323 @@ async function readJsonSafe(res){
   }catch(e){
     return {data: {}, text};
   }
+}
+
+function setAiMediaStudioStatus(text, connected){
+  const el = document.getElementById("aiMediaStudioStatus");
+  if(!el) return;
+  el.innerText = text || "Idle";
+  if(connected) el.classList.add("connected");
+  else el.classList.remove("connected");
+}
+
+function setAiMediaStudioMessage(text){
+  const el = document.getElementById("aiMediaStudioMessage");
+  if(el) el.innerText = text || "";
+}
+
+function setAiMediaType(type){
+  aiMediaType = (type === "carousel" || type === "reel" || type === "image") ? type : "image";
+
+  const bImage = document.getElementById("aiMediaTypeImage");
+  const bCarousel = document.getElementById("aiMediaTypeCarousel");
+  const bReel = document.getElementById("aiMediaTypeReel");
+  if(bImage) bImage.classList.toggle("is-active", aiMediaType === "image");
+  if(bCarousel) bCarousel.classList.toggle("is-active", aiMediaType === "carousel");
+  if(bReel) bReel.classList.toggle("is-active", aiMediaType === "reel");
+
+  const slideField = document.getElementById("aiMediaSlideCountField");
+  const durField = document.getElementById("aiMediaDurationField");
+  if(slideField) slideField.style.display = (aiMediaType === "carousel") ? "" : "none";
+  if(durField) durField.style.display = (aiMediaType === "reel") ? "" : "none";
+
+  const fmtSel = document.getElementById("aiMediaFormat");
+  if(fmtSel){
+    if(aiMediaType === "reel"){
+      fmtSel.value = "9:16";
+    }else if(fmtSel.value === "9:16"){
+      fmtSel.value = "4:5";
+    }
+  }
+}
+
+function onAiMediaFormatChanged(){
+  const fmtSel = document.getElementById("aiMediaFormat");
+  if(!fmtSel) return;
+  if(aiMediaType === "reel" && fmtSel.value !== "9:16"){
+    fmtSel.value = "9:16";
+  }
+}
+
+function renderAiMediaPreview(job){
+  const box = document.getElementById("aiMediaPreview");
+  const meta = document.getElementById("aiMediaPreviewMeta");
+  if(!box || !meta) return;
+
+  if(!job){
+    box.innerHTML = '<div class="hint">No preview yet.</div>';
+    meta.innerHTML = "";
+    return;
+  }
+
+  const urls = Array.isArray(job.public_urls) ? job.public_urls : [];
+  const mediaType = String(job.media_type || "");
+
+  if(!urls.length){
+    box.innerHTML = '<div class="hint">No generated public URLs yet. If this is a Reel, it may still be generating. Refresh jobs.</div>';
+  }else{
+    box.innerHTML = urls.map(u => {
+      if(mediaType === "reel" && /\.mp4(\?|#|$)/i.test(u)){
+        return `<div class="preview-card"><video controls playsinline src="${esc(u)}"></video><div class="preview-meta mono">${esc(u)}</div></div>`;
+      }
+      return `<div class="preview-card"><img src="${esc(u)}" alt="preview"><div class="preview-meta mono">${esc(u)}</div></div>`;
+    }).join("");
+  }
+
+  const caption = (job.caption || "").trim();
+  const script = (job.reel_script || "").trim();
+  const parts = [];
+  parts.push(`<div><strong>Type:</strong> ${esc(mediaType)} &nbsp; <span class="pill">${esc(job.status || "")}</span></div>`);
+  if(caption) parts.push(`<div style="margin-top:10px;"><strong>Caption:</strong><div style="white-space:pre-wrap;margin-top:6px;">${esc(caption)}</div></div>`);
+  if(script) parts.push(`<div style="margin-top:10px;"><strong>Reel package:</strong><div style="white-space:pre-wrap;margin-top:6px;">${esc(script)}</div></div>`);
+  if(job.error_message) parts.push(`<div style="margin-top:10px;color:#ffb4b4;"><strong>Error:</strong> ${esc(job.error_message)}</div>`);
+  meta.innerHTML = parts.join("");
+}
+
+function renderAiMediaJobs(){
+  const box = document.getElementById("aiMediaJobsList");
+  if(!box) return;
+  if(!aiMediaJobs.length){
+    box.innerHTML = '<div class="hint">No AI media jobs yet.</div>';
+    return;
+  }
+  box.innerHTML = aiMediaJobs.map(job => {
+    const urls = Array.isArray(job.public_urls) ? job.public_urls : [];
+    const thumbs = urls.slice(0, 4).map(u => {
+      if(String(job.media_type || "") === "reel" && /\.mp4(\?|#|$)/i.test(u)){
+        return `<video muted playsinline src="${esc(u)}"></video>`;
+      }
+      return `<img src="${esc(u)}" alt="thumb">`;
+    }).join("");
+    const caption = esc((job.caption || "").slice(0, 180));
+    const err = job.error_message ? `<div class="job-meta" style="color:#ffb4b4;">${esc(job.error_message)}</div>` : "";
+    const useBtn = urls.length ? `<button class="mini mini-green" onclick="useAiMediaJobInPublisher(${Number(job.id)})">Use in Publisher</button>` : "";
+    const viewBtn = `<button class="mini" onclick="showAiMediaPreview(${Number(job.id)})">Preview</button>`;
+    return `
+      <div class="job-row">
+        <div class="job-top">
+          <div><strong>${esc(job.media_type || "media")}</strong> <span class="pill">${esc(job.status || "")}</span></div>
+          <div class="hint">${esc(job.provider || "")}</div>
+        </div>
+        <div class="job-meta">${caption || "No caption"}</div>
+        ${err}
+        <div class="thumbs">${thumbs}</div>
+        <div class="row-actions">${viewBtn}${useBtn}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function loadAiMediaJobs(){
+  if(!companyId){
+    aiMediaJobs = [];
+    renderAiMediaJobs();
+    setAiMediaStudioMessage("Select a company first.");
+    return;
+  }
+
+  try{
+    const res = await fetch("/api/ai-media/jobs?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      aiMediaJobs = [];
+      renderAiMediaJobs();
+      setAiMediaStudioMessage(data.error || out.text || "AI media jobs could not load.");
+      return;
+    }
+    aiMediaJobs = data.jobs || [];
+    renderAiMediaJobs();
+    if(aiMediaLastJob){
+      const updated = aiMediaJobs.find(j => Number(j.id) === Number(aiMediaLastJob.id));
+      if(updated) aiMediaLastJob = updated;
+      renderAiMediaPreview(aiMediaLastJob);
+    }
+    setAiMediaStudioMessage("Ready.");
+  }catch(e){
+    aiMediaJobs = [];
+    renderAiMediaJobs();
+    setAiMediaStudioMessage("AI media jobs could not load.");
+  }
+}
+
+function getAiMediaInputs(){
+  const prompt = (document.getElementById("aiMediaPrompt")?.value || "").trim();
+  const style = (document.getElementById("aiMediaStyle")?.value || "").trim();
+  const format = (document.getElementById("aiMediaFormat")?.value || "").trim();
+  const slideCount = Number(document.getElementById("aiMediaSlideCount")?.value || 5);
+  const durationSeconds = Number(document.getElementById("aiMediaDuration")?.value || 8);
+  return {prompt, style, format, slideCount, durationSeconds};
+}
+
+async function generateAiImage(){
+  const inp = getAiMediaInputs();
+  if(!companyId){ setAiMediaStudioMessage("Select a company first."); return; }
+  if(!inp.prompt){ setAiMediaStudioMessage("Prompt is required."); return; }
+  if(inp.format !== "1:1" && inp.format !== "4:5" && inp.format !== "9:16"){ setAiMediaStudioMessage("Select a format."); return; }
+
+  setAiMediaStudioStatus("Generating...", true);
+  setAiMediaStudioMessage("Generating image...");
+  try{
+    const res = await fetch("/api/ai-media/generate-image", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, prompt: inp.prompt, style: inp.style, format: inp.format})
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setAiMediaStudioStatus("Failed", false);
+      setAiMediaStudioMessage(data.error || out.text || "Image generation failed.");
+      if(data.job) aiMediaLastJob = data.job;
+      renderAiMediaPreview(aiMediaLastJob);
+      await loadAiMediaJobs();
+      return;
+    }
+    aiMediaLastJob = data.job || null;
+    renderAiMediaPreview(aiMediaLastJob);
+    setAiMediaStudioStatus("Completed", true);
+    setAiMediaStudioMessage("Image generated.");
+    await loadAiMediaJobs();
+  }catch(e){
+    setAiMediaStudioStatus("Failed", false);
+    setAiMediaStudioMessage("Image generation failed.");
+  }
+}
+
+async function generateAiCarousel(){
+  const inp = getAiMediaInputs();
+  if(!companyId){ setAiMediaStudioMessage("Select a company first."); return; }
+  if(!inp.prompt){ setAiMediaStudioMessage("Prompt is required."); return; }
+  if(inp.format !== "1:1" && inp.format !== "4:5"){ setAiMediaStudioMessage("Carousel format must be 1:1 or 4:5."); return; }
+  const slides = Math.max(3, Math.min(10, Number(inp.slideCount || 5)));
+
+  setAiMediaStudioStatus("Generating...", true);
+  setAiMediaStudioMessage("Generating carousel...");
+  try{
+    const res = await fetch("/api/ai-media/generate-carousel", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, prompt: inp.prompt, style: inp.style, format: inp.format, slide_count: slides})
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setAiMediaStudioStatus("Failed", false);
+      setAiMediaStudioMessage(data.error || out.text || "Carousel generation failed.");
+      if(data.job) aiMediaLastJob = data.job;
+      renderAiMediaPreview(aiMediaLastJob);
+      await loadAiMediaJobs();
+      return;
+    }
+    aiMediaLastJob = data.job || null;
+    renderAiMediaPreview(aiMediaLastJob);
+    setAiMediaStudioStatus("Completed", true);
+    setAiMediaStudioMessage("Carousel generated.");
+    await loadAiMediaJobs();
+  }catch(e){
+    setAiMediaStudioStatus("Failed", false);
+    setAiMediaStudioMessage("Carousel generation failed.");
+  }
+}
+
+async function generateAiReel(){
+  const inp = getAiMediaInputs();
+  if(!companyId){ setAiMediaStudioMessage("Select a company first."); return; }
+  if(!inp.prompt){ setAiMediaStudioMessage("Prompt is required."); return; }
+  const dur = Math.max(5, Math.min(30, Number(inp.durationSeconds || 8)));
+
+  setAiMediaStudioStatus("Generating...", true);
+  setAiMediaStudioMessage("Generating Reel...");
+  try{
+    const res = await fetch("/api/ai-media/generate-reel", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, prompt: inp.prompt, style: inp.style, format: "9:16", duration_seconds: dur})
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setAiMediaStudioStatus("Failed", false);
+      setAiMediaStudioMessage(data.error || out.text || "Reel generation failed.");
+      if(data.job) aiMediaLastJob = data.job;
+      renderAiMediaPreview(aiMediaLastJob);
+      await loadAiMediaJobs();
+      return;
+    }
+    aiMediaLastJob = data.job || null;
+    renderAiMediaPreview(aiMediaLastJob);
+    setAiMediaStudioStatus("Completed", true);
+    setAiMediaStudioMessage(data.warning || "Reel created. If video is still generating, refresh jobs.");
+    await loadAiMediaJobs();
+  }catch(e){
+    setAiMediaStudioStatus("Failed", false);
+    setAiMediaStudioMessage("Reel generation failed.");
+  }
+}
+
+function showAiMediaPreview(jobId){
+  const job = aiMediaJobs.find(j => Number(j.id) === Number(jobId)) || null;
+  aiMediaLastJob = job;
+  renderAiMediaPreview(job);
+}
+
+function useAiMediaJobInPublisher(jobId){
+  const job = aiMediaJobs.find(j => Number(j.id) === Number(jobId)) || null;
+  aiMediaLastJob = job;
+  renderAiMediaPreview(job);
+  useAiMediaInInstagramPublisher();
+}
+
+function useAiMediaInInstagramPublisher(){
+  const job = aiMediaLastJob;
+  if(!job){
+    setAiMediaStudioMessage("Generate media first.");
+    return;
+  }
+  const urls = Array.isArray(job.public_urls) ? job.public_urls : [];
+  if(!urls.length){
+    setAiMediaStudioMessage("This media has no public URLs yet. Refresh AI Media jobs.");
+    return;
+  }
+
+  const mediaType = String(job.media_type || "");
+  const mediaBox = document.getElementById("igMediaUrls");
+  const captionBox = document.getElementById("igCaption");
+
+  if(mediaType === "carousel"){
+    setSelectedInstagramPostType("carousel");
+    if(mediaBox) mediaBox.value = urls.join("\n");
+  }else if(mediaType === "reel"){
+    setSelectedInstagramPostType("reel");
+    if(mediaBox) mediaBox.value = urls[0] || "";
+  }else{
+    setSelectedInstagramPostType("image");
+    if(mediaBox) mediaBox.value = urls[0] || "";
+  }
+
+  const caption = (job.caption || "").trim();
+  if(captionBox && caption){
+    captionBox.value = caption;
+  }
+  updateInstagramMediaHint();
+  setInstagramPublishMessage("Filled from AI Media Studio. Ready to publish.");
+
+  const pub = document.getElementById("instagramPublisher");
+  if(pub) pub.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
 function showAccessDenied(detail){
@@ -1205,6 +1697,8 @@ async function initPage(){
 
   loadPosts();
   loadInstagramPublisher();
+  setAiMediaType(aiMediaType);
+  loadAiMediaJobs();
 }
 
 async function loadPosts(){
