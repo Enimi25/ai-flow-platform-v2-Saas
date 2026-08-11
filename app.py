@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -77,6 +78,9 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=_secret_key,
     session_cookie="ai_flow_session",
+    # Keep an authenticated browser session for 30 days instead of Starlette's
+    # short default, so users are not unexpectedly redirected to login.
+    max_age=60 * 60 * 24 * 30,
     same_site="lax",
     https_only=True,
 )
