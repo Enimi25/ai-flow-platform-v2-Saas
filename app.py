@@ -184,17 +184,52 @@ def verify_password(password: str, stored: str) -> bool:
 
 def get_session_user(request: Request) -> dict | None:
     sess = getattr(request, "session", None)
-    if not sess:
+    if sess and sess.get("user_id"):
+        return {
+            "user_id": sess.get("user_id"),
+            "email": sess.get("email") or "",
+            "role": sess.get("role") or "",
+            "company_id": sess.get("company_id") or "",
+        }
+
+    # The original app relied only on Starlette's signed session cookie.  If the
+    # signing secret ever changes during a deploy, every user looks logged out.
+    # Fall back to a database-backed, HttpOnly remember token instead.
+    token = (request.cookies.get("ai_flow_remember") or "").strip()
+    if not token:
         return None
-    user_id = sess.get("user_id")
-    if not user_id:
+    conn = get_db_connection()
+    if not conn:
         return None
-    return {
-        "user_id": sess.get("user_id"),
-        "email": sess.get("email") or "",
-        "role": sess.get("role") or "",
-        "company_id": sess.get("company_id") or "",
-    }
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT u.id, u.email, u.role, u.company_id
+                FROM v2_auth_sessions s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.token_hash = %s
+                  AND s.expires_at > %s
+                  AND s.revoked_at = ''
+                  AND COALESCE(u.status, 'active') = 'active'
+                LIMIT 1
+                """,
+                (hashlib.sha256(token.encode("utf-8")).hexdigest(), now_utc_iso()),
+            )
+            user = cur.fetchone()
+            if not user:
+                return None
+            return {
+                "user_id": user.get("id"),
+                "email": user.get("email") or "",
+                "role": user.get("role") or "",
+                "company_id": user.get("company_id") or "",
+            }
+    except Exception as e:
+        print("PERSISTENT SESSION LOOKUP ERROR:", str(e))
+        return None
+    finally:
+        conn.close()
 
 
 def require_login(request: Request) -> dict | None:
@@ -421,6 +456,24 @@ def init_db():
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT ''")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
+
+            # Durable browser login tokens. These survive a harmless Render
+            # restart or signed-cookie secret rotation; only a SHA-256 digest is
+            # retained in the database.
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_auth_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    token_hash TEXT UNIQUE NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    revoked_at TEXT DEFAULT '',
+                    created_at TEXT DEFAULT ''
+                );
+                """
+            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_auth_sessions_token_hash ON v2_auth_sessions(token_hash)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_v2_auth_sessions_user_id ON v2_auth_sessions(user_id)")
 
             # Invite system (MVP): company admins can invite employees/clients.
             cur.execute(
@@ -1363,7 +1416,28 @@ async def login_api(request: Request):
             except Exception as e:
                 print("SESSION SET ERROR:", str(e))
 
-            return JSONResponse(
+            # Keep a durable login token in Postgres as a recovery path when a
+            # signed session cookie becomes invalid after an infrastructure
+            # restart. The browser receives only the random token; the database
+            # stores its one-way hash.
+            remember_token = secrets.token_urlsafe(48)
+            remember_hash = hashlib.sha256(remember_token.encode("utf-8")).hexdigest()
+            remember_expires = (datetime.utcnow() + timedelta(days=30)).isoformat() + "Z"
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO v2_auth_sessions (user_id, token_hash, expires_at, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (int(user["id"]), remember_hash, remember_expires, now_utc_iso()),
+                )
+                cur.execute("DELETE FROM v2_auth_sessions WHERE expires_at <= %s", (now_utc_iso(),))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print("PERSISTENT SESSION CREATE ERROR:", str(e))
+
+            response = JSONResponse(
                 {
                     "success": True,
                     "email": user["email"],
@@ -1372,6 +1446,16 @@ async def login_api(request: Request):
                     "userId": user.get("id"),
                 }
             )
+            response.set_cookie(
+                key="ai_flow_remember",
+                value=remember_token,
+                max_age=60 * 60 * 24 * 30,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                path="/",
+            )
+            return response
 
     except Exception as e:
         print("LOGIN ERROR:", str(e))
@@ -1387,11 +1471,28 @@ async def login_api(request: Request):
 
 @app.post("/logout-api")
 async def logout_api(request: Request):
+    token = (request.cookies.get("ai_flow_remember") or "").strip()
+    if token:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE v2_auth_sessions SET revoked_at = %s WHERE token_hash = %s",
+                        (now_utc_iso(), hashlib.sha256(token.encode("utf-8")).hexdigest()),
+                    )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+            finally:
+                conn.close()
     try:
         request.session.clear()
     except Exception:
         pass
-    return JSONResponse({"success": True})
+    response = JSONResponse({"success": True})
+    response.delete_cookie("ai_flow_remember", path="/")
+    return response
 
 @app.get("/api/me")
 def api_me(request: Request):
