@@ -857,12 +857,34 @@ def bootstrap_platform_admin():
 # STATIC PAGES
 # =========================================================
 
-def page_response(filename: str, media_type: str | None = None):
-    return FileResponse(
-        BASE_DIR / filename,
-        media_type=media_type,
-        headers={"Cache-Control": "no-store, max-age=0"},
-    )
+def page_response(filename: str, media_type: str | None = None, request: Request | None = None):
+    """Serve a page without allowing stale browser storage to look like a logout.
+
+    The legacy dashboard pages still read identity fields from localStorage during
+    startup.  Authentication itself is cookie based, so re-hydrate those UI-only
+    fields from the verified server session before the page's own scripts run.
+    """
+    headers = {"Cache-Control": "no-store, max-age=0"}
+    user = get_session_user(request) if request else None
+    if user and filename.endswith(".html"):
+        identity = json.dumps(
+            {
+                "email": user.get("email") or "",
+                "role": user.get("role") or "",
+                "companyId": user.get("company_id") or "",
+            }
+        ).replace("</", "<\\/")
+        bootstrap = (
+            "<script>(function(){try{const u="
+            + identity
+            + ";if(u.email)localStorage.setItem('ai_flow_email',u.email);"
+            + "if(u.role)localStorage.setItem('ai_flow_role',u.role);"
+            + "if(u.companyId)localStorage.setItem('ai_flow_company_id',u.companyId);"
+            + "}catch(e){}})();</script>"
+        )
+        html = (BASE_DIR / filename).read_text(encoding="utf-8")
+        return HTMLResponse(html.replace("</head>", bootstrap + "</head>", 1), headers=headers)
+    return FileResponse(BASE_DIR / filename, media_type=media_type, headers=headers)
 
 @app.get("/media/{path:path}")
 def media_response(path: str):
@@ -908,7 +930,7 @@ def dashboard_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
         return guard
-    return page_response("dashboard.html")
+    return page_response("dashboard.html", request=request)
 
 
 @app.get("/leads-page")
@@ -916,7 +938,7 @@ def leads_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
         return guard
-    return page_response("leads.html")
+    return page_response("leads.html", request=request)
 
 
 @app.get("/content-factory")
@@ -925,21 +947,21 @@ def content_factory_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
         return guard
-    return page_response("content.html")
+    return page_response("content.html", request=request)
 
 @app.get("/settings")
 def settings_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
     if guard:
         return guard
-    return page_response("settings.html")
+    return page_response("settings.html", request=request)
 
 @app.get("/social-accounts")
 def social_accounts_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
     if guard:
         return guard
-    return page_response("social.html")
+    return page_response("social.html", request=request)
 
 
 @app.get("/ai-replies")
@@ -947,21 +969,21 @@ def ai_replies_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
         return guard
-    return page_response("replies.html")
+    return page_response("replies.html", request=request)
 
 @app.get("/billing")
 def billing_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
     if guard:
         return guard
-    return page_response("billing.html")
+    return page_response("billing.html", request=request)
 
 @app.get("/analytics")
 def analytics_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
         return guard
-    return page_response("analytics.html")
+    return page_response("analytics.html", request=request)
 
 
 @app.get("/calendar")
@@ -969,7 +991,7 @@ def calendar_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE)
     if guard:
         return guard
-    return page_response("calendar.html")
+    return page_response("calendar.html", request=request)
 
 
 @app.get("/admin")
@@ -977,14 +999,14 @@ def admin_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN)
     if guard:
         return guard
-    return page_response("admin.html")
+    return page_response("admin.html", request=request)
 
 @app.get("/onboarding")
 def onboarding_page(request: Request):
     guard = guard_page(request, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN)
     if guard:
         return guard
-    return page_response("onboarding.html")
+    return page_response("onboarding.html", request=request)
 
 
 @app.get("/team")
