@@ -331,8 +331,9 @@ button:hover{
 <script>
 const email = localStorage.getItem("ai_flow_email");
 const companyId = localStorage.getItem("ai_flow_company_id");
+const role = localStorage.getItem("ai_flow_role") || "";
 
-if (!email || !companyId) {
+if (!email || (!companyId && role !== "platform_admin")) {
   window.location.href = "/login";
 }
 
