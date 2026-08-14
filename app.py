@@ -6391,6 +6391,33 @@ def _fallback_social_draft(company_name: str, platform: str, draft_type: str, da
     return {"title": title, "caption": caption, "hook": hook, "hashtags": hashtags, "visual_idea": visual}
 
 
+def _recent_social_context(company_id: str, platform: str) -> str:
+    """Small history window used to avoid repetitive daily content."""
+    conn = get_db_connection()
+    if not conn:
+        return "No reliable performance or publishing history is available yet."
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT title, hook, status, publish_message
+                FROM v2_social_content_drafts
+                WHERE company_id = %s AND platform = %s
+                ORDER BY id DESC
+                LIMIT 12
+                """,
+                (company_id, platform),
+            )
+            rows = cur.fetchall()
+        if not rows:
+            return "No reliable performance or publishing history is available yet."
+        return json.dumps(rows, ensure_ascii=False)[:4000]
+    except Exception:
+        return "Publishing history could not be loaded. Do not invent performance data."
+    finally:
+        conn.close()
+
+
 def _generate_social_draft(company_id: str, platform: str, draft_type: str):
     """
     Returns dict with keys: title, caption, hook, hashtags, visual_idea.
@@ -6413,27 +6440,39 @@ def _generate_social_draft(company_id: str, platform: str, draft_type: str):
             conn.close()
 
     date_str = _today_utc_date_str()
+    recent_context = _recent_social_context(company_id, platform)
 
     api_key = os.getenv("GROQ_API_KEY")
     if api_key:
         try:
             client = Groq(api_key=api_key.strip())
             prompt = f"""
-Generate ONE social content draft for AI FLOW client.
+You are the organic growth operator inside AI FLOW. Create ONE publish-ready social post variant.
 
 Company: {company_name or "Client"}
 Platform: {platform}
-Draft type: {draft_type}
+Content slot: {draft_type}
 Date: {date_str}
+Recent content history: {recent_context}
 
 Return JSON ONLY with keys:
 title, caption, hook, hashtags, visual_idea
 
 Rules:
-- write in English
-- keep it short and clear
-- hashtags should be one string with # tags
-- caption can include short script if type is reel/video
+- Write in English only.
+- First reason silently about the audience's current pain, platform-native behavior,
+  and which angle is least repetitive. Never claim live trends or performance data
+  unless it appears in the supplied history.
+- Optimize for organic distribution: immediate specific hook, one useful idea,
+  easy-to-scan language, retention or save/share value, and one natural CTA.
+- Do not use engagement bait, fake urgency, unsupported statistics, spam, or promises
+  that a post will go viral.
+- Adapt to {platform}; do not reuse generic cross-platform wording.
+- The title is an internal label, not a caption headline.
+- Keep hashtags relevant and restrained: 3-6 tags in one string.
+- For Reel/video, caption must include a concise 12-20 second scene/script plan.
+- visual_idea must be production-ready: subject, composition, on-screen copy,
+  safe zones, and the first-frame hook.
 """
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -6457,7 +6496,7 @@ Rules:
 
 
 def _ensure_daily_social_drafts(company_id: str):
-    """Create at least 1 draft per day; we generate 1 per platform for a better MVP experience."""
+    """Create three daily content units, adapted for every supported platform."""
     today = _today_utc_date_str()
     now = _iso_z(datetime.utcnow())
 
@@ -6466,65 +6505,50 @@ def _ensure_daily_social_drafts(company_id: str):
         return False, "Database error"
 
     try:
-        # Create missing daily drafts (atomic-ish via INSERT ... SELECT ... WHERE NOT EXISTS).
+        # Three daily units: education, proof, and short-form video. Each gets a
+        # platform-native variant so clients do not spray identical copy everywhere.
         platforms = ["Facebook", "Instagram", "TikTok"]
+        daily_slots = ["Educational static", "Proof or case study", "Organic short-form Reel"]
         for platform in platforms:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM v2_social_content_drafts
-                    WHERE company_id = %s AND content_date = %s AND platform = %s
-                    LIMIT 1
-                    """,
-                    (company_id, today, platform),
-                )
-                already = cur.fetchone() is not None
-
-            if already:
-                continue
-
-            types = _SOCIAL_DRAFT_TYPES_BY_PLATFORM.get(platform) or ["AI tip"]
-            # Deterministic pick per day/platform.
-            idx = (int(today.replace("-", "")) + len(platform)) % len(types)
-            draft_type = types[idx]
-            draft = _generate_social_draft(company_id, platform, draft_type)
-
-            with conn.cursor() as cur:
-                # Prevent duplicates if multiple requests race.
-                cur.execute(
-                    """
-                    INSERT INTO v2_social_content_drafts (
-                        company_id, content_date, platform, draft_type,
-                        title, caption, hook, hashtags, visual_idea,
-                        status, publish_message, created_at, updated_at
+            for draft_type in daily_slots:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT 1 FROM v2_social_content_drafts
+                        WHERE company_id = %s AND content_date = %s
+                          AND platform = %s AND draft_type = %s
+                        LIMIT 1
+                        """,
+                        (company_id, today, platform, draft_type),
                     )
-                    SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM v2_social_content_drafts
-                        WHERE company_id = %s AND content_date = %s AND platform = %s
+                    already = cur.fetchone() is not None
+                if already:
+                    continue
+
+                draft = _generate_social_draft(company_id, platform, draft_type)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO v2_social_content_drafts (
+                            company_id, content_date, platform, draft_type,
+                            title, caption, hook, hashtags, visual_idea,
+                            status, publish_message, created_at, updated_at
+                        )
+                        SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM v2_social_content_drafts
+                            WHERE company_id = %s AND content_date = %s
+                              AND platform = %s AND draft_type = %s
+                        )
+                        """,
+                        (
+                            company_id, today, platform, draft_type,
+                            draft.get("title") or "", draft.get("caption") or "",
+                            draft.get("hook") or "", draft.get("hashtags") or "",
+                            draft.get("visual_idea") or "", "draft", "", now, now,
+                            company_id, today, platform, draft_type,
+                        ),
                     )
-                    """,
-                    (
-                        company_id,
-                        today,
-                        platform,
-                        draft_type,
-                        draft.get("title") or "",
-                        draft.get("caption") or "",
-                        draft.get("hook") or "",
-                        draft.get("hashtags") or "",
-                        draft.get("visual_idea") or "",
-                        "draft",
-                        "",
-                        now,
-                        now,
-                        company_id,
-                        today,
-                        platform,
-                    ),
-                )
 
         conn.commit()
         return True, ""
