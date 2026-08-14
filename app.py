@@ -474,6 +474,7 @@ def init_db():
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'")
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data TEXT DEFAULT ''")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
 
@@ -1760,6 +1761,53 @@ def api_me(request: Request):
     except Exception:
         active_company_id = ""
     return JSONResponse({"success": True, "user": user, "activeCompanyId": active_company_id})
+
+
+@app.get("/api/profile/avatar")
+def get_profile_avatar(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT avatar_data FROM users WHERE email = %s", ((user.get("email") or "").strip().lower(),))
+            row = cur.fetchone() or {}
+        return JSONResponse({"success": True, "avatar": row.get("avatar_data") or ""})
+    finally:
+        conn.close()
+
+
+@app.post("/api/profile/avatar")
+async def save_profile_avatar(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    data = await request.json()
+    avatar = str(data.get("avatar") or "").strip()
+    allowed = ("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,")
+    if not avatar.startswith(allowed):
+        return json_error("Use a PNG, JPEG, or WebP image", 400)
+    if len(avatar) > 1_450_000:
+        return json_error("Avatar must be smaller than 1 MB", 400)
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET avatar_data = %s, updated_at = %s WHERE email = %s",
+                (avatar, now_utc_iso(), (user.get("email") or "").strip().lower()),
+            )
+        conn.commit()
+        return JSONResponse({"success": True})
+    except Exception:
+        conn.rollback()
+        return json_error("Could not save avatar", 500)
+    finally:
+        conn.close()
 
 
 @app.get("/api/platform-info")

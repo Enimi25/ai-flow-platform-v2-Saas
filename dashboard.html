@@ -628,13 +628,24 @@ const userAvatar = document.getElementById("userAvatar");
 const avatarInput = document.getElementById("avatarInput");
 const savedAvatar = localStorage.getItem("ai_flow_avatar");
 if(savedAvatar) userAvatar.src = savedAvatar;
+fetch("/api/profile/avatar", {credentials:"same-origin"}).then(r => r.json()).then(data => {
+  if(data && data.avatar){ userAvatar.src = data.avatar; localStorage.setItem("ai_flow_avatar", data.avatar); }
+}).catch(() => {});
 userAvatar.addEventListener("click", () => avatarInput.click());
 avatarInput.addEventListener("change", () => {
   const file = avatarInput.files && avatarInput.files[0];
   if(!file) return;
   if(file.size > 1024 * 1024){ setMessage("Avatar must be smaller than 1 MB."); return; }
   const reader = new FileReader();
-  reader.onload = () => { userAvatar.src = reader.result; localStorage.setItem("ai_flow_avatar", reader.result); setMessage("Avatar updated."); };
+  reader.onload = async () => {
+    userAvatar.src = reader.result;
+    localStorage.setItem("ai_flow_avatar", reader.result);
+    try{
+      const res = await fetch("/api/profile/avatar", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify({avatar:reader.result})});
+      const data = await res.json();
+      setMessage(res.ok && data.success ? "Avatar updated." : (data.error || "Could not save avatar."));
+    }catch(e){ setMessage("Could not save avatar."); }
+  };
   reader.readAsDataURL(file);
 });
 
