@@ -446,6 +446,15 @@ button{
         <strong id="workspaceStatus" style="color:#4ade80;">—</strong>
       </div>
 
+      <h2 style="margin-top:22px;">AI FLOW Company</h2>
+      <div class="row"><span>Operator</span><strong id="platformCompanyName">—</strong></div>
+      <div class="row"><span>Country</span><strong id="platformCountry">—</strong></div>
+      <div class="row"><span>Address</span><strong id="platformAddress">—</strong></div>
+      <div class="row"><span>Support</span><strong id="platformSupportEmail">—</strong></div>
+      <div class="row"><span>Backup</span><strong id="platformBackupEmail">—</strong></div>
+      <div class="row"><span>Phone</span><strong id="platformPhone">—</strong></div>
+      <div class="row"><span>Registration</span><strong id="platformRegistration">—</strong></div>
+
       <button class="dark" onclick="goTeam()" style="margin-top:12px;">Manage Team</button>
       <button class="dark" onclick="resetSettings()" style="margin-top:18px;">Reset Demo Settings</button>
 
@@ -596,6 +605,18 @@ async function initSettings(){
     document.getElementById("clientEmail").innerText = email || "Account";
     document.getElementById("workspaceEmail").innerText = email || "—";
     document.getElementById("workspaceCompany").innerText = companyId || "Select a business";
+    try{
+      const infoRes = await fetch("/api/platform-info", {credentials:"same-origin"});
+      const info = await infoRes.json();
+      const company = info.company || {};
+      document.getElementById("platformCompanyName").innerText = company.companyName || "—";
+      document.getElementById("platformCountry").innerText = company.country || "—";
+      document.getElementById("platformAddress").innerText = company.address || "—";
+      document.getElementById("platformSupportEmail").innerText = company.supportEmail || "—";
+      document.getElementById("platformBackupEmail").innerText = company.backupEmail || "—";
+      document.getElementById("platformPhone").innerText = company.phone || "—";
+      document.getElementById("platformRegistration").innerText = company.registrationStatus || "—";
+    }catch(e){}
     if(!companyId){
       document.getElementById("workspaceMsg").innerText = "Select a business workspace from Dashboard.";
       return;
