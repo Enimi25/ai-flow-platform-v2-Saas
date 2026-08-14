@@ -765,6 +765,41 @@ Want to see it on your website or WhatsApp? Message us.
     <div class="hint" id="metaQuickPublishMessage">Reconnect Meta once if publishing permissions were added after the original connection.</div>
   </div>
 
+  <div class="card publisher-card" id="tiktokQuickPublisher">
+    <div class="publisher-head">
+      <div>
+        <span class="pill">TikTok Direct Post</span>
+        <h2>Publish TikTok Photo Post</h2>
+        <div class="hint">TikTok requires current creator settings and explicit confirmation before every Direct Post.</div>
+      </div>
+      <span class="pill" id="tiktokPublisherStatus">Check account</span>
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="tiktokPhotoUrl">Public photo URL</label>
+      <input id="tiktokPhotoUrl" value="https://ai-flow-platform-v2-saas.onrender.com/media/social/2026-08-14/ai-flow-post-01.png">
+    </div>
+    <div class="form-grid" style="margin-top:14px;">
+      <div class="field">
+        <label for="tiktokPostTitle">Title</label>
+        <input id="tiktokPostTitle" value="Your AI Sales Department">
+      </div>
+      <div class="field">
+        <label for="tiktokPrivacyLevel">Privacy</label>
+        <select id="tiktokPrivacyLevel"><option value="">Load creator options first</option></select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="tiktokDescription">Description</label>
+      <textarea id="tiktokDescription">AI FLOW replies, qualifies, follows up and books appointments 24/7. #AIFlow #AISales #BusinessAutomation</textarea>
+    </div>
+    <div class="action-row">
+      <button class="dark" onclick="loadTikTokCreatorInfo()">Load Creator Settings</button>
+      <label><input type="checkbox" id="tiktokPublishConfirmed"> I reviewed this post and confirm publishing</label>
+      <button class="green" onclick="publishTikTokPhoto()">Publish to TikTok</button>
+    </div>
+    <div class="hint" id="tiktokPublishMessage">Reconnect TikTok after video.publish is approved. Unaudited apps can publish private posts only.</div>
+  </div>
+
   <div class="card publisher-card" id="instagramPublisher">
     <div class="publisher-head">
       <div>
@@ -1337,6 +1372,74 @@ async function publishStaticCampaign(){
     setMetaQuickPublishMessage(summary || data.error || out.text || "Publish failed.");
   }catch(e){
     setMetaQuickPublishMessage("Publish request failed.");
+  }
+}
+
+function setTikTokPublishMessage(text){
+  const el = document.getElementById("tiktokPublishMessage");
+  if(el) el.innerText = text;
+}
+
+async function loadTikTokCreatorInfo(){
+  if(!companyId){
+    setTikTokPublishMessage("Select a company first.");
+    return;
+  }
+  setTikTokPublishMessage("Loading current TikTok creator settings...");
+  try{
+    const res = await fetch("/api/tiktok/creator-info?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setTikTokPublishMessage(data.error || out.text || "TikTok creator settings failed.");
+      return;
+    }
+    const creator = data.creator || {};
+    const options = creator.privacy_level_options || [];
+    const select = document.getElementById("tiktokPrivacyLevel");
+    if(select){
+      select.innerHTML = options.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    }
+    const status = document.getElementById("tiktokPublisherStatus");
+    if(status){ status.innerText = "Ready"; status.classList.add("connected"); }
+    setTikTokPublishMessage(options.length ? "Review the post, choose privacy, then confirm publishing." : "TikTok returned no available privacy options.");
+  }catch(e){
+    setTikTokPublishMessage("TikTok creator settings failed.");
+  }
+}
+
+async function publishTikTokPhoto(){
+  if(!companyId){
+    setTikTokPublishMessage("Select a company first.");
+    return;
+  }
+  const confirmed = document.getElementById("tiktokPublishConfirmed")?.checked === true;
+  if(!confirmed){
+    setTikTokPublishMessage("Review the post and explicitly confirm before publishing.");
+    return;
+  }
+  const payload = {
+    companyId,
+    confirmed:true,
+    photoUrl:(document.getElementById("tiktokPhotoUrl")?.value || "").trim(),
+    title:(document.getElementById("tiktokPostTitle")?.value || "").trim(),
+    description:(document.getElementById("tiktokDescription")?.value || "").trim(),
+    privacyLevel:(document.getElementById("tiktokPrivacyLevel")?.value || "").trim()
+  };
+  setTikTokPublishMessage("Sending approved post to TikTok...");
+  try{
+    const res = await fetch("/api/tiktok/publish-photo", {
+      method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setTikTokPublishMessage(data.error || out.text || "TikTok publish failed.");
+      return;
+    }
+    setTikTokPublishMessage("TikTok accepted the post. Publish ID: " + (data.publishId || "pending") + ". Processing must complete before it counts as published.");
+  }catch(e){
+    setTikTokPublishMessage("TikTok publish failed.");
   }
 }
 

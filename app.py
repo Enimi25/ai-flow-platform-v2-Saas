@@ -5660,12 +5660,14 @@ Connected. You can close this tab.
 
 
 @app.get("/api/tiktok/account")
-def tiktok_account(companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+def tiktok_account(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request, companyId, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     conn = get_db_connection()
     if not conn:
@@ -5692,6 +5694,180 @@ def tiktok_account(companyId: str = ""):
         return JSONResponse({"error": "TikTok account error"}, status_code=500)
     finally:
         conn.close()
+
+
+def _tiktok_company_token(company_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return "", "", "Database error"
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT access_token, scope
+                FROM v2_social_tokens
+                WHERE company_id = %s AND provider = 'tiktok'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (company_id,),
+            )
+            row = cur.fetchone()
+        if not row or not (row.get("access_token") or "").strip():
+            return "", "", "TikTok is not connected"
+        return (row.get("access_token") or "").strip(), (row.get("scope") or "").strip(), ""
+    except Exception:
+        return "", "", "TikTok token lookup error"
+    finally:
+        conn.close()
+
+
+def _tiktok_post_json(path: str, access_token: str, payload: dict):
+    url = "https://open.tiktokapis.com" + path
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+            "User-Agent": "AI-FLOW/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace") or "{}")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw or "{}")
+        except Exception:
+            data = {}
+        return data, f"TikTok API HTTP {exc.code}"
+    except Exception as exc:
+        return {}, f"TikTok API request error: {type(exc).__name__}"
+    error = data.get("error") or {}
+    code = str(error.get("code") or "ok")
+    if code not in {"", "ok"}:
+        return data, str(error.get("message") or code)[:500]
+    return data, ""
+
+
+def _resolve_tiktok_write_company(request: Request, provided_company_id: str):
+    company_id, user, err = resolve_company_id(
+        request, provided_company_id, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return "", err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return "", json_error("Forbidden", 403)
+    return company_id, None
+
+
+@app.get("/api/tiktok/creator-info")
+def tiktok_creator_info(request: Request, companyId: str = ""):
+    company_id, err = _resolve_tiktok_write_company(request, companyId)
+    if err:
+        return err
+    token, scope, token_err = _tiktok_company_token(company_id)
+    if token_err:
+        return json_error(token_err, 400)
+    if "video.publish" not in scope:
+        return json_error("Reconnect TikTok and grant video.publish", 400)
+    data, api_err = _tiktok_post_json("/v2/post/publish/creator_info/query/", token, {})
+    if api_err:
+        return JSONResponse({"error": api_err, "detail": data.get("error") or {}}, status_code=400)
+    return JSONResponse({"success": True, "creator": data.get("data") or {}})
+
+
+@app.post("/api/tiktok/publish-photo")
+async def tiktok_publish_photo(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_tiktok_write_company(
+        request, (data.get("companyId") or "").strip()
+    )
+    if err:
+        return err
+    if data.get("confirmed") is not True:
+        return json_error("Explicit confirmation is required before posting to TikTok", 400)
+
+    photo_url = str(data.get("photoUrl") or "").strip()
+    title = str(data.get("title") or "").strip()[:90]
+    description = str(data.get("description") or "").strip()[:2200]
+    privacy_level = str(data.get("privacyLevel") or "SELF_ONLY").strip()
+    if _validate_instagram_public_urls([photo_url]):
+        return json_error("A public photo URL is required", 400)
+
+    token, scope, token_err = _tiktok_company_token(company_id)
+    if token_err:
+        return json_error(token_err, 400)
+    if "video.publish" not in scope:
+        return json_error("Reconnect TikTok and grant video.publish", 400)
+
+    creator_response, creator_err = _tiktok_post_json(
+        "/v2/post/publish/creator_info/query/", token, {}
+    )
+    if creator_err:
+        return JSONResponse({"error": creator_err, "detail": creator_response.get("error") or {}}, status_code=400)
+    creator = creator_response.get("data") or {}
+    allowed_privacy = creator.get("privacy_level_options") or []
+    if privacy_level not in allowed_privacy:
+        return JSONResponse(
+            {
+                "error": "Selected TikTok privacy level is unavailable",
+                "allowedPrivacyLevels": allowed_privacy,
+            },
+            status_code=400,
+        )
+
+    payload = {
+        "post_info": {
+            "title": title,
+            "description": description,
+            "disable_comment": bool(data.get("disableComment", False)),
+            "privacy_level": privacy_level,
+            "auto_add_music": bool(data.get("autoAddMusic", False)),
+        },
+        "source_info": {
+            "source": "PULL_FROM_URL",
+            "photo_cover_index": 0,
+            "photo_images": [photo_url],
+        },
+        "post_mode": "DIRECT_POST",
+        "media_type": "PHOTO",
+    }
+    published, publish_err = _tiktok_post_json("/v2/post/publish/content/init/", token, payload)
+    if publish_err:
+        return JSONResponse({"error": publish_err, "detail": published.get("error") or {}}, status_code=400)
+    publish_id = str((published.get("data") or {}).get("publish_id") or "").strip()
+    return JSONResponse(
+        {
+            "success": bool(publish_id),
+            "publishId": publish_id,
+            "message": "TikTok is processing the post. Check publish status before reporting success.",
+        }
+    )
+
+
+@app.post("/api/tiktok/publish-status")
+async def tiktok_publish_status(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_tiktok_write_company(
+        request, (data.get("companyId") or "").strip()
+    )
+    if err:
+        return err
+    publish_id = str(data.get("publishId") or "").strip()
+    if not publish_id:
+        return json_error("publishId is required", 400)
+    token, scope, token_err = _tiktok_company_token(company_id)
+    if token_err:
+        return json_error(token_err, 400)
+    result, api_err = _tiktok_post_json(
+        "/v2/post/publish/status/fetch/", token, {"publish_id": publish_id}
+    )
+    if api_err:
+        return JSONResponse({"error": api_err, "detail": result.get("error") or {}}, status_code=400)
+    return JSONResponse({"success": True, "status": result.get("data") or {}})
 
 
 @app.post("/api/tiktok/disconnect")
