@@ -11,6 +11,7 @@ import hmac
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import json
 import secrets
 import urllib.parse
@@ -21,6 +22,9 @@ import uuid
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import stripe
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
 
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -550,6 +554,22 @@ def init_db():
                     meeting_link TEXT DEFAULT '',
                     status TEXT DEFAULT 'booked',
                     created_at TEXT DEFAULT ''
+                );
+                """
+            )
+            cur.execute("ALTER TABLE v2_bookings ADD COLUMN IF NOT EXISTS service TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_bookings ADD COLUMN IF NOT EXISTS address TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_bookings ADD COLUMN IF NOT EXISTS calendar_event_id TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE v2_bookings ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'awaiting_payment'")
+
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_google_calendar_tokens (
+                    company_id TEXT PRIMARY KEY,
+                    token_json TEXT NOT NULL DEFAULT '{}',
+                    calendar_id TEXT DEFAULT 'primary',
+                    timezone TEXT DEFAULT 'Asia/Bangkok',
+                    updated_at TEXT DEFAULT ''
                 );
                 """
             )
@@ -5445,6 +5465,219 @@ async def tiktok_disconnect(request: Request):
 # =========================================================
 # BOOKINGS / CALENDAR
 # =========================================================
+
+GOOGLE_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+
+def _google_calendar_flow(state: str = ""):
+    client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip()
+    client_secret = (os.getenv("GOOGLE_CLIENT_SECRET") or "").strip()
+    redirect_uri = (os.getenv("GOOGLE_REDIRECT_URI") or "").strip()
+    if not client_id or not client_secret or not redirect_uri:
+        return None
+    config = {
+        "web": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [redirect_uri],
+        }
+    }
+    return Flow.from_client_config(
+        config,
+        scopes=GOOGLE_CALENDAR_SCOPES,
+        redirect_uri=redirect_uri,
+        state=state or None,
+    )
+
+
+def _google_calendar_service(company_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return None, "Database unavailable", "primary", "Asia/Bangkok"
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT token_json, calendar_id, timezone FROM v2_google_calendar_tokens WHERE company_id = %s",
+                (company_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None, "Google Calendar is not connected", "primary", "Asia/Bangkok"
+        info = json.loads(row.get("token_json") or "{}")
+        credentials = Credentials.from_authorized_user_info(info, GOOGLE_CALENDAR_SCOPES)
+        service = build("calendar", "v3", credentials=credentials, cache_discovery=False)
+        return service, "", row.get("calendar_id") or "primary", row.get("timezone") or "Asia/Bangkok"
+    except Exception as e:
+        print("GOOGLE CALENDAR SERVICE ERROR:", str(e))
+        return None, "Google Calendar connection error", "primary", "Asia/Bangkok"
+    finally:
+        conn.close()
+
+
+@app.get("/connect/google-calendar")
+def connect_google_calendar(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request, companyId, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+    flow = _google_calendar_flow()
+    if not flow:
+        return json_error("Google OAuth is not configured", 503)
+    state = _create_oauth_state("google", company_id, include_company_prefix=True)
+    request.session["google_calendar_state"] = state
+    authorization_url, _ = flow.authorization_url(
+        access_type="offline", include_granted_scopes="true", prompt="consent", state=state
+    )
+    return RedirectResponse(authorization_url, status_code=302)
+
+
+@app.get("/google-calendar/callback")
+def google_calendar_callback(request: Request, code: str = "", state: str = ""):
+    if not code or not state or state != request.session.get("google_calendar_state"):
+        return json_error("Invalid Google OAuth state", 400)
+    company_id, state_error = _verify_signed_oauth_state(state, "google")
+    if state_error or not company_id:
+        return json_error("Invalid or expired Google OAuth state", 400)
+    flow = _google_calendar_flow(state)
+    if not flow:
+        return json_error("Google OAuth is not configured", 503)
+    try:
+        flow.fetch_token(code=code)
+        token_json = flow.credentials.to_json()
+        conn = get_db_connection()
+        if not conn:
+            return json_error("Database unavailable", 503)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO v2_google_calendar_tokens (company_id, token_json, updated_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (company_id) DO UPDATE SET token_json = EXCLUDED.token_json, updated_at = EXCLUDED.updated_at
+                    """,
+                    (company_id, token_json, now_utc_iso()),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        request.session.pop("google_calendar_state", None)
+        return RedirectResponse("/calendar?google=connected", status_code=302)
+    except Exception as e:
+        print("GOOGLE CALENDAR CALLBACK ERROR:", str(e))
+        return json_error("Google Calendar connection failed", 500)
+
+
+@app.get("/api/booking/availability")
+def public_booking_availability(companyId: str = "", days: int = 7):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return json_error("Missing companyId", 400)
+    service, error, calendar_id, timezone_name = _google_calendar_service(company_id)
+    if not service:
+        return json_error(error, 409)
+    days = max(1, min(int(days or 7), 14))
+    tz = ZoneInfo(timezone_name)
+    now = datetime.now(tz)
+    end = now + timedelta(days=days)
+    try:
+        busy_result = service.freebusy().query(
+            body={
+                "timeMin": now.isoformat(),
+                "timeMax": end.isoformat(),
+                "timeZone": timezone_name,
+                "items": [{"id": calendar_id}],
+            }
+        ).execute()
+        busy = busy_result.get("calendars", {}).get(calendar_id, {}).get("busy", [])
+        busy_ranges = [
+            (datetime.fromisoformat(x["start"].replace("Z", "+00:00")), datetime.fromisoformat(x["end"].replace("Z", "+00:00")))
+            for x in busy
+        ]
+        slots = []
+        day = now.date()
+        while day <= end.date() and len(slots) < 12:
+            for hour in (9, 10, 11, 13, 14, 15, 16):
+                start = datetime(day.year, day.month, day.day, hour, 0, tzinfo=tz)
+                finish = start + timedelta(hours=1)
+                if start <= now + timedelta(minutes=30):
+                    continue
+                if not any(start < b_end and finish > b_start for b_start, b_end in busy_ranges):
+                    slots.append({"start": start.isoformat(), "end": finish.isoformat(), "label": start.strftime("%a %d %b, %H:%M")})
+                if len(slots) >= 12:
+                    break
+            day += timedelta(days=1)
+        return JSONResponse({"success": True, "timezone": timezone_name, "slots": slots})
+    except Exception as e:
+        print("GOOGLE AVAILABILITY ERROR:", str(e))
+        return json_error("Could not read Google Calendar availability", 502)
+
+
+@app.get("/api/booking/status")
+def public_booking_status(companyId: str = ""):
+    company_id = (companyId or "").strip()
+    if not company_id:
+        return json_error("Missing companyId", 400)
+    service, error, _calendar_id, timezone_name = _google_calendar_service(company_id)
+    return JSONResponse({"companyId": company_id, "googleConnected": bool(service), "timezone": timezone_name, "error": "" if service else error})
+
+
+@app.post("/api/booking/create")
+async def public_booking_create(request: Request):
+    data = await request.json()
+    company_id = (data.get("companyId") or "").strip()
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    address = (data.get("address") or "").strip()
+    service_name = (data.get("service") or "Appointment").strip()
+    start_raw = (data.get("start") or "").strip()
+    if not company_id or not name or not email or not phone or not start_raw:
+        return json_error("Name, email, phone and appointment time are required", 400)
+    service, error, calendar_id, timezone_name = _google_calendar_service(company_id)
+    if not service:
+        return json_error(error, 409)
+    try:
+        start = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+        end = start + timedelta(hours=1)
+        event = service.events().insert(
+            calendarId=calendar_id,
+            sendUpdates="all",
+            body={
+                "summary": f"{service_name} — {name}",
+                "description": "Booked through AI FLOW",
+                "location": address,
+                "start": {"dateTime": start.isoformat(), "timeZone": timezone_name},
+                "end": {"dateTime": end.isoformat(), "timeZone": timezone_name},
+                "attendees": [{"email": email}],
+            },
+        ).execute()
+        conn = get_db_connection()
+        if not conn:
+            return json_error("Database unavailable", 503)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO v2_bookings
+                    (company_id, client_name, email, phone, meeting_time, meeting_link, status, created_at,
+                     service, address, calendar_event_id, payment_status)
+                    VALUES (%s,%s,%s,%s,%s,%s,'booked',%s,%s,%s,%s,'awaiting_payment') RETURNING id
+                    """,
+                    (company_id, name, email, phone, start.isoformat(), event.get("htmlLink") or "", now_utc_iso(), service_name, address, event.get("id") or ""),
+                )
+                booking_id = cur.fetchone()[0]
+            conn.commit()
+        finally:
+            conn.close()
+        return JSONResponse({"success": True, "bookingId": booking_id, "calendarEvent": event.get("htmlLink"), "paymentStatus": "awaiting_payment"})
+    except Exception as e:
+        print("PUBLIC BOOKING ERROR:", str(e))
+        return json_error("Could not create booking", 502)
 
 @app.get("/bookings-data")
 def bookings_data(request: Request, companyId: str = ""):

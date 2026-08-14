@@ -50,6 +50,8 @@
   const DEFAULT_CHAT_API = origin + "/chat";
   const DEFAULT_CREATE_LEAD_API = origin + "/create-lead";
   const DEFAULT_WIDGET_SETTINGS_API = origin + "/widget-settings";
+  const BOOKING_AVAILABILITY_API = origin + "/api/booking/availability";
+  const BOOKING_CREATE_API = origin + "/api/booking/create";
 
   const API = config.apiUrl || DEFAULT_CHAT_API;
   const CREATE_LEAD_API = config.createLeadUrl || DEFAULT_CREATE_LEAD_API;
@@ -238,6 +240,10 @@
       border-color: rgba(124, 58, 237, 0.45);
     }
 
+    #aiw-booking { display:none; padding:12px; background:#101018; border-top:1px solid rgba(255,255,255,.08); }
+    #aiw-booking input, #aiw-booking select { width:100%; margin:4px 0; padding:10px 11px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#181823; color:#fff; }
+    #aiw-booking button { width:100%; margin-top:7px; padding:11px; border:0; border-radius:12px; background:linear-gradient(135deg,#7c3aed,#4f46e5); color:#fff; font-weight:900; cursor:pointer; }
+
     #aiw-input-wrap {
       display: flex;
       gap: 10px;
@@ -322,6 +328,15 @@
       <button class="aiw-qbtn" type="button" data-text="Pay">Pay</button>
     </div>
 
+    <form id="aiw-booking">
+      <select id="aiw-slot" required><option value="">Loading available times…</option></select>
+      <input id="aiw-name" placeholder="Full name" required />
+      <input id="aiw-phone" placeholder="Phone" required />
+      <input id="aiw-email" type="email" placeholder="Email" required />
+      <input id="aiw-address" placeholder="Address (optional)" />
+      <button type="submit">Confirm appointment</button>
+    </form>
+
     <div id="aiw-input-wrap">
       <input id="aiw-input" placeholder="Type your message..." autocomplete="off" />
       <button id="aiw-send" type="button">→</button>
@@ -335,6 +350,8 @@
   const input = box.querySelector("#aiw-input");
   const sendBtn = box.querySelector("#aiw-send");
   const closeBtn = box.querySelector("#aiw-close");
+  const bookingForm = box.querySelector("#aiw-booking");
+  const slotSelect = box.querySelector("#aiw-slot");
   let greeted = false;
 
   async function loadWidgetSettings() {
@@ -511,6 +528,62 @@
     }
   }
 
+  async function openBooking() {
+    if (!companyId) {
+      addMessage("Booking is not configured for this website.", "system");
+      return;
+    }
+    bookingForm.style.display = "block";
+    slotSelect.innerHTML = '<option value="">Loading available times…</option>';
+    try {
+      const res = await fetch(BOOKING_AVAILABILITY_API + "?companyId=" + encodeURIComponent(companyId));
+      const data = await res.json();
+      if (!res.ok || !data.slots || !data.slots.length) {
+        throw new Error(data.error || "No times available");
+      }
+      slotSelect.innerHTML = '<option value="">Choose a time (' + data.timezone + ')</option>' +
+        data.slots.slice(0, 6).map(function (s) {
+          return '<option value="' + s.start + '">' + s.label + '</option>';
+        }).join("");
+      addMessage("Choose one of the nearest available times and enter your contact details.", "bot");
+    } catch (e) {
+      bookingForm.style.display = "none";
+      addMessage(e.message || "Calendar is not connected yet.", "system");
+    }
+  }
+
+  bookingForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const submit = bookingForm.querySelector("button");
+    submit.disabled = true;
+    try {
+      const res = await fetch(BOOKING_CREATE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: companyId,
+          start: slotSelect.value,
+          name: box.querySelector("#aiw-name").value.trim(),
+          phone: box.querySelector("#aiw-phone").value.trim(),
+          email: box.querySelector("#aiw-email").value.trim(),
+          address: box.querySelector("#aiw-address").value.trim(),
+          service: offer || "Appointment"
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Booking failed");
+      bookingForm.style.display = "none";
+      addMessage("Appointment confirmed. A Google Calendar invitation was sent to your email. Payment is the next step.", "bot");
+      if (paymentLink && paymentLink.indexOf("test_your_payment_link") === -1) {
+        window.open(paymentLink, "_blank");
+      }
+    } catch (err) {
+      addMessage(err.message || "Could not create booking.", "system");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   btn.addEventListener("click", toggleWidget);
   closeBtn.addEventListener("click", closeWidget);
 
@@ -531,6 +604,10 @@
   box.querySelectorAll(".aiw-qbtn").forEach(function (quickBtn) {
     quickBtn.addEventListener("click", function () {
       const text = quickBtn.getAttribute("data-text");
+      if (text === "Book") {
+        openBooking();
+        return;
+      }
       sendMessage(text);
     });
   });

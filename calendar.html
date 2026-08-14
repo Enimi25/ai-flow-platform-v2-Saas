@@ -298,6 +298,12 @@ button:hover{
   </div>
   <div class="grid">
     <div class="card">
+      <h2>Google Calendar</h2>
+      <div id="googleCalendarStatus" class="empty">Checking connection…</div>
+      <button id="googleCalendarConnectBtn" onclick="connectGoogleCalendar()">Connect Google Calendar</button>
+      <div class="msg">The website widget uses this calendar to show free times and create client appointments.</div>
+    </div>
+    <div class="card">
       <h2>Create Booking</h2>
       <label>Client Name</label>
       <input id="clientName" placeholder="John Smith">
@@ -351,6 +357,31 @@ function logout(){
 
 function setMsg(text){
   document.getElementById("msg").innerText = text;
+}
+
+function connectGoogleCalendar(){
+  window.location.href = "/connect/google-calendar?companyId=" + encodeURIComponent(companyId);
+}
+
+async function loadGoogleCalendarStatus(){
+  const statusEl = document.getElementById("googleCalendarStatus");
+  const button = document.getElementById("googleCalendarConnectBtn");
+  try{
+    const res = await fetch("/api/booking/status?companyId=" + encodeURIComponent(companyId), {
+      credentials:"same-origin"
+    });
+    const data = await res.json();
+    if(res.ok && data.connected){
+      statusEl.innerText = "Connected · " + (data.timezone || "Asia/Bangkok");
+      statusEl.className = "status";
+      button.innerText = "Reconnect Google Calendar";
+      return;
+    }
+    statusEl.innerText = data.error || "Not connected";
+    button.innerText = "Connect Google Calendar";
+  }catch(e){
+    statusEl.innerText = "Could not check Google Calendar status.";
+  }
 }
 
 async function loadBookings(){
@@ -548,6 +579,7 @@ function renderBookings(){
   });
 }
 
+loadGoogleCalendarStatus();
 loadBookings();
 </script>
 

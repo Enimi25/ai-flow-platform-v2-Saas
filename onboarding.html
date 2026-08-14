@@ -257,6 +257,18 @@
       </div>
 
       <div class="card" style="grid-column:1/-1;">
+        <h2>Connect Your Business</h2>
+        <div class="msg" style="margin-bottom:14px;">Connect each provider once. AI FLOW stores access securely and never asks clients to paste social-media passwords.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;">
+          <button class="btn green" type="button" onclick="connectMeta()">Connect Facebook + Instagram</button>
+          <button class="btn green" type="button" onclick="connectWhatsApp()">Connect WhatsApp</button>
+          <button class="btn green" type="button" onclick="connectTikTok()">Connect TikTok</button>
+          <button class="btn green" type="button" onclick="connectGoogleCalendar()">Connect Google Calendar</button>
+        </div>
+        <div class="msg" id="integrationMsg" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card" style="grid-column:1/-1;">
         <h2>Website Widget Code</h2>
         <div id="widgetCode" class="code"></div>
         <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
@@ -284,6 +296,43 @@
 
   function setMsg(t){document.getElementById("msg").innerText = t;}
   function setCopy(t){document.getElementById("copyMsg").innerText = t;}
+  function setIntegrationMsg(t){document.getElementById("integrationMsg").innerText = t;}
+
+  function connectMeta(){
+    window.location.href = "/api/meta/connect?companyId=" + encodeURIComponent(companyId);
+  }
+
+  function connectGoogleCalendar(){
+    window.location.href = "/connect/google-calendar?companyId=" + encodeURIComponent(companyId);
+  }
+
+  async function connectTikTok(){
+    setIntegrationMsg("Preparing TikTok connection…");
+    try{
+      const res = await fetch("/tiktok-connect-url?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const data = await res.json();
+      if(!res.ok || !data.auth_url) throw new Error(data.detail || data.error || "TikTok is not configured yet.");
+      window.location.href = data.auth_url;
+    }catch(e){
+      setIntegrationMsg(e.message || "Could not start TikTok connection.");
+    }
+  }
+
+  async function connectWhatsApp(){
+    setIntegrationMsg("Preparing WhatsApp connection…");
+    try{
+      const res = await fetch("/whatsapp-connect-url?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+      const data = await res.json();
+      if(!res.ok || data.success === false) throw new Error(data.detail || data.error || "WhatsApp is not configured yet.");
+      if(data.auth_url){
+        window.location.href = data.auth_url;
+        return;
+      }
+      setIntegrationMsg(data.message || "WhatsApp is configured.");
+    }catch(e){
+      setIntegrationMsg(e.message || "Could not start WhatsApp connection.");
+    }
+  }
 
   function widgetSnippet(){
     const src = window.location.origin + "/widget.js";
