@@ -456,13 +456,13 @@ td{
   <div class="logo"><img class="ai-flow-brand-icon" src="/media/brand/ai-flow-app-icon.png" alt="AI FLOW logo"><span style="color:#f7fbff">AI <span>FLOW</span></span></div>
 
   <div class="menu">
-    <a href="/dashboard" class="active">Dashboard</a>
+    <a href="/dashboard" class="active">Overview</a>
     <a href="/leads-page">Leads</a>
-    <a href="/content-factory">Content Factory</a>
-    <a href="/social-accounts">Social Accounts</a>
-    <a href="/ai-replies">AI Replies</a>
-    <a href="/analytics">Analytics</a>
+    <a href="/ai-replies">Conversations</a>
     <a href="/calendar">Calendar</a>
+    <a href="/content-factory">Content</a>
+    <a href="/social-accounts">Connections</a>
+    <a href="/analytics">Analytics</a>
     <a href="/billing">Billing</a>
     <a href="/settings">Settings</a>
   </div>
@@ -471,7 +471,7 @@ td{
 <div class="main">
 
   <div class="topbar">
-    <input class="search" placeholder="Search leads, campaigns, content..." />
+    <div style="font-weight:900;letter-spacing:-.02em;">AI FLOW Workspace</div>
 
     <div class="user-box">
       <div>
@@ -491,30 +491,28 @@ td{
 
   <div class="content">
 
-    <div class="title">Client Dashboard</div>
+    <div class="title">Overview</div>
 
     <div class="subtitle">
-      Real CRM data from PostgreSQL: leads, posts, bookings and Content Factory.
+      Your sales activity at a glance.
     </div>
 
     <div id="platformAdminCompanyBox" class="box" style="margin-top:16px;display:none;">
       <h2 style="font-size:18px;margin-bottom:10px;">Platform Admin</h2>
-      <div style="color:var(--muted);margin-top:-2px;margin-bottom:12px;line-height:1.5;">
-        You are viewing a company dashboard. Select a company to load real data.
-      </div>
+      <div style="color:var(--muted);margin-top:-2px;margin-bottom:12px;line-height:1.5;">Choose the workspace you want to manage.</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
         <select id="platformCompanySelect" class="search" style="max-width:520px;">
           <option value="">Loading companies...</option>
         </select>
-        <button class="dark-btn" onclick="applyPlatformCompany()">View Company</button>
-        <button class="dark-btn" onclick="goAdmin()" id="goAdminBtn" style="display:none;">Platform Admin Dashboard</button>
+        <button class="dark-btn" onclick="applyPlatformCompany()">Open Workspace</button>
+        <button class="dark-btn" onclick="goAdmin()" id="goAdminBtn" style="display:none;">Admin</button>
       </div>
       <div id="platformAdminMsg" class="msg" style="margin-top:12px;"></div>
     </div>
 
     <div class="action-row">
-      <button class="dark-btn" onclick="loadDashboardData()">Refresh Data</button>
-      <button class="green-btn" onclick="goContentFactory()">Generate AI Post</button>
+      <a class="green-btn" href="/leads-page" style="text-decoration:none;display:inline-flex;align-items:center;">View Leads</a>
+      <a class="dark-btn" href="/content-factory" style="text-decoration:none;display:inline-flex;align-items:center;">Create Content</a>
     </div>
 
     <div id="message" class="msg"></div>
@@ -579,24 +577,6 @@ td{
         </div>
       </div>
 
-    </div>
-
-    <div class="box" style="margin-top:24px;">
-      <h2>Social Content Automation</h2>
-      <div style="color:var(--muted);margin-top:-8px;margin-bottom:16px;">
-        Daily drafts for Facebook, Instagram, and TikTok. Approve before publishing.
-      </div>
-
-      <div id="socialDraftsToday">
-        <div class="empty">Loading today&apos;s drafts...</div>
-      </div>
-
-      <div style="margin-top:22px;">
-        <div style="font-size:16px;font-weight:900;margin-bottom:10px;">Content History</div>
-        <div id="socialDraftHistory">
-          <div class="empty">Loading content history...</div>
-        </div>
-      </div>
     </div>
 
     <footer class="brand-footer">

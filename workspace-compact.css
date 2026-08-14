@@ -38,3 +38,6 @@ table{font-size:12px!important}th{padding:9px 8px!important;font-size:10px!impor
 .calendar-page .booking h3{margin:0!important;font-size:14px!important}.calendar-page .booking p{font-size:12px!important}.calendar-page .booking .meta{margin:0!important}.calendar-page .booking .status{margin:0!important;justify-self:start!important}.calendar-page .booking-actions{margin:0!important;grid-column:3;grid-row:1/span 3!important}
 @media(max-width:900px){.sidebar{width:100%!important}.main{padding:18px!important}.stats{grid-template-columns:repeat(2,1fr)!important}}
 @media(max-width:900px){.calendar-page .grid{grid-template-columns:1fr!important}.calendar-page .grid>.card{grid-column:1!important;grid-row:auto!important}.calendar-page .booking{grid-template-columns:1fr!important}.calendar-page .booking-actions{grid-column:1!important;grid-row:auto!important;justify-content:flex-start!important}}
+.advanced-tools{margin:18px 0;border:1px solid var(--border)!important;border-radius:14px;background:rgba(10,25,31,.48)}
+.advanced-tools>summary{cursor:pointer;list-style:none;padding:15px 18px;color:var(--muted);font-weight:800}
+.advanced-tools>summary::-webkit-details-marker{display:none}.advanced-tools>summary::after{content:"+";float:right;font-size:20px}.advanced-tools[open]>summary::after{content:"−"}.advanced-tools-body{padding:0 14px 14px}

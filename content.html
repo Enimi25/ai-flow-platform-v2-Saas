@@ -641,8 +641,8 @@ textarea{
 
   <div class="top">
     <div>
-      <h1>Content Factory</h1>
-      <div class="sub">Generate and manage social posts for this client.</div>
+      <h1>Content</h1>
+      <div class="sub">Create, review and schedule content from one place.</div>
     </div>
 
     <div class="user">
@@ -652,18 +652,16 @@ textarea{
   </div>
 
   <div class="actions">
-    <button class="green" onclick="generatePost()">Generate AI Post</button>
-    <button class="dark" onclick="openInstagramPublisher()">Instagram Publisher</button>
-    <button class="dark" onclick="loadPosts()">Refresh Posts</button>
-    <button class="dark" onclick="goDashboard()">Back to Dashboard</button>
+    <button class="green" onclick="document.getElementById('aiMediaStudio').scrollIntoView({behavior:'smooth'})">Create with AI</button>
+    <button class="dark" onclick="document.getElementById('postsBody').scrollIntoView({behavior:'smooth'})">Saved Content</button>
   </div>
 
   <div class="card media-studio-card" id="aiMediaStudio">
     <div class="publisher-head">
       <div>
-        <span class="pill connected">AI Media Studio v1</span>
-        <h2 style="margin:12px 0 8px;">Generate Visual Media</h2>
-        <div class="hint">When generation succeeds, you can send the media directly to Instagram Publisher below (no copy/paste).</div>
+        <span class="pill connected">AI Creator</span>
+        <h2 style="margin:12px 0 8px;">Create Content</h2>
+        <div class="hint">Choose a format, describe the idea and let AI prepare the creative.</div>
       </div>
       <span class="pill" id="aiMediaStudioStatus">Idle</span>
     </div>
@@ -721,8 +719,7 @@ textarea{
       <button class="green" onclick="generateAiImage()">Generate Image</button>
       <button class="green" onclick="generateAiCarousel()">Generate Carousel</button>
       <button class="green" onclick="generateAiReel()">Generate Reel</button>
-      <button class="dark" onclick="useAiMediaInInstagramPublisher()">Use in Instagram Publisher</button>
-      <button class="dark" onclick="loadAiMediaJobs()">Refresh Jobs</button>
+      <button class="dark" onclick="useAiMediaInInstagramPublisher()">Prepare to Publish</button>
     </div>
 
     <div class="hint" id="aiMediaStudioMessage" style="margin-top:12px;">Configure an AI image/video provider to generate media (e.g. set `OPENAI_API_KEY`).</div>
@@ -738,9 +735,9 @@ textarea{
   <div class="card publisher-card" id="automationSettingsCard">
     <div class="publisher-head">
       <div>
-        <span class="pill connected">Daily Automation</span>
-        <h2>Three Content Units per Day</h2>
-        <div class="hint">AI prepares an educational static, proof/case study and short-form Reel with platform-native variants.</div>
+        <span class="pill connected">Automation</span>
+        <h2>Publishing Schedule</h2>
+        <div class="hint">Choose when approved content should be prepared or published.</div>
       </div>
       <label><input type="checkbox" id="socialAutomationEnabled"> Enabled</label>
     </div>
@@ -766,6 +763,9 @@ textarea{
     <div class="hint" id="socialAutomationMessage">TikTok always requires its current consent/review flow.</div>
   </div>
 
+  <details class="advanced-tools">
+    <summary>Advanced publishing tools</summary>
+    <div class="advanced-tools-body">
   <div class="card publisher-card" id="metaQuickPublisher">
     <div class="publisher-head">
       <div>
@@ -931,12 +931,15 @@ Want to see it on your website or WhatsApp? Message us.
     <div class="jobs-list" id="instagramJobsList"></div>
   </div>
 
+    </div>
+  </details>
+
   <div id="msg" class="msg">Loading...</div>
 
   <div class="grid">
 
     <div class="card">
-      <h2>Create New Post</h2>
+      <h2>Quick Draft</h2>
 
       <label>Platform</label>
       <select id="platform">
