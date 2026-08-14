@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>AI FLOW Leads</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/workspace-compact.css">
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -501,15 +502,10 @@ td{
 </div>
 
 <script>
-const email = localStorage.getItem("ai_flow_email");
-const companyId = localStorage.getItem("ai_flow_company_id");
-const role = localStorage.getItem("ai_flow_role") || "";
-
-if (!email || (!companyId && role !== "platform_admin")) {
-  window.location.href = "/login";
-}
-
-document.getElementById("clientEmail").innerText = email;
+let email = localStorage.getItem("ai_flow_email") || "";
+let companyId = localStorage.getItem("ai_flow_company_id") || "";
+let role = localStorage.getItem("ai_flow_role") || "";
+document.getElementById("clientEmail").innerText = email || "Account";
 
 function logout(){
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
@@ -734,7 +730,23 @@ async function createDemoData(){
   }
 }
 
-loadLeads();
+async function initLeads(){
+  try{
+    const res = await fetch("/api/me", {credentials:"same-origin"});
+    const data = await res.json();
+    if(!res.ok || data.error){ window.location.href = "/login"; return; }
+    const user = data.user || {};
+    email = String(user.email || email || "");
+    companyId = String(user.company_id || data.activeCompanyId || companyId || "").trim();
+    document.getElementById("clientEmail").innerText = email || "Account";
+    if(email) localStorage.setItem("ai_flow_email", email);
+    if(companyId) localStorage.setItem("ai_flow_company_id", companyId);
+    if(!companyId){ setMsg("Select a business workspace from Dashboard."); return; }
+    loadLeads();
+  }catch(e){ setMsg("Could not load your workspace."); }
+}
+
+initLeads();
 </script>
 
 <script>
