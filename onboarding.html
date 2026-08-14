@@ -303,7 +303,7 @@
   }
 
   function connectGoogleCalendar(){
-    window.location.href = "/connect/google-calendar?companyId=" + encodeURIComponent(companyId);
+    window.location.href = "/auth/google?next=/onboarding";
   }
 
   async function connectTikTok(){
