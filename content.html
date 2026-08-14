@@ -778,6 +778,10 @@ Want to see it on your website or WhatsApp? Message us.
       <label for="tiktokPhotoUrl">Public photo URL</label>
       <input id="tiktokPhotoUrl" value="https://ai-flow-platform-v2-saas.onrender.com/media/social/2026-08-14/ai-flow-post-01.png">
     </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="tiktokVideoUrl">Public Reel URL</label>
+      <input id="tiktokVideoUrl" value="https://ai-flow-platform-v2-saas.onrender.com/media/social/2026-08-14/ai-flow-reel-01.mp4">
+    </div>
     <div class="form-grid" style="margin-top:14px;">
       <div class="field">
         <label for="tiktokPostTitle">Title</label>
@@ -795,7 +799,8 @@ Want to see it on your website or WhatsApp? Message us.
     <div class="action-row">
       <button class="dark" onclick="loadTikTokCreatorInfo()">Load Creator Settings</button>
       <label><input type="checkbox" id="tiktokPublishConfirmed"> I reviewed this post and confirm publishing</label>
-      <button class="green" onclick="publishTikTokPhoto()">Publish to TikTok</button>
+      <button class="green" onclick="publishTikTokPhoto()">Publish Photo</button>
+      <button class="green" onclick="publishTikTokVideo()">Publish Reel</button>
     </div>
     <div class="hint" id="tiktokPublishMessage">Reconnect TikTok after video.publish is approved. Unaudited apps can publish private posts only.</div>
   </div>
@@ -1440,6 +1445,40 @@ async function publishTikTokPhoto(){
     setTikTokPublishMessage("TikTok accepted the post. Publish ID: " + (data.publishId || "pending") + ". Processing must complete before it counts as published.");
   }catch(e){
     setTikTokPublishMessage("TikTok publish failed.");
+  }
+}
+
+async function publishTikTokVideo(){
+  if(!companyId){
+    setTikTokPublishMessage("Select a company first.");
+    return;
+  }
+  const confirmed = document.getElementById("tiktokPublishConfirmed")?.checked === true;
+  if(!confirmed){
+    setTikTokPublishMessage("Review the Reel and explicitly confirm before publishing.");
+    return;
+  }
+  const payload = {
+    companyId,
+    confirmed:true,
+    videoUrl:(document.getElementById("tiktokVideoUrl")?.value || "").trim(),
+    title:(document.getElementById("tiktokDescription")?.value || "").trim(),
+    privacyLevel:(document.getElementById("tiktokPrivacyLevel")?.value || "").trim()
+  };
+  setTikTokPublishMessage("Sending approved Reel to TikTok...");
+  try{
+    const res = await fetch("/api/tiktok/publish-video", {
+      method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setTikTokPublishMessage(data.error || out.text || "TikTok Reel publish failed.");
+      return;
+    }
+    setTikTokPublishMessage("TikTok accepted the Reel. Publish ID: " + (data.publishId || "pending") + ". Processing must complete before it counts as published.");
+  }catch(e){
+    setTikTokPublishMessage("TikTok Reel publish failed.");
   }
 }
 

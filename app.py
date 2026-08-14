@@ -5848,6 +5848,66 @@ async def tiktok_publish_photo(request: Request):
     )
 
 
+@app.post("/api/tiktok/publish-video")
+async def tiktok_publish_video(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_tiktok_write_company(
+        request, (data.get("companyId") or "").strip()
+    )
+    if err:
+        return err
+    if data.get("confirmed") is not True:
+        return json_error("Explicit confirmation is required before posting to TikTok", 400)
+
+    video_url = str(data.get("videoUrl") or "").strip()
+    title = str(data.get("title") or "").strip()[:2200]
+    privacy_level = str(data.get("privacyLevel") or "SELF_ONLY").strip()
+    if _validate_instagram_public_urls([video_url]):
+        return json_error("A public video URL is required", 400)
+
+    token, scope, token_err = _tiktok_company_token(company_id)
+    if token_err:
+        return json_error(token_err, 400)
+    if "video.publish" not in scope:
+        return json_error("Reconnect TikTok and grant video.publish", 400)
+
+    creator_response, creator_err = _tiktok_post_json(
+        "/v2/post/publish/creator_info/query/", token, {}
+    )
+    if creator_err:
+        return JSONResponse({"error": creator_err, "detail": creator_response.get("error") or {}}, status_code=400)
+    creator = creator_response.get("data") or {}
+    allowed_privacy = creator.get("privacy_level_options") or []
+    if privacy_level not in allowed_privacy:
+        return JSONResponse(
+            {"error": "Selected TikTok privacy level is unavailable", "allowedPrivacyLevels": allowed_privacy},
+            status_code=400,
+        )
+
+    payload = {
+        "post_info": {
+            "title": title,
+            "privacy_level": privacy_level,
+            "disable_duet": bool(data.get("disableDuet", False)),
+            "disable_comment": bool(data.get("disableComment", False)),
+            "disable_stitch": bool(data.get("disableStitch", False)),
+            "video_cover_timestamp_ms": int(data.get("videoCoverTimestampMs") or 1000),
+        },
+        "source_info": {"source": "PULL_FROM_URL", "video_url": video_url},
+    }
+    published, publish_err = _tiktok_post_json("/v2/post/publish/video/init/", token, payload)
+    if publish_err:
+        return JSONResponse({"error": publish_err, "detail": published.get("error") or {}}, status_code=400)
+    publish_id = str((published.get("data") or {}).get("publish_id") or "").strip()
+    return JSONResponse(
+        {
+            "success": bool(publish_id),
+            "publishId": publish_id,
+            "message": "TikTok is processing the video. Check publish status before reporting success.",
+        }
+    )
+
+
 @app.post("/api/tiktok/publish-status")
 async def tiktok_publish_status(request: Request):
     data = await request.json()
