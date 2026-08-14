@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>AI FLOW Login</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/media/brand/ai-flow-app-icon.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{
@@ -29,7 +30,8 @@ body{
   box-shadow:0 30px 80px rgba(0,0,0,.16);
   backdrop-filter: blur(18px);
 }
-.logo{font-size:34px;font-weight:900;margin-bottom:8px}
+.logo{display:flex;align-items:center;gap:12px;font-size:34px;font-weight:900;margin-bottom:12px}
+.logo img{width:54px;height:54px;border-radius:17px;object-fit:cover;box-shadow:0 16px 42px rgba(65,220,255,.2)}
 .logo span{color:#b8ff7a}
 .sub{color:#9fb7c3;margin-bottom:26px;line-height:1.5}
 label{display:block;margin-bottom:8px;color:#d7e6eb;font-size:14px;font-weight:800}
@@ -89,7 +91,7 @@ input:focus{
 <body>
 
 <div class="box">
-  <div class="logo">AI <span>FLOW</span></div>
+  <div class="logo"><img src="/media/brand/ai-flow-app-icon.png" alt="AI FLOW logo"><span style="color:#f7fbff">AI <span>FLOW</span></span></div>
   <div class="sub">Login or create an account to access your AI sales dashboard.</div>
 
   <label>Email</label>

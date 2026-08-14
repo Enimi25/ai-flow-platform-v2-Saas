@@ -47,11 +47,15 @@ body{
   overflow:auto;
 }
 .logo{
+  display:flex;
+  align-items:center;
+  gap:11px;
   font-size:26px;
   font-weight:950;
   margin-bottom:22px;
   letter-spacing:.2px;
 }
+.logo img{width:46px;height:46px;border-radius:15px;object-fit:cover;box-shadow:0 14px 38px rgba(65,220,255,.18)}
 .logo span{color:var(--accent)}
 .menu{
   display:flex;
@@ -127,7 +131,14 @@ body{
   height:42px;
   border-radius:50%;
   background:linear-gradient(135deg, rgba(184,255,122,0.95) 0%, rgba(65,220,255,0.70) 100%);
+  border:2px solid rgba(255,255,255,.18);
+  object-fit:cover;
+  cursor:pointer;
+  box-shadow:0 12px 30px rgba(65,220,255,.16);
 }
+.brand-footer{display:flex;align-items:center;gap:12px;margin-top:28px;padding:16px 18px;border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.04)}
+.brand-footer img{width:44px;height:44px;border-radius:14px;object-fit:cover}
+.brand-footer strong{display:block}.brand-footer a{color:var(--accent);font-size:13px;text-decoration:none;font-weight:850}
 .logout-btn{
   background:rgba(255,255,255,0.06);
   color:var(--text);
@@ -442,7 +453,7 @@ td{
 <body>
 
 <div class="sidebar">
-  <div class="logo">AI <span>FLOW</span></div>
+  <div class="logo"><img src="/media/brand/ai-flow-app-icon.png" alt="AI FLOW logo"><span style="color:#f7fbff">AI <span>FLOW</span></span></div>
 
   <div class="menu">
     <a href="/dashboard" class="active">Dashboard</a>
@@ -471,7 +482,8 @@ td{
         <div id="clientMeta" style="font-size:13px;color:#94a3b8;">—</div>
       </div>
 
-      <div class="avatar"></div>
+      <img id="userAvatar" class="avatar" src="/media/brand/ai-flow-app-icon.png" alt="Your avatar" title="Choose your avatar">
+      <input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
@@ -588,6 +600,11 @@ td{
       </div>
     </div>
 
+    <footer class="brand-footer">
+      <img src="/media/brand/ai-flow-app-icon.png" alt="AI FLOW logo">
+      <div><strong>AI FLOW</strong><a href="https://wa.me/972559665585" target="_blank" rel="noopener">Contact AI FLOW on WhatsApp</a></div>
+    </footer>
+
   </div>
 </div>
 
@@ -601,12 +618,26 @@ if (!email) {
 }
 
 document.getElementById("clientEmail").innerText = email;
-document.getElementById("clientMeta").innerText = role ? ("Role: " + role) : "—";
+document.getElementById("clientMeta").innerText = role === "platform_admin" ? "Platform Administrator" : (role || "Client");
 if(role){
   const b = document.getElementById("roleBadge");
   b.style.display = "inline-block";
   b.innerText = (role === "platform_admin") ? "Platform Admin" : role;
 }
+
+const userAvatar = document.getElementById("userAvatar");
+const avatarInput = document.getElementById("avatarInput");
+const savedAvatar = localStorage.getItem("ai_flow_avatar");
+if(savedAvatar) userAvatar.src = savedAvatar;
+userAvatar.addEventListener("click", () => avatarInput.click());
+avatarInput.addEventListener("change", () => {
+  const file = avatarInput.files && avatarInput.files[0];
+  if(!file) return;
+  if(file.size > 1024 * 1024){ setMessage("Avatar must be smaller than 1 MB."); return; }
+  const reader = new FileReader();
+  reader.onload = () => { userAvatar.src = reader.result; localStorage.setItem("ai_flow_avatar", reader.result); setMessage("Avatar updated."); };
+  reader.readAsDataURL(file);
+});
 
 function logout() {
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}

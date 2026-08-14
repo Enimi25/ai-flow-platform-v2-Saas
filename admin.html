@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>AI FLOW Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/media/brand/ai-flow-app-icon.png">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -40,6 +41,10 @@
       margin-bottom:22px;
     }
     .left-top{display:flex;flex-direction:column;gap:6px}
+    .admin-brand{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+    .admin-brand img{width:58px;height:58px;border-radius:18px;object-fit:cover;box-shadow:0 18px 50px rgba(65,220,255,.18)}
+    .admin-brand strong{font-size:22px;letter-spacing:-.3px}
+    .admin-brand small{display:block;color:var(--muted);font-weight:800;margin-top:2px}
     .title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     h1{font-size:34px;letter-spacing:-.2px}
     .sub{color:var(--muted);margin-top:6px}
@@ -74,7 +79,9 @@
     .btn2:hover{transform:translateY(-1px);background:rgba(255,255,255,0.08)}
     .btn2:active{transform:translateY(0)}
     .nav{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .who{color:var(--muted);font-size:13px;margin-top:4px}
+    .who{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--muted);font-size:13px}
+    .who-email{color:var(--text);font-weight:850}
+    .role-badge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(184,255,122,.11);border:1px solid rgba(184,255,122,.22);color:var(--accent);font-size:11px;font-weight:950;letter-spacing:.02em}
     .msg{color:var(--muted);margin:12px 0 18px}
     .cards{
       display:grid;
@@ -122,12 +129,19 @@
   <div class="wrap">
     <div class="top">
       <div class="left-top">
+        <a class="admin-brand" href="/dashboard" style="color:inherit;text-decoration:none">
+          <img src="/media/brand/ai-flow-app-icon.png" alt="AI FLOW logo">
+          <span><strong>AI FLOW</strong><small>AI Sales Platform</small></span>
+        </a>
         <div class="title-row">
           <h1>Admin Dashboard</h1>
           <span class="pill">Platform Admin</span>
         </div>
         <div class="sub">You are viewing platform-wide controls and metrics.</div>
-        <div class="who"><span id="whoEmail">—</span> • <span id="whoRole">—</span></div>
+        <div class="who">
+          <span id="whoEmail" class="who-email">—</span>
+          <span id="whoRole" class="role-badge">Platform Administrator</span>
+        </div>
       </div>
       <div class="nav">
         <a class="btn2" href="/admin">Platform Admin Dashboard</a>
@@ -175,7 +189,7 @@
   const lsEmail = localStorage.getItem("ai_flow_email") || "";
   const lsRole = localStorage.getItem("ai_flow_role") || "";
   document.getElementById("whoEmail").innerText = lsEmail || "Unknown";
-  document.getElementById("whoRole").innerText = lsRole || "Unknown";
+  document.getElementById("whoRole").innerText = lsRole === "platform_admin" ? "Platform Administrator" : (lsRole || "Administrator");
 
   function logout(){
     try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
