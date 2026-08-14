@@ -3244,8 +3244,19 @@ def meta_connect(request: Request, companyId: str = ""):
         return JSONResponse({"error": state_error}, status_code=500)
     _store_oauth_state_in_session(request, "meta", state, company_id)
 
-    # Development mode scopes (basic login). Keep this minimal until the Meta app is approved for advanced scopes.
-    scope = ",".join(["public_profile", "email"])
+    # Publishing scopes. Meta may require Advanced Access/app review before
+    # non-role users can grant these permissions.
+    scope = ",".join(
+        [
+            "public_profile",
+            "email",
+            "pages_show_list",
+            "pages_read_engagement",
+            "pages_manage_posts",
+            "instagram_basic",
+            "instagram_content_publish",
+        ]
+    )
 
     qs = urllib.parse.urlencode(
         {
@@ -5032,7 +5043,12 @@ def tiktok_connect_url(request: Request, companyId: str = ""):
         return JSONResponse({"success": False, "error": state_error}, status_code=500)
     _store_oauth_state_in_session(request, "tiktok", state, company_id)
 
-    auth_url = _build_tiktok_authorize_url(client_key, redirect_uri, state, scope="user.info.basic")
+    auth_url = _build_tiktok_authorize_url(
+        client_key,
+        redirect_uri,
+        state,
+        scope="user.info.basic,video.upload,video.publish",
+    )
 
     return JSONResponse({"success": True, "auth_url": auth_url, "url": auth_url})
 
