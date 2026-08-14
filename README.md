@@ -24,9 +24,10 @@ Optional (AI generation):
 Google Calendar booking:
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REDIRECT_URI` (for example `https://<your-render-domain>/google-calendar/callback`)
+- `GOOGLE_REDIRECT_URI` (for example `https://<your-render-domain>/google/callback`)
+- `GOOGLE_AUTH_REDIRECT_URI` (optional; defaults to `GOOGLE_REDIRECT_URI`)
 
-The Google Cloud OAuth client must enable the Google Calendar API and use the exact redirect URI above.
+The Google Cloud OAuth client must enable the Google Calendar API and use the exact redirect URI above. `Continue with Google + Calendar` requests only verified profile/email and Calendar access; it does not request Gmail messages.
 
 Notes:
 - Redirect URIs must be **exactly** the same as registered in the provider dashboards.

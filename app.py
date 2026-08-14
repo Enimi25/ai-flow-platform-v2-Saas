@@ -5467,15 +5467,20 @@ async def tiktok_disconnect(request: Request):
 # =========================================================
 
 GOOGLE_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
+GOOGLE_ACCOUNT_SCOPES = [
+    "openid",
+    "email",
+    "profile",
+    "https://www.googleapis.com/auth/calendar",
+]
 
 
-def _google_calendar_flow(state: str = ""):
+def _google_oauth_client_config(redirect_uri: str):
     client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip()
     client_secret = (os.getenv("GOOGLE_CLIENT_SECRET") or "").strip()
-    redirect_uri = (os.getenv("GOOGLE_REDIRECT_URI") or "").strip()
     if not client_id or not client_secret or not redirect_uri:
         return None
-    config = {
+    return {
         "web": {
             "client_id": client_id,
             "client_secret": client_secret,
@@ -5484,6 +5489,189 @@ def _google_calendar_flow(state: str = ""):
             "redirect_uris": [redirect_uri],
         }
     }
+
+
+def _google_account_flow(state: str = ""):
+    redirect_uri = (
+        os.getenv("GOOGLE_AUTH_REDIRECT_URI")
+        or os.getenv("GOOGLE_REDIRECT_URI")
+        or ""
+    ).strip()
+    config = _google_oauth_client_config(redirect_uri)
+    if not config:
+        return None
+    return Flow.from_client_config(
+        config,
+        scopes=GOOGLE_ACCOUNT_SCOPES,
+        redirect_uri=redirect_uri,
+        state=state or None,
+    )
+
+
+def _google_user_info(access_token: str):
+    req = urllib.request.Request(
+        "https://openidconnect.googleapis.com/v1/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    with urllib.request.urlopen(req, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _google_browser_login_response(request: Request, email: str, role: str, company_id: str, user_id: int, target: str):
+    request.session.clear()
+    request.session["user_id"] = int(user_id)
+    request.session["email"] = email
+    request.session["role"] = role
+    request.session["company_id"] = company_id
+
+    remember_token = secrets.token_urlsafe(48)
+    remember_hash = hashlib.sha256(remember_token.encode("utf-8")).hexdigest()
+    remember_expires = (datetime.utcnow() + timedelta(days=30)).isoformat() + "Z"
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO v2_auth_sessions (user_id, token_hash, expires_at, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (int(user_id), remember_hash, remember_expires, now_utc_iso()),
+                )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print("GOOGLE LOGIN SESSION ERROR:", type(e).__name__)
+        finally:
+            conn.close()
+
+    safe_target = target if target in {"/dashboard", "/onboarding", "/calendar", "/social-accounts"} else "/dashboard"
+    html = f"""<!doctype html><html><body><script>
+localStorage.setItem('ai_flow_email', {json.dumps(email)});
+localStorage.setItem('ai_flow_role', {json.dumps(role)});
+localStorage.setItem('ai_flow_company_id', {json.dumps(company_id)});
+window.location.replace({json.dumps(safe_target)});
+</script></body></html>"""
+    response = HTMLResponse(html)
+    response.set_cookie(
+        key="ai_flow_remember",
+        value=remember_token,
+        max_age=60 * 60 * 24 * 30,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@app.get("/auth/google")
+def google_account_login(request: Request, next: str = "/dashboard"):
+    flow = _google_account_flow()
+    if not flow:
+        return json_error("Google OAuth is not configured", 503)
+    current_user = get_session_user(request) or {}
+    company_hint = (current_user.get("company_id") or "new_google_user").strip()
+    state = _create_oauth_state("google_account", company_hint)
+    request.session["google_account_state"] = state
+    request.session["google_account_next"] = next if next.startswith("/") else "/dashboard"
+    authorization_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        state=state,
+    )
+    return RedirectResponse(authorization_url, status_code=302)
+
+
+@app.get("/google/callback")
+@app.get("/auth/google/callback")
+def google_account_callback(request: Request, code: str = "", state: str = ""):
+    expected_state = request.session.get("google_account_state") or ""
+    if not code or not state or not hmac.compare_digest(state, expected_state):
+        return json_error("Invalid Google OAuth state", 400)
+    _company_hint, state_error = _verify_signed_oauth_state(state, "google_account")
+    if state_error:
+        return json_error("Invalid or expired Google OAuth state", 400)
+    flow = _google_account_flow(state)
+    if not flow:
+        return json_error("Google OAuth is not configured", 503)
+
+    try:
+        flow.fetch_token(code=code)
+        info = _google_user_info(flow.credentials.token)
+        email = (info.get("email") or "").strip().lower()
+        if not email or info.get("email_verified") is not True:
+            return json_error("Google email is not verified", 403)
+
+        conn = get_db_connection()
+        if not conn:
+            return json_error("Database unavailable", 503)
+        created = False
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                user = cur.fetchone()
+                if not user:
+                    created = True
+                    company_id = email
+                    created_at = now_utc_iso()
+                    random_password = hash_password(secrets.token_urlsafe(48))
+                    cur.execute(
+                        """
+                        INSERT INTO companies (company_id, company_name, owner_email, plan, status, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (company_id) DO NOTHING
+                        """,
+                        (company_id, info.get("name") or "New Client Company", email, "Growth Studio", "active", created_at),
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING *
+                        """,
+                        (email, random_password, random_password, ROLE_COMPANY_ADMIN, company_id, USER_STATUS_ACTIVE, created_at, created_at),
+                    )
+                    user = cur.fetchone()
+                    cur.execute(
+                        "UPDATE companies SET owner_user_id = %s, updated_at = %s WHERE company_id = %s",
+                        (int(user["id"]), created_at, company_id),
+                    )
+
+                role = (user.get("role") or ROLE_COMPANY_ADMIN).strip() or ROLE_COMPANY_ADMIN
+                if role in {"admin", ROLE_CLIENT} and (user.get("company_id") or "").strip():
+                    role = ROLE_PLATFORM_ADMIN if role == "admin" else ROLE_COMPANY_ADMIN
+                company_id = (user.get("company_id") or "").strip()
+                if role != ROLE_PLATFORM_ADMIN and company_id:
+                    cur.execute(
+                        """
+                        INSERT INTO v2_google_calendar_tokens (company_id, token_json, updated_at)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (company_id) DO UPDATE SET token_json = EXCLUDED.token_json, updated_at = EXCLUDED.updated_at
+                        """,
+                        (company_id, flow.credentials.to_json(), now_utc_iso()),
+                    )
+            conn.commit()
+        finally:
+            conn.close()
+
+        target = request.session.get("google_account_next") or ("/onboarding" if created else "/dashboard")
+        if created and target == "/dashboard":
+            target = "/onboarding"
+        return _google_browser_login_response(request, email, role, company_id, int(user["id"]), target)
+    except Exception as e:
+        print("GOOGLE ACCOUNT CALLBACK ERROR:", type(e).__name__, str(e))
+        return json_error("Google sign-in failed", 500)
+
+
+def _google_calendar_flow(state: str = ""):
+    client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip()
+    client_secret = (os.getenv("GOOGLE_CLIENT_SECRET") or "").strip()
+    redirect_uri = (os.getenv("GOOGLE_REDIRECT_URI") or "").strip()
+    if not client_id or not client_secret or not redirect_uri:
+        return None
+    config = _google_oauth_client_config(redirect_uri)
     return Flow.from_client_config(
         config,
         scopes=GOOGLE_CALENDAR_SCOPES,
@@ -5525,15 +5713,7 @@ def connect_google_calendar(request: Request, companyId: str = ""):
         return err
     if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
         return json_error("Forbidden", 403)
-    flow = _google_calendar_flow()
-    if not flow:
-        return json_error("Google OAuth is not configured", 503)
-    state = _create_oauth_state("google", company_id, include_company_prefix=True)
-    request.session["google_calendar_state"] = state
-    authorization_url, _ = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true", prompt="consent", state=state
-    )
-    return RedirectResponse(authorization_url, status_code=302)
+    return RedirectResponse("/auth/google?next=/calendar", status_code=302)
 
 
 @app.get("/google-calendar/callback")

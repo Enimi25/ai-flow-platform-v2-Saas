@@ -69,6 +69,13 @@ input:focus{
   color:#f7fbff;
   border:1px solid rgba(255,255,255,0.12);
 }
+.google{
+  background:#fff;
+  color:#17202a;
+  border:1px solid rgba(255,255,255,0.2);
+}
+.divider{display:flex;align-items:center;gap:12px;color:#9fb7c3;margin:8px 0 16px;font-size:13px}
+.divider:before,.divider:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.12)}
 .btn:hover{transform:translateY(-1px)}
 .login:hover{box-shadow:0 26px 70px rgba(184,255,122,0.18)}
 .register:hover{box-shadow:0 18px 50px rgba(0,0,0,0.18)}
@@ -93,6 +100,8 @@ input:focus{
 
   <button class="btn login" id="loginBtn">Login</button>
   <button class="btn register" id="registerBtn">Create New Account</button>
+  <div class="divider">or</div>
+  <button class="btn google" id="googleBtn">Continue with Google + Calendar</button>
 
   <div id="msg" class="msg"></div>
 </div>
@@ -199,6 +208,9 @@ async function loginUser(){
 
 document.getElementById("loginBtn").onclick = loginUser;
 document.getElementById("registerBtn").onclick = registerUser;
+document.getElementById("googleBtn").onclick = function(){
+  window.location.href = "/auth/google";
+};
 </script>
 
 </body>
