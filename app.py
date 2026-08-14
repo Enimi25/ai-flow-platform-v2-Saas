@@ -781,7 +781,7 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS v2_social_automation_settings (
                     company_id TEXT PRIMARY KEY,
                     enabled BOOLEAN DEFAULT FALSE,
-                    daily_content_units INTEGER DEFAULT 3,
+                    daily_content_units INTEGER DEFAULT 1,
                     timezone TEXT DEFAULT 'UTC',
                     publish_mode TEXT DEFAULT 'approval',
                     posting_times TEXT DEFAULT '["09:00","14:00","19:00"]',
@@ -7208,7 +7208,7 @@ Rules:
 
 
 def _ensure_daily_social_drafts(company_id: str):
-    """Create three daily content units, adapted for every supported platform."""
+    """Create the configured daily queue without publishing it."""
     today = _today_utc_date_str()
     now = _iso_z(datetime.utcnow())
 
@@ -7217,12 +7217,26 @@ def _ensure_daily_social_drafts(company_id: str):
         return False, "Database error"
 
     try:
-        # Three daily units: education, proof, and short-form video. Each gets a
-        # platform-native variant so clients do not spray identical copy everywhere.
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT daily_content_units FROM v2_social_automation_settings WHERE company_id = %s",
+                (company_id,),
+            )
+            settings_row = cur.fetchone()
+        configured_units = max(1, min(3, int((settings_row or {}).get("daily_content_units") or 1)))
+        try:
+            launch_queue_limit = max(1, min(3, int(os.getenv("SOCIAL_QUEUE_DAILY_LIMIT", "1"))))
+        except Exception:
+            launch_queue_limit = 1
+        daily_units = min(configured_units, launch_queue_limit)
+
+        # Start with one reviewed daily concept while integrations are being
+        # approved. The same concept gets a platform-native variant, and the
+        # setting can be raised to three after launch readiness is confirmed.
         platforms = ["Facebook", "Instagram", "TikTok"]
         daily_slots = ["Educational static", "Proof or case study", "Organic short-form Reel"]
         for platform in platforms:
-            for draft_type in daily_slots:
+            for draft_type in daily_slots[:daily_units]:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
@@ -7297,7 +7311,7 @@ def social_automation_settings(request: Request, companyId: str = ""):
         return err
     defaults = {
         "enabled": False,
-        "dailyContentUnits": 3,
+        "dailyContentUnits": 1,
         "timezone": "UTC",
         "publishMode": "approval",
         "postingTimes": ["09:00", "14:00", "19:00"],
@@ -7323,7 +7337,7 @@ def social_automation_settings(request: Request, companyId: str = ""):
                 "success": True,
                 "settings": {
                     "enabled": bool(row.get("enabled")),
-                    "dailyContentUnits": int(row.get("daily_content_units") or 3),
+                    "dailyContentUnits": int(row.get("daily_content_units") or 1),
                     "timezone": row.get("timezone") or "UTC",
                     "publishMode": row.get("publish_mode") or "approval",
                     "postingTimes": posting_times,
@@ -7349,6 +7363,10 @@ async def save_social_automation_settings(request: Request):
     # the safe default and reject invented fully autonomous modes.
     if publish_mode not in {"approval", "meta_auto_after_brand_approval"}:
         return json_error("Invalid publish mode", 400)
+    try:
+        daily_units = max(1, min(3, int(data.get("dailyContentUnits") or 1)))
+    except Exception:
+        return json_error("Daily content units must be between 1 and 3", 400)
     posting_times = data.get("postingTimes") or ["09:00", "14:00", "19:00"]
     if not isinstance(posting_times, list) or len(posting_times) != 3:
         return json_error("Exactly three posting times are required", 400)
@@ -7382,7 +7400,7 @@ async def save_social_automation_settings(request: Request):
                     updated_at = EXCLUDED.updated_at
                 """,
                 (
-                    company_id, enabled, 3, timezone_name, publish_mode,
+                    company_id, enabled, daily_units, timezone_name, publish_mode,
                     json.dumps(clean_times), now, now,
                 ),
             )
