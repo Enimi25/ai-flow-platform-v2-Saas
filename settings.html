@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>AI FLOW Settings</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/workspace-compact.css">
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -456,17 +457,9 @@ button{
 </div>
 
 <script>
-const email = localStorage.getItem("ai_flow_email");
-const companyId = localStorage.getItem("ai_flow_company_id");
-const role = localStorage.getItem("ai_flow_role") || "";
-
-if (!email || (!companyId && role !== "platform_admin")) {
-  window.location.href = "/login";
-}
-
-document.getElementById("clientEmail").innerText = email;
-document.getElementById("workspaceEmail").innerText = email;
-document.getElementById("workspaceCompany").innerText = companyId;
+let email = localStorage.getItem("ai_flow_email") || "";
+let companyId = localStorage.getItem("ai_flow_company_id") || "";
+let role = localStorage.getItem("ai_flow_role") || "";
 
 function logout(){
   try{ fetch("/logout-api", {method:"POST", credentials:"same-origin"}); }catch(e){}
@@ -487,6 +480,10 @@ function goTeam(){
 }
 
 async function saveSettings(){
+  if(!companyId){
+    setAllMsgs("Select a business workspace before saving settings.");
+    return;
+  }
   setAllMsgs("Saving settings...");
 
   const payload = {
@@ -584,7 +581,32 @@ function resetSettings(){
   document.getElementById("workspaceMsg").innerText = "Defaults loaded. Click Save to persist.";
 }
 
-loadSettings();
+async function initSettings(){
+  try{
+    const res = await fetch("/api/me", {credentials:"same-origin"});
+    const data = await res.json();
+    if(!res.ok || data.error){ window.location.href = "/login"; return; }
+    const user = data.user || {};
+    email = String(user.email || email || "");
+    role = String(user.role || role || "");
+    companyId = String(user.company_id || data.activeCompanyId || companyId || "").trim();
+    if(email) localStorage.setItem("ai_flow_email", email);
+    if(role) localStorage.setItem("ai_flow_role", role);
+    if(companyId) localStorage.setItem("ai_flow_company_id", companyId);
+    document.getElementById("clientEmail").innerText = email || "Account";
+    document.getElementById("workspaceEmail").innerText = email || "—";
+    document.getElementById("workspaceCompany").innerText = companyId || "Select a business";
+    if(!companyId){
+      document.getElementById("workspaceMsg").innerText = "Select a business workspace from Dashboard.";
+      return;
+    }
+    loadSettings();
+  }catch(e){
+    document.getElementById("workspaceMsg").innerText = "Could not load your workspace.";
+  }
+}
+
+initSettings();
 </script>
 
 <script>

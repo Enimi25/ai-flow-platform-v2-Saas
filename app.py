@@ -126,6 +126,10 @@ ROLE_PLATFORM_ADMIN = "platform_admin"
 ROLE_COMPANY_ADMIN = "company_admin"
 ROLE_EMPLOYEE = "employee"
 ROLE_CLIENT = "client"
+FIXED_PLATFORM_ADMIN_EMAILS = (
+    "baskinltd@gmail.com",
+    "baskinltd@yahoo.com",
+)
 
 USER_STATUS_ACTIVE = "active"
 USER_STATUS_INVITED = "invited"
@@ -856,16 +860,11 @@ def startup_event():
 
 def bootstrap_platform_admin():
     """
-    Creates the platform admin user from env vars if missing.
-    Env:
-      PLATFORM_ADMIN_EMAIL
-      PLATFORM_ADMIN_PASSWORD
+    Guarantees one durable platform owner after every database recreation.
+    The owner can always sign in with Google. PLATFORM_ADMIN_PASSWORD is an
+    optional Render secret that also enables password login.
     """
-    email = (os.getenv("PLATFORM_ADMIN_EMAIL") or "").strip().lower()
     password = (os.getenv("PLATFORM_ADMIN_PASSWORD") or "").strip()
-
-    if not email:
-        return
 
     conn = get_db_connection()
     if not conn:
@@ -873,50 +872,51 @@ def bootstrap_platform_admin():
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-            existing = cur.fetchone()
+            # A project has exactly one platform owner. Existing business
+            # owners keep access to their own companies, but not the platform.
+            cur.execute(
+                """
+                UPDATE users
+                SET role = CASE WHEN COALESCE(company_id, '') <> '' THEN %s ELSE %s END,
+                    updated_at = %s
+                WHERE LOWER(email) NOT IN (%s, %s)
+                  AND role IN (%s, 'admin')
+                """,
+                (
+                    ROLE_COMPANY_ADMIN,
+                    ROLE_CLIENT,
+                    now_utc_iso(),
+                    FIXED_PLATFORM_ADMIN_EMAILS[0],
+                    FIXED_PLATFORM_ADMIN_EMAILS[1],
+                    ROLE_PLATFORM_ADMIN,
+                ),
+            )
+            for email in FIXED_PLATFORM_ADMIN_EMAILS:
+                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                existing = cur.fetchone()
+                created_at = now_utc_iso()
+                pw = hash_password(password) if password else ""
 
-            created_at = now_utc_iso()
-            pw = hash_password(password) if password else ""
-
-            if existing:
-                # Upgrade existing user to platform admin.
-                updates = ["role = %s", "company_id = %s", "status = %s", "updated_at = %s"]
-                values = [ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, created_at]
-
-                if pw:
-                    updates.extend(["password = %s", "password_hash = %s"])
-                    values.extend([pw, pw])
-
-                values.append(int(existing["id"]))
-                cur.execute(
-                    f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
-                    tuple(values),
-                )
-            else:
-                # Create platform admin if missing.
-                if not pw:
-                    print("BOOTSTRAP PLATFORM ADMIN ERROR: PLATFORM_ADMIN_PASSWORD missing")
-                    return
-                cur.execute(
-                    """
-                    INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        email,
-                        pw,
-                        pw,
-                        ROLE_PLATFORM_ADMIN,
-                        "",
-                        USER_STATUS_ACTIVE,
-                        created_at,
-                        created_at,
-                    ),
-                )
+                if existing:
+                    updates = ["role = %s", "company_id = %s", "status = %s", "updated_at = %s"]
+                    values = [ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, created_at]
+                    if pw:
+                        updates.extend(["password = %s", "password_hash = %s"])
+                        values.extend([pw, pw])
+                    values.append(int(existing["id"]))
+                    cur.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = %s", tuple(values))
+                else:
+                    login_hash = pw or hash_password(secrets.token_urlsafe(64))
+                    cur.execute(
+                        """
+                        INSERT INTO users (email, password, password_hash, role, company_id, status, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (email, login_hash, login_hash, ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, created_at, created_at),
+                    )
 
         conn.commit()
-        print(f"PLATFORM_ADMIN_BOOTSTRAP_OK email={email}")
+        print(f"PLATFORM_ADMIN_BOOTSTRAP_OK emails={','.join(FIXED_PLATFORM_ADMIN_EMAILS)}")
     except Exception as e:
         print("BOOTSTRAP PLATFORM ADMIN ERROR:", str(e))
     finally:
@@ -948,11 +948,23 @@ def page_response(filename: str, media_type: str | None = None, request: Request
             }
         ).replace("</", "<\\/")
         bootstrap = (
+            "<style>.workspace-identity{margin:-10px 8px 18px;padding:9px 10px;"
+            "border:1px solid #26332e;border-radius:8px;background:#11191e;"
+            "font:700 11px/1.35 ui-sans-serif,system-ui;color:#aebbb5;word-break:break-word}"
+            ".workspace-identity strong{display:block;color:#f3f7f5;font-size:12px;margin-bottom:2px}"
+            ".workspace-identity.admin strong{color:#dfffbd}</style>"
             "<script>(function(){try{const u="
             + identity
             + ";if(u.email)localStorage.setItem('ai_flow_email',u.email);"
             + "if(u.role)localStorage.setItem('ai_flow_role',u.role);"
             + "if(u.companyId)localStorage.setItem('ai_flow_company_id',u.companyId);"
+            + "document.addEventListener('DOMContentLoaded',function(){"
+            + "const logo=document.querySelector('.sidebar .logo');if(!logo)return;"
+            + "const box=document.createElement('div');box.className='workspace-identity'+(u.role==='platform_admin'?' admin':'');"
+            + "if(u.role==='platform_admin'){box.innerHTML='<strong>Platform Admin</strong>'+String(u.email||'');}"
+            + "else{const role=u.role==='company_admin'?'Business Owner':(u.role==='employee'?'Team Member':'Client');"
+            + "box.innerHTML='<strong>'+role+'</strong>Client ID: '+String(u.companyId||'Not assigned');}"
+            + "logo.insertAdjacentElement('afterend',box);});"
             + "}catch(e){}})();</script>"
         )
         html = (BASE_DIR / filename).read_text(encoding="utf-8")
@@ -1035,6 +1047,15 @@ def social_accounts_page(request: Request):
     if guard:
         return guard
     return page_response("social.html", request=request)
+
+
+@app.get("/workspace-compact.css")
+def workspace_compact_styles():
+    return FileResponse(
+        BASE_DIR / "workspace-compact.css",
+        media_type="text/css",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/ai-replies")
@@ -1406,14 +1427,24 @@ async def login_api(request: Request):
                 except Exception:
                     conn.rollback()
 
-            # Safety: if this email is configured as PLATFORM_ADMIN_EMAIL, treat it as platform admin.
-            boot_email = (os.getenv("PLATFORM_ADMIN_EMAIL") or "").strip().lower()
-            if boot_email and email == boot_email and role != ROLE_PLATFORM_ADMIN:
+            # The platform owner identity is fixed in code and cannot drift
+            # when Render recreates the free database.
+            if email in FIXED_PLATFORM_ADMIN_EMAILS and role != ROLE_PLATFORM_ADMIN:
                 role = ROLE_PLATFORM_ADMIN
                 try:
                     cur.execute(
                         "UPDATE users SET role = %s, company_id = %s, status = %s, updated_at = %s WHERE id = %s",
                         (ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, now_utc_iso(), int(user["id"])),
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+            elif email not in FIXED_PLATFORM_ADMIN_EMAILS and role == ROLE_PLATFORM_ADMIN:
+                role = ROLE_COMPANY_ADMIN if (user.get("company_id") or "").strip() else ROLE_CLIENT
+                try:
+                    cur.execute(
+                        "UPDATE users SET role = %s, updated_at = %s WHERE id = %s",
+                        (role, now_utc_iso(), int(user["id"])),
                     )
                     conn.commit()
                 except Exception:
@@ -5643,6 +5674,19 @@ def google_account_callback(request: Request, code: str = "", state: str = ""):
                 if role in {"admin", ROLE_CLIENT} and (user.get("company_id") or "").strip():
                     role = ROLE_PLATFORM_ADMIN if role == "admin" else ROLE_COMPANY_ADMIN
                 company_id = (user.get("company_id") or "").strip()
+                if email in FIXED_PLATFORM_ADMIN_EMAILS:
+                    role = ROLE_PLATFORM_ADMIN
+                    company_id = ""
+                    cur.execute(
+                        "UPDATE users SET role = %s, company_id = %s, status = %s, updated_at = %s WHERE id = %s",
+                        (ROLE_PLATFORM_ADMIN, "", USER_STATUS_ACTIVE, now_utc_iso(), int(user["id"])),
+                    )
+                elif role == ROLE_PLATFORM_ADMIN:
+                    role = ROLE_COMPANY_ADMIN if company_id else ROLE_CLIENT
+                    cur.execute(
+                        "UPDATE users SET role = %s, updated_at = %s WHERE id = %s",
+                        (role, now_utc_iso(), int(user["id"])),
+                    )
                 if role != ROLE_PLATFORM_ADMIN and company_id:
                     cur.execute(
                         """
