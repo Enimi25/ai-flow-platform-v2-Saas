@@ -908,6 +908,7 @@ def init_db():
 def startup_event():
     init_db()
     bootstrap_platform_admin()
+    bootstrap_platform_company()
     _log_social_env_debug()
 
 
@@ -972,6 +973,64 @@ def bootstrap_platform_admin():
         print(f"PLATFORM_ADMIN_BOOTSTRAP_OK emails={','.join(FIXED_PLATFORM_ADMIN_EMAILS)}")
     except Exception as e:
         print("BOOTSTRAP PLATFORM ADMIN ERROR:", str(e))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def bootstrap_platform_company():
+    """Keep the platform's own AI FLOW workspace available after DB recreation.
+
+    Social OAuth tokens still require an intentional reconnect, but the stable
+    workspace ID prevents platform admins from landing in an unusable dashboard
+    with no company to select.
+    """
+    company_id = (os.getenv("PLATFORM_COMPANY_ID") or "ai-flow").strip() or "ai-flow"
+    company_name = (os.getenv("PLATFORM_COMPANY_NAME") or "AI FLOW").strip() or "AI FLOW"
+    owner_email = FIXED_PLATFORM_ADMIN_EMAILS[0]
+    timestamp = now_utc_iso()
+
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO companies (
+                    company_id, company_name, owner_email, plan, status,
+                    payment_status, created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (company_id) DO UPDATE SET
+                    company_name = CASE
+                        WHEN COALESCE(companies.company_name, '') = '' THEN EXCLUDED.company_name
+                        ELSE companies.company_name
+                    END,
+                    owner_email = CASE
+                        WHEN COALESCE(companies.owner_email, '') = '' THEN EXCLUDED.owner_email
+                        ELSE companies.owner_email
+                    END,
+                    status = 'active',
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    company_id,
+                    company_name,
+                    owner_email,
+                    "Growth Studio",
+                    "active",
+                    "unpaid",
+                    timestamp,
+                    timestamp,
+                ),
+            )
+        conn.commit()
+        print(f"PLATFORM_COMPANY_BOOTSTRAP_OK company_id={company_id}")
+    except Exception as e:
+        print("BOOTSTRAP PLATFORM COMPANY ERROR:", str(e))
     finally:
         try:
             conn.close()
