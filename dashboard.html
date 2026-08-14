@@ -715,6 +715,11 @@ async function loadCompaniesForPlatformAdmin(){
       }
       sel.appendChild(opt);
     });
+    if(!companyId && items.length === 1){
+      sel.value = String(items[0].company_id || "");
+      await applyPlatformCompany();
+      return;
+    }
     setPlatformMsg(items.length ? "Select a company and click View Company." : "No companies found.");
   }catch(e){
     setPlatformMsg("Connection error loading companies.");

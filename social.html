@@ -822,6 +822,10 @@ async function loadCompaniesForPlatformAdmin(selectedId){
     }catch(e2){}
     loadSocialData();
   };
+  if(!selectedId && items.length === 1){
+    sel.value = String(items[0].company_id || "");
+    await sel.onchange();
+  }
 }
 
 function setConnectedHtml(html){
