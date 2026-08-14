@@ -513,7 +513,6 @@ td{
     </div>
 
     <div class="action-row">
-      <button class="green-btn" onclick="loadDemoData()">Load Demo Data</button>
       <button class="dark-btn" onclick="loadDashboardData()">Refresh Data</button>
       <button class="green-btn" onclick="goContentFactory()">Generate AI Post</button>
     </div>
@@ -564,7 +563,7 @@ td{
 
           <tbody id="leadsBody">
             <tr>
-              <td colspan="4" class="empty">No leads yet. Click Load Demo Data.</td>
+              <td colspan="4" class="empty">No leads yet. New qualified leads will appear here.</td>
             </tr>
           </tbody>
         </table>
@@ -575,7 +574,7 @@ td{
 
         <div id="postsBody">
           <div class="empty">
-            No posts yet. Click Generate AI Post or Load Demo Data.
+            No posts yet. Create your first post in Content Factory.
           </div>
         </div>
       </div>
@@ -795,7 +794,7 @@ function renderLeads(leads) {
   body.innerHTML = "";
 
   if (!leads.length) {
-    body.innerHTML = '<tr><td colspan="4" class="empty">No leads yet. Click Load Demo Data.</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="empty">No leads yet. New qualified leads will appear here.</td></tr>';
     return;
   }
 
@@ -819,7 +818,7 @@ function renderPosts(posts) {
   body.innerHTML = "";
 
   if (!posts.length) {
-    body.innerHTML = '<div class="empty">No posts yet. Click Generate AI Post or Load Demo Data.</div>';
+    body.innerHTML = '<div class="empty">No posts yet. Create your first post in Content Factory.</div>';
     return;
   }
 
