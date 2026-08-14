@@ -1070,7 +1070,7 @@ def page_response(filename: str, media_type: str | None = None, request: Request
             'img.alt="AI FLOW";img.className="ai-flow-brand-icon";logo.prepend(img);});'
             'if(!document.querySelector(".brand-signature")){var a=document.createElement("a");'
             'a.href="/";a.className="brand-signature";a.setAttribute("aria-label","AI FLOW home");'
-            'a.innerHTML="<img src=\"/media/brand/ai-flow-app-icon.png\" alt=\"\">Powered by AI FLOW";'
+            'a.innerHTML=`<img src="/media/brand/ai-flow-app-icon.png" alt="">Powered by AI FLOW`;'
             'document.body.appendChild(a);}});</script>'
         )
         html = (BASE_DIR / filename).read_text(encoding="utf-8")
