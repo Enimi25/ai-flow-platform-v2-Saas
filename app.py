@@ -3486,12 +3486,14 @@ def meta_callback(request: Request, code: str = "", state: str = ""):
 
 
 @app.get("/api/meta/accounts")
-def meta_accounts(companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+def meta_accounts(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request, companyId, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     conn = get_db_connection()
     if not conn:
@@ -3524,11 +3526,16 @@ def meta_accounts(companyId: str = ""):
 @app.post("/api/meta/disconnect")
 async def meta_disconnect(request: Request):
     data = await request.json()
-    company_id = (data.get("companyId") or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+    company_id, user, err = resolve_company_id(
+        request,
+        (data.get("companyId") or "").strip(),
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
 
     conn = get_db_connection()
     if not conn:
@@ -3851,6 +3858,145 @@ def _instagram_permalink(media_id: str, access_token: str) -> str:
         print("INSTAGRAM PERMALINK FETCH ERROR:", err[:160])
         return ""
     return (data.get("permalink") or "").strip()
+
+
+def _facebook_page_token(company_id: str, page_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return "", "Database error"
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT access_token FROM v2_social_tokens
+                WHERE company_id = %s AND provider = 'meta'
+                  AND platform = 'Facebook' AND account_id = %s
+                ORDER BY id DESC LIMIT 1
+                """,
+                (company_id, page_id),
+            )
+            row = cur.fetchone()
+        token = (row.get("access_token") or "").strip() if row else ""
+        return (token, "") if token else ("", "Facebook token missing. Reconnect Meta.")
+    except Exception:
+        return "", "Facebook token lookup error"
+    finally:
+        conn.close()
+
+
+def _facebook_publish_image(page_id: str, access_token: str, image_url: str, caption: str):
+    endpoint = (
+        f"https://graph.facebook.com/{_instagram_graph_version()}/"
+        f"{urllib.parse.quote(page_id, safe='')}/photos"
+    )
+    data, err = _http_post_form_json_graph(
+        endpoint,
+        {"url": image_url, "caption": caption, "published": "true", "access_token": access_token},
+        timeout_sec=60,
+    )
+    if err:
+        return {}, err
+    object_id = str(data.get("post_id") or data.get("id") or "").strip()
+    permalink = ""
+    if object_id:
+        query = urllib.parse.urlencode({"fields": "permalink_url", "access_token": access_token})
+        details, details_err = _http_get_json_graph(
+            f"https://graph.facebook.com/{_instagram_graph_version()}/{urllib.parse.quote(object_id, safe='')}?{query}",
+            timeout_sec=20,
+        )
+        if not details_err:
+            permalink = str(details.get("permalink_url") or "").strip()
+    return {"id": object_id, "permalink": permalink}, ""
+
+
+@app.post("/api/social/publish-static")
+async def publish_static_to_meta(request: Request):
+    """Publish one approved static creative to connected Facebook and Instagram accounts."""
+    data = await request.json()
+    company_id, user, err = resolve_company_id(
+        request,
+        (data.get("companyId") or "").strip(),
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+
+    image_url = str(data.get("imageUrl") or "").strip()
+    caption = str(data.get("caption") or "").strip()
+    requested = data.get("platforms") or ["Facebook", "Instagram"]
+    platforms = {str(x or "").strip() for x in requested}
+    if _validate_instagram_public_urls([image_url]):
+        return json_error("A public image URL is required", 400)
+    if not caption:
+        return json_error("Caption is required", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT platform, account_id, account_name
+                FROM v2_social_accounts
+                WHERE company_id = %s AND platform IN ('Facebook','Instagram')
+                  AND status = 'connected'
+                ORDER BY id DESC
+                """,
+                (company_id,),
+            )
+            accounts = cur.fetchall()
+    finally:
+        conn.close()
+
+    results = {}
+    for platform in ("Facebook", "Instagram"):
+        if platform not in platforms:
+            continue
+        account = next((row for row in accounts if row.get("platform") == platform), None)
+        if not account:
+            results[platform] = {"success": False, "error": f"{platform} is not connected"}
+            continue
+        account_id = str(account.get("account_id") or "").strip()
+
+        if platform == "Facebook":
+            token, token_err = _facebook_page_token(company_id, account_id)
+            if token_err:
+                results[platform] = {"success": False, "error": token_err}
+                continue
+            published, publish_err = _facebook_publish_image(account_id, token, image_url, caption)
+            results[platform] = (
+                {"success": False, "error": publish_err}
+                if publish_err
+                else {"success": True, **published}
+            )
+            continue
+
+        _account, token, token_err = _instagram_token_for_account(company_id, account_id)
+        if token_err:
+            results[platform] = {"success": False, "error": token_err}
+            continue
+        creation_id, create_err = _instagram_create_container(
+            account_id, token, {"image_url": image_url, "caption": caption}
+        )
+        if create_err:
+            results[platform] = {"success": False, "error": create_err}
+            continue
+        media_id, publish_err = _instagram_publish_container(account_id, token, creation_id)
+        if publish_err:
+            results[platform] = {"success": False, "error": publish_err}
+            continue
+        results[platform] = {
+            "success": True,
+            "id": media_id,
+            "permalink": _instagram_permalink(media_id, token),
+        }
+
+    complete = bool(results) and all(item.get("success") for item in results.values())
+    return JSONResponse({"success": complete, "results": results}, status_code=200 if complete else 207)
 
 
 @app.get("/api/instagram/accounts")
@@ -6575,13 +6721,30 @@ def _ensure_daily_social_drafts(company_id: str):
         conn.close()
 
 
+def _resolve_social_content_company(request: Request, provided_company_id: str, *, write: bool = False):
+    company_id, user, err = resolve_company_id(
+        request,
+        provided_company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return "", err
+    allowed_roles = (ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN) if write else (
+        ROLE_PLATFORM_ADMIN,
+        ROLE_COMPANY_ADMIN,
+        ROLE_EMPLOYEE,
+    )
+    if not user or not is_role(user, *allowed_roles):
+        return "", json_error("Forbidden", 403)
+    return company_id, None
+
+
 @app.get("/social-content-data")
-def social_content_data(companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+def social_content_data(request: Request, companyId: str = ""):
+    company_id, err = _resolve_social_content_company(request, companyId)
+    if err:
+        return err
 
     ok, err = _ensure_daily_social_drafts(company_id)
     if not ok:
@@ -6631,13 +6794,12 @@ def social_content_data(companyId: str = ""):
 @app.post("/social-content/regenerate")
 async def social_content_regenerate(request: Request):
     data = await request.json()
-    company_id = (data.get("companyId") or "").strip()
+    company_id, err = _resolve_social_content_company(
+        request, (data.get("companyId") or "").strip(), write=True
+    )
+    if err:
+        return err
     draft_id = data.get("id")
-
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -6703,13 +6865,12 @@ async def social_content_regenerate(request: Request):
 @app.post("/social-content/update")
 async def social_content_update(request: Request):
     data = await request.json()
-    company_id = (data.get("companyId") or "").strip()
+    company_id, err = _resolve_social_content_company(
+        request, (data.get("companyId") or "").strip(), write=True
+    )
+    if err:
+        return err
     draft_id = data.get("id")
-
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -6767,14 +6928,13 @@ async def social_content_update(request: Request):
 @app.post("/social-content/status")
 async def social_content_status(request: Request):
     data = await request.json()
-    company_id = (data.get("companyId") or "").strip()
+    company_id, err = _resolve_social_content_company(
+        request, (data.get("companyId") or "").strip(), write=True
+    )
+    if err:
+        return err
     draft_id = data.get("id")
     status = (data.get("status") or "").strip()
-
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:
@@ -6815,13 +6975,12 @@ async def social_content_status(request: Request):
 @app.post("/social-content/publish")
 async def social_content_publish(request: Request):
     data = await request.json()
-    company_id = (data.get("companyId") or "").strip()
+    company_id, err = _resolve_social_content_company(
+        request, (data.get("companyId") or "").strip(), write=True
+    )
+    if err:
+        return err
     draft_id = data.get("id")
-
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
     try:
         draft_id_int = int(draft_id)
     except Exception:

@@ -735,6 +735,36 @@ textarea{
     <div class="jobs-grid" id="aiMediaJobsList"></div>
   </div>
 
+  <div class="card publisher-card" id="metaQuickPublisher">
+    <div class="publisher-head">
+      <div>
+        <span class="pill connected">Meta Quick Publish</span>
+        <h2>Publish One Static Creative</h2>
+        <div class="hint">Send one approved image to the connected Facebook Page and Instagram Business account.</div>
+      </div>
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="metaStaticImageUrl">Public image URL</label>
+      <input id="metaStaticImageUrl" value="https://ai-flow-platform-v2-saas.onrender.com/media/social/2026-08-14/ai-flow-post-01.png">
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="metaStaticCaption">Caption</label>
+      <textarea id="metaStaticCaption">Turn conversations into booked revenue.
+
+AI FLOW replies, qualifies, follows up and books appointments 24/7 — so small businesses can respond faster and miss fewer opportunities.
+
+Want to see it on your website or WhatsApp? Message us.
+
+#AIFlow #AISales #BusinessAutomation #LeadGeneration #SmallBusiness</textarea>
+    </div>
+    <div class="action-row">
+      <label><input type="checkbox" id="publishFacebook" checked> Facebook</label>
+      <label><input type="checkbox" id="publishInstagram" checked> Instagram</label>
+      <button class="green" onclick="publishStaticCampaign()">Publish Approved Post</button>
+    </div>
+    <div class="hint" id="metaQuickPublishMessage">Reconnect Meta once if publishing permissions were added after the original connection.</div>
+  </div>
+
   <div class="card publisher-card" id="instagramPublisher">
     <div class="publisher-head">
       <div>
@@ -1266,6 +1296,48 @@ function setInstagramPublisherStatus(text, connected){
 function setInstagramPublishMessage(text){
   const el = document.getElementById("instagramPublishMessage");
   if(el) el.innerText = text;
+}
+
+function setMetaQuickPublishMessage(text){
+  const el = document.getElementById("metaQuickPublishMessage");
+  if(el) el.innerText = text;
+}
+
+async function publishStaticCampaign(){
+  if(!companyId){
+    setMetaQuickPublishMessage("Select a company first.");
+    return;
+  }
+  const imageUrl = (document.getElementById("metaStaticImageUrl")?.value || "").trim();
+  const caption = (document.getElementById("metaStaticCaption")?.value || "").trim();
+  const platforms = [];
+  if(document.getElementById("publishFacebook")?.checked) platforms.push("Facebook");
+  if(document.getElementById("publishInstagram")?.checked) platforms.push("Instagram");
+  if(!imageUrl || !caption || !platforms.length){
+    setMetaQuickPublishMessage("Image URL, caption and at least one platform are required.");
+    return;
+  }
+  setMetaQuickPublishMessage("Publishing approved static creative...");
+  try{
+    const res = await fetch("/api/social/publish-static", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, imageUrl, caption, platforms})
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    const results = data.results || {};
+    const summary = Object.entries(results).map(([platform, result]) => {
+      if(result && result.success){
+        return platform + ": published" + (result.permalink ? " — " + result.permalink : "");
+      }
+      return platform + ": " + ((result && result.error) || "publish failed");
+    }).join(" | ");
+    setMetaQuickPublishMessage(summary || data.error || out.text || "Publish failed.");
+  }catch(e){
+    setMetaQuickPublishMessage("Publish request failed.");
+  }
 }
 
 function getSelectedInstagramPostType(){
