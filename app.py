@@ -3220,11 +3220,9 @@ def _validate_redirect_uri(uri: str, provider: str):
 
 @app.get("/api/meta/connect")
 def meta_connect(request: Request, companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+    company_id, err = _resolve_social_admin_company(request, companyId)
+    if err:
+        return err
 
     app_id, app_secret, redirect_uri = _meta_config()
     if not app_id or not app_secret or not redirect_uri:
@@ -4515,6 +4513,20 @@ def _resolve_ai_media_company(request: Request, provided_company_id: str):
     return company_id, None
 
 
+def _resolve_social_admin_company(request: Request, provided_company_id: str):
+    company_id, user, err = resolve_company_id(
+        request,
+        provided_company_id,
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return "", err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return "", json_error("Forbidden", 403)
+    return company_id, None
+
+
 def _parse_json_list(value: str):
     if not value:
         return []
@@ -5325,11 +5337,9 @@ async def ai_media_generate_reel(request: Request):
 
 @app.get("/tiktok-connect-url")
 def tiktok_connect_url(request: Request, companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
+    company_id, err = _resolve_social_admin_company(request, companyId)
+    if err:
+        return err
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
@@ -5371,12 +5381,10 @@ def tiktok_connect_url(request: Request, companyId: str = ""):
 
 
 @app.get("/tiktok-oauth-preflight")
-def tiktok_oauth_preflight(companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
+def tiktok_oauth_preflight(request: Request, companyId: str = ""):
+    company_id, err = _resolve_social_admin_company(request, companyId)
+    if err:
+        return err
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
@@ -5593,12 +5601,14 @@ def tiktok_oauth_callback(request: Request, code: str = "", state: str = ""):
 
 
 @app.get("/tiktok-accounts")
-def tiktok_accounts(companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"error": "Unknown companyId"}, status_code=404)
+def tiktok_accounts(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request, companyId, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     conn = get_db_connection()
     if not conn:
@@ -5629,11 +5639,9 @@ def tiktok_accounts(companyId: str = ""):
 
 @app.get("/api/tiktok/connect")
 def tiktok_connect(request: Request, companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
+    company_id, err = _resolve_social_admin_company(request, companyId)
+    if err:
+        return err
 
     client_key, client_secret, redirect_uri = _tiktok_config()
     config_issue = _tiktok_config_issue(client_key, client_secret, redirect_uri)
@@ -6714,12 +6722,14 @@ async def delete_booking(request: Request):
         conn.close()
 
 @app.get("/social-data")
-def social_data(companyId: str = ""):
-    if not companyId:
-        return JSONResponse(
-            {"error": "Missing companyId"},
-            status_code=400,
-        )
+def social_data(request: Request, companyId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request, companyId, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN, ROLE_EMPLOYEE):
+        return json_error("Forbidden", 403)
 
     conn = get_db_connection()
 
@@ -6738,7 +6748,7 @@ def social_data(companyId: str = ""):
                 WHERE company_id = %s
                 ORDER BY id DESC
                 """,
-                (companyId,),
+                (company_id,),
             )
 
             accounts = cur.fetchall()
@@ -6786,12 +6796,10 @@ def social_data(companyId: str = ""):
 
 
 @app.get("/whatsapp-connect-url")
-def whatsapp_connect_url(companyId: str = ""):
-    company_id = (companyId or "").strip()
-    if not company_id:
-        return JSONResponse({"success": False, "error": "Missing companyId"}, status_code=400)
-    if not _company_exists(company_id):
-        return JSONResponse({"success": False, "error": "Unknown companyId"}, status_code=404)
+def whatsapp_connect_url(request: Request, companyId: str = ""):
+    company_id, err = _resolve_social_admin_company(request, companyId)
+    if err:
+        return err
 
     cfg = _whatsapp_config_snapshot()
 
