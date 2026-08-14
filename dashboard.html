@@ -672,11 +672,11 @@ async function loadCompaniesForPlatformAdmin(){
     const items = data.companies || [];
     sel.innerHTML = '<option value=\"\">Select a company...</option>';
     items.forEach(c => {
-      const id = String(c.company_id || \"\");
-      const name = String(c.company_name || \"\");
-      const status = String(c.status || \"active\");
-      const label = (name ? (name + \" — \") : \"\") + id + (status !== \"active\" ? (\" (\" + status + \")\") : \"\");
-      const opt = document.createElement(\"option\");
+      const id = String(c.company_id || "");
+      const name = String(c.company_name || "");
+      const status = String(c.status || "active");
+      const label = (name ? (name + " — ") : "") + id + (status !== "active" ? (" (" + status + ")") : "");
+      const opt = document.createElement("option");
       opt.value = id;
       opt.innerText = label;
       if(companyId && id === companyId){
@@ -684,30 +684,30 @@ async function loadCompaniesForPlatformAdmin(){
       }
       sel.appendChild(opt);
     });
-    setPlatformMsg(items.length ? \"Select a company and click View Company.\" : \"No companies found.\");
+    setPlatformMsg(items.length ? "Select a company and click View Company." : "No companies found.");
   }catch(e){
-    setPlatformMsg(\"Connection error loading companies.\");
+    setPlatformMsg("Connection error loading companies.");
   }
 }
 
 async function applyPlatformCompany(){
-  const sel = document.getElementById(\"platformCompanySelect\");
-  const id = (sel && sel.value) ? String(sel.value) : \"\";
+  const sel = document.getElementById("platformCompanySelect");
+  const id = (sel && sel.value) ? String(sel.value) : "";
   if(!id){
-    setPlatformMsg(\"Select a company first.\");
+    setPlatformMsg("Select a company first.");
     return;
   }
   companyId = id;
-  localStorage.setItem(\"ai_flow_company_id\", companyId);
+  localStorage.setItem("ai_flow_company_id", companyId);
   try{
-    await fetch(\"/api/set-active-company\", {
-      method:\"POST\",
-      credentials:\"same-origin\",
-      headers:{\"Content-Type\":\"application/json\"},
+    await fetch("/api/set-active-company", {
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
       body:JSON.stringify({companyId: companyId})
     });
   }catch(e){}
-  setMessage(\"\");
+  setMessage("");
   loadDashboardData();
 }
 
