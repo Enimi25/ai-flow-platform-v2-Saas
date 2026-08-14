@@ -776,6 +776,47 @@ def init_db():
                 """
             )
 
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_social_automation_settings (
+                    company_id TEXT PRIMARY KEY,
+                    enabled BOOLEAN DEFAULT FALSE,
+                    daily_content_units INTEGER DEFAULT 3,
+                    timezone TEXT DEFAULT 'UTC',
+                    publish_mode TEXT DEFAULT 'approval',
+                    posting_times TEXT DEFAULT '["09:00","14:00","19:00"]',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS v2_social_publish_log (
+                    id SERIAL PRIMARY KEY,
+                    company_id TEXT DEFAULT '',
+                    platform TEXT DEFAULT '',
+                    content_kind TEXT DEFAULT '',
+                    external_id TEXT DEFAULT '',
+                    permalink TEXT DEFAULT '',
+                    status TEXT DEFAULT '',
+                    error_message TEXT DEFAULT '',
+                    scheduled_for TEXT DEFAULT '',
+                    published_at TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT ''
+                );
+                """
+            )
+
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_v2_social_publish_log_company
+                ON v2_social_publish_log (company_id, created_at DESC);
+                """
+            )
+
             # Stripe payment records (MVP).
             cur.execute(
                 """
@@ -7153,6 +7194,157 @@ def _resolve_social_content_company(request: Request, provided_company_id: str, 
     if not user or not is_role(user, *allowed_roles):
         return "", json_error("Forbidden", 403)
     return company_id, None
+
+
+@app.get("/api/social/automation-settings")
+def social_automation_settings(request: Request, companyId: str = ""):
+    company_id, err = _resolve_social_content_company(request, companyId)
+    if err:
+        return err
+    defaults = {
+        "enabled": False,
+        "dailyContentUnits": 3,
+        "timezone": "UTC",
+        "publishMode": "approval",
+        "postingTimes": ["09:00", "14:00", "19:00"],
+    }
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM v2_social_automation_settings WHERE company_id = %s",
+                (company_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return JSONResponse({"success": True, "settings": defaults})
+        try:
+            posting_times = json.loads(row.get("posting_times") or "[]")
+        except Exception:
+            posting_times = defaults["postingTimes"]
+        return JSONResponse(
+            {
+                "success": True,
+                "settings": {
+                    "enabled": bool(row.get("enabled")),
+                    "dailyContentUnits": int(row.get("daily_content_units") or 3),
+                    "timezone": row.get("timezone") or "UTC",
+                    "publishMode": row.get("publish_mode") or "approval",
+                    "postingTimes": posting_times,
+                },
+            }
+        )
+    finally:
+        conn.close()
+
+
+@app.post("/api/social/automation-settings")
+async def save_social_automation_settings(request: Request):
+    data = await request.json()
+    company_id, err = _resolve_social_content_company(
+        request, (data.get("companyId") or "").strip(), write=True
+    )
+    if err:
+        return err
+    enabled = data.get("enabled") is True
+    timezone_name = str(data.get("timezone") or "UTC").strip()[:80] or "UTC"
+    publish_mode = str(data.get("publishMode") or "approval").strip()
+    # TikTok requires an explicit per-post review/confirmation. Keep approval as
+    # the safe default and reject invented fully autonomous modes.
+    if publish_mode not in {"approval", "meta_auto_after_brand_approval"}:
+        return json_error("Invalid publish mode", 400)
+    posting_times = data.get("postingTimes") or ["09:00", "14:00", "19:00"]
+    if not isinstance(posting_times, list) or len(posting_times) != 3:
+        return json_error("Exactly three posting times are required", 400)
+    clean_times = []
+    for value in posting_times:
+        candidate = str(value or "").strip()
+        try:
+            datetime.strptime(candidate, "%H:%M")
+        except Exception:
+            return json_error("Posting times must use HH:MM", 400)
+        clean_times.append(candidate)
+
+    now = _iso_z(datetime.utcnow())
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO v2_social_automation_settings (
+                    company_id, enabled, daily_content_units, timezone,
+                    publish_mode, posting_times, created_at, updated_at
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (company_id) DO UPDATE SET
+                    enabled = EXCLUDED.enabled,
+                    daily_content_units = EXCLUDED.daily_content_units,
+                    timezone = EXCLUDED.timezone,
+                    publish_mode = EXCLUDED.publish_mode,
+                    posting_times = EXCLUDED.posting_times,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    company_id, enabled, 3, timezone_name, publish_mode,
+                    json.dumps(clean_times), now, now,
+                ),
+            )
+        conn.commit()
+        return JSONResponse({"success": True})
+    finally:
+        conn.close()
+
+
+def _social_cron_authorized(request: Request):
+    expected = (os.getenv("SOCIAL_CRON_SECRET") or "").strip()
+    if not expected:
+        return False, json_error("SOCIAL_CRON_SECRET is not configured", 503)
+    supplied = (request.headers.get("authorization") or "").strip()
+    if supplied.lower().startswith("bearer "):
+        supplied = supplied[7:].strip()
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        return False, json_error("Unauthorized", 401)
+    return True, None
+
+
+@app.post("/api/cron/social-content")
+def run_social_content_cron(request: Request):
+    authorized, err = _social_cron_authorized(request)
+    if not authorized:
+        return err
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT s.company_id
+                FROM v2_social_automation_settings s
+                JOIN companies c ON c.company_id = s.company_id
+                WHERE s.enabled = TRUE AND COALESCE(c.status, 'active') = 'active'
+                ORDER BY s.company_id
+                """
+            )
+            company_ids = [str(row.get("company_id") or "") for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+    generated, failed = [], []
+    for company_id in company_ids:
+        ok, generate_err = _ensure_daily_social_drafts(company_id)
+        (generated if ok else failed).append(company_id if ok else {"companyId": company_id, "error": generate_err})
+    return JSONResponse(
+        {
+            "success": not failed,
+            "generatedCompanies": len(generated),
+            "failed": failed,
+            "note": "This job creates the daily approval queue. Publishing remains policy- and permission-gated per channel.",
+        }
+    )
 
 
 @app.get("/social-content-data")

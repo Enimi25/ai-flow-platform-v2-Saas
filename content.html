@@ -735,6 +735,37 @@ textarea{
     <div class="jobs-grid" id="aiMediaJobsList"></div>
   </div>
 
+  <div class="card publisher-card" id="automationSettingsCard">
+    <div class="publisher-head">
+      <div>
+        <span class="pill connected">Daily Automation</span>
+        <h2>Three Content Units per Day</h2>
+        <div class="hint">AI prepares an educational static, proof/case study and short-form Reel with platform-native variants.</div>
+      </div>
+      <label><input type="checkbox" id="socialAutomationEnabled"> Enabled</label>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="socialAutomationTimezone">Timezone</label>
+        <input id="socialAutomationTimezone" value="Asia/Bangkok">
+      </div>
+      <div class="field">
+        <label for="socialAutomationMode">Publishing mode</label>
+        <select id="socialAutomationMode">
+          <option value="approval">Approval required</option>
+          <option value="meta_auto_after_brand_approval">Meta auto-publish after brand approval</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
+      <div class="field"><label for="socialTime1">Post 1</label><input id="socialTime1" type="time" value="09:00"></div>
+      <div class="field"><label for="socialTime2">Post 2</label><input id="socialTime2" type="time" value="14:00"></div>
+      <div class="field"><label for="socialTime3">Post 3</label><input id="socialTime3" type="time" value="19:00"></div>
+    </div>
+    <div class="action-row"><button class="green" onclick="saveSocialAutomationSettings()">Save Automation</button></div>
+    <div class="hint" id="socialAutomationMessage">TikTok always requires its current consent/review flow.</div>
+  </div>
+
   <div class="card publisher-card" id="metaQuickPublisher">
     <div class="publisher-head">
       <div>
@@ -1350,6 +1381,48 @@ function setMetaQuickPublishMessage(text){
   if(el) el.innerText = text;
 }
 
+function setSocialAutomationMessage(text){
+  const el = document.getElementById("socialAutomationMessage");
+  if(el) el.innerText = text;
+}
+
+async function loadSocialAutomationSettings(){
+  if(!companyId) return;
+  try{
+    const res = await fetch("/api/social/automation-settings?companyId=" + encodeURIComponent(companyId), {credentials:"same-origin"});
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){ setSocialAutomationMessage(data.error || "Automation settings could not load."); return; }
+    const settings = data.settings || {};
+    document.getElementById("socialAutomationEnabled").checked = settings.enabled === true;
+    document.getElementById("socialAutomationTimezone").value = settings.timezone || "UTC";
+    document.getElementById("socialAutomationMode").value = settings.publishMode || "approval";
+    const times = settings.postingTimes || ["09:00","14:00","19:00"];
+    ["socialTime1","socialTime2","socialTime3"].forEach((id, index) => { document.getElementById(id).value = times[index] || ""; });
+    setSocialAutomationMessage(settings.enabled ? "Daily content queue is enabled." : "Daily content queue is disabled.");
+  }catch(e){ setSocialAutomationMessage("Automation settings could not load."); }
+}
+
+async function saveSocialAutomationSettings(){
+  if(!companyId){ setSocialAutomationMessage("Select a company first."); return; }
+  const payload = {
+    companyId,
+    enabled:document.getElementById("socialAutomationEnabled")?.checked === true,
+    timezone:(document.getElementById("socialAutomationTimezone")?.value || "UTC").trim(),
+    publishMode:document.getElementById("socialAutomationMode")?.value || "approval",
+    postingTimes:["socialTime1","socialTime2","socialTime3"].map(id => document.getElementById(id)?.value || "")
+  };
+  setSocialAutomationMessage("Saving automation settings...");
+  try{
+    const res = await fetch("/api/social/automation-settings", {
+      method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    setSocialAutomationMessage(res.ok && !data.error ? "Automation settings saved." : (data.error || out.text || "Save failed."));
+  }catch(e){ setSocialAutomationMessage("Save failed."); }
+}
+
 async function publishStaticCampaign(){
   if(!companyId){
     setMetaQuickPublishMessage("Select a company first.");
@@ -1960,6 +2033,7 @@ async function initPage(){
   }
 
   loadPosts();
+  loadSocialAutomationSettings();
   loadInstagramPublisher();
   setAiMediaType(aiMediaType);
   loadAiMediaJobs();
