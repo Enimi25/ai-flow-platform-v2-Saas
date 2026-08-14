@@ -130,6 +130,16 @@ FIXED_PLATFORM_ADMIN_EMAILS = (
     "baskinltd@gmail.com",
     "baskinltd@yahoo.com",
 )
+PLATFORM_COMPANY_PROFILE = {
+    "companyName": "Baskin Ltd",
+    "country": "Singapore",
+    "address": "1 Raffles Place, Singapore 048616 (temporary mailing address)",
+    "supportEmail": "baskinltd@gmail.com",
+    "backupEmail": "baskinltd@yahoo.com",
+    "phone": "Not configured",
+    "registrationStatus": "Registration details pending verification",
+    "registrationNumber": "Not configured",
+}
 
 USER_STATUS_ACTIVE = "active"
 USER_STATUS_INVITED = "invited"
@@ -968,7 +978,8 @@ def page_response(filename: str, media_type: str | None = None, request: Request
             + "}catch(e){}})();</script>"
         )
         html = (BASE_DIR / filename).read_text(encoding="utf-8")
-        return HTMLResponse(html.replace("</head>", bootstrap + "</head>", 1), headers=headers)
+        assistant = '<script src="/app-assistant.js" defer></script>'
+        return HTMLResponse(html.replace("</head>", bootstrap + assistant + "</head>", 1), headers=headers)
     return FileResponse(BASE_DIR / filename, media_type=media_type, headers=headers)
 
 @app.get("/media/{path:path}")
@@ -1192,6 +1203,62 @@ def admin_data(request: Request):
 @app.get("/widget.js")
 def widget():
     return page_response("widget.js", media_type="application/javascript")
+
+
+@app.get("/app-assistant.js")
+def app_assistant_script():
+    return FileResponse(
+        BASE_DIR / "app-assistant.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.post("/api/support/chat")
+async def app_support_chat(request: Request):
+    user = require_login(request)
+    if not user:
+        return json_error("Not logged in", 401)
+    data = await request.json()
+    message = str(data.get("message") or "").strip()[:2000]
+    page = str(data.get("page") or "").strip()[:120]
+    if not message:
+        return json_error("Enter a question", 400)
+
+    fallback = (
+        "I can help with AI FLOW setup, social channels, Google Calendar, "
+        "bookings, payments, CRM, leads, and content publishing. For account-specific help, "
+        "use Contact AI FLOW Support below."
+    )
+    api_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    if not api_key:
+        return JSONResponse({"success": True, "reply": fallback})
+    try:
+        client = Groq(api_key=api_key)
+        completion = client.chat.completions.create(
+            model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are AI FLOW product support inside an English-only SaaS dashboard. "
+                        "Answer briefly and clearly. Help with Dashboard, Leads, Content Factory, "
+                        "Social Accounts, Customer Conversations, Analytics, Google Calendar, "
+                        "bookings, Stripe payments, CRM, Billing and Settings. Never invent connection "
+                        "status or claim an action succeeded. Direct account-specific or unresolved "
+                        "issues to the Contact AI FLOW Support button."
+                    ),
+                },
+                {"role": "user", "content": f"Current page: {page}\nQuestion: {message}"},
+            ],
+            temperature=0.2,
+            max_tokens=350,
+        )
+        reply = (completion.choices[0].message.content or "").strip() or fallback
+        return JSONResponse({"success": True, "reply": reply})
+    except Exception as e:
+        print("APP SUPPORT CHAT ERROR:", type(e).__name__, str(e)[:200])
+        return JSONResponse({"success": True, "reply": fallback})
 
 
 @app.get("/privacy", response_class=HTMLResponse)
@@ -1556,6 +1623,13 @@ def api_me(request: Request):
     except Exception:
         active_company_id = ""
     return JSONResponse({"success": True, "user": user, "activeCompanyId": active_company_id})
+
+
+@app.get("/api/platform-info")
+def platform_info(request: Request):
+    if not require_login(request):
+        return json_error("Not logged in", 401)
+    return JSONResponse({"success": True, "company": PLATFORM_COMPANY_PROFILE})
 
 
 @app.get("/api/companies")
