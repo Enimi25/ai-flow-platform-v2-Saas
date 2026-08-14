@@ -453,6 +453,7 @@ button{
       <div class="row"><span>Support</span><strong id="platformSupportEmail">—</strong></div>
       <div class="row"><span>Backup</span><strong id="platformBackupEmail">—</strong></div>
       <div class="row"><span>Phone</span><strong id="platformPhone">—</strong></div>
+      <div class="row"><span>Business WhatsApp</span><strong id="platformWhatsapp">—</strong></div>
       <div class="row"><span>Registration</span><strong id="platformRegistration">—</strong></div>
 
       <button class="dark" onclick="goTeam()" style="margin-top:12px;">Manage Team</button>
@@ -615,6 +616,7 @@ async function initSettings(){
       document.getElementById("platformSupportEmail").innerText = company.supportEmail || "—";
       document.getElementById("platformBackupEmail").innerText = company.backupEmail || "—";
       document.getElementById("platformPhone").innerText = company.phone || "—";
+      document.getElementById("platformWhatsapp").innerText = company.whatsapp || "—";
       document.getElementById("platformRegistration").innerText = company.registrationStatus || "—";
     }catch(e){}
     if(!companyId){
