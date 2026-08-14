@@ -18,6 +18,7 @@ import urllib.parse
 import urllib.error
 import urllib.request
 import uuid
+import time
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -3848,6 +3849,28 @@ def _instagram_publish_container(ig_user_id: str, access_token: str, creation_id
     return media_id, ""
 
 
+def _instagram_wait_for_container(creation_id: str, access_token: str, max_wait_seconds: int = 60):
+    """Poll asynchronous Reel/carousel processing before media_publish."""
+    deadline = time.monotonic() + max(5, max_wait_seconds)
+    last_status = ""
+    while time.monotonic() < deadline:
+        query = urllib.parse.urlencode({"fields": "status_code,status", "access_token": access_token})
+        url = (
+            f"https://graph.facebook.com/{_instagram_graph_version()}/"
+            f"{urllib.parse.quote(creation_id, safe='')}?{query}"
+        )
+        data, err = _http_get_json_graph(url, timeout_sec=20)
+        if err:
+            return err
+        last_status = str(data.get("status_code") or "").upper()
+        if last_status == "FINISHED":
+            return ""
+        if last_status in {"ERROR", "EXPIRED"}:
+            return _safe_instagram_error(data.get("status") or f"Instagram container {last_status.lower()}")
+        time.sleep(3)
+    return f"Instagram media is still processing ({last_status or 'unknown'}). Try publishing again shortly."
+
+
 def _instagram_permalink(media_id: str, access_token: str) -> str:
     if not media_id:
         return ""
@@ -3997,6 +4020,149 @@ async def publish_static_to_meta(request: Request):
 
     complete = bool(results) and all(item.get("success") for item in results.values())
     return JSONResponse({"success": complete, "results": results}, status_code=200 if complete else 207)
+
+
+@app.post("/api/facebook/publish-reel")
+async def facebook_publish_reel(request: Request):
+    data = await request.json()
+    company_id, user, err = resolve_company_id(
+        request,
+        (data.get("companyId") or "").strip(),
+        allow_public=False,
+        allow_platform_admin_any=True,
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+    if data.get("confirmed") is not True:
+        return json_error("Explicit confirmation is required before publishing", 400)
+
+    video_url = str(data.get("videoUrl") or "").strip()
+    title = str(data.get("title") or "").strip()[:255]
+    description = str(data.get("description") or "").strip()[:5000]
+    if _validate_instagram_public_urls([video_url]):
+        return json_error("A public Reel URL is required", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT account_id FROM v2_social_accounts
+                WHERE company_id = %s AND platform = 'Facebook' AND status = 'connected'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (company_id,),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    page_id = str(row.get("account_id") or "").strip() if row else ""
+    if not page_id:
+        return json_error("Facebook Page is not connected", 400)
+    token, token_err = _facebook_page_token(company_id, page_id)
+    if token_err:
+        return json_error(token_err, 400)
+
+    reels_url = (
+        f"https://graph.facebook.com/{_instagram_graph_version()}/"
+        f"{urllib.parse.quote(page_id, safe='')}/video_reels"
+    )
+    started, start_err = _http_post_form_json_graph(
+        reels_url, {"access_token": token, "upload_phase": "start"}, timeout_sec=45
+    )
+    if start_err:
+        return json_error(start_err, 400)
+    video_id = str(started.get("video_id") or "").strip()
+    upload_url = str(started.get("upload_url") or "").strip()
+    if not video_id or not upload_url.startswith("https://rupload.facebook.com/"):
+        return json_error("Facebook did not return a valid Reel upload session", 502)
+
+    upload_req = urllib.request.Request(
+        upload_url,
+        data=b"",
+        method="POST",
+        headers={
+            "Authorization": f"OAuth {token}",
+            "file_url": video_url,
+            "User-Agent": "AI-FLOW/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(upload_req, timeout=90) as response:
+            upload_data = json.loads(response.read().decode("utf-8", errors="replace") or "{}")
+    except Exception as exc:
+        return json_error(f"Facebook Reel upload failed: {type(exc).__name__}", 502)
+    if upload_data.get("success") is not True:
+        return json_error("Facebook did not accept the hosted Reel", 502)
+
+    finished, finish_err = _http_post_form_json_graph(
+        reels_url,
+        {
+            "access_token": token,
+            "video_id": video_id,
+            "upload_phase": "finish",
+            "video_state": "PUBLISHED",
+            "description": description,
+            "title": title,
+        },
+        timeout_sec=60,
+    )
+    if finish_err:
+        return json_error(finish_err, 400)
+    return JSONResponse(
+        {
+            "success": finished.get("success") is True,
+            "videoId": video_id,
+            "message": "Facebook accepted the Reel. Check processing status before reporting it as published.",
+        }
+    )
+
+
+@app.get("/api/facebook/reel-status")
+def facebook_reel_status(request: Request, companyId: str = "", videoId: str = ""):
+    company_id, user, err = resolve_company_id(
+        request, companyId, allow_public=False, allow_platform_admin_any=True
+    )
+    if err:
+        return err
+    if not user or not is_role(user, ROLE_PLATFORM_ADMIN, ROLE_COMPANY_ADMIN):
+        return json_error("Forbidden", 403)
+    video_id = str(videoId or "").strip()
+    if not video_id:
+        return json_error("videoId is required", 400)
+
+    conn = get_db_connection()
+    if not conn:
+        return json_error("Database error", 500)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT account_id FROM v2_social_accounts
+                WHERE company_id = %s AND platform = 'Facebook' AND status = 'connected'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (company_id,),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    page_id = str(row.get("account_id") or "").strip() if row else ""
+    token, token_err = _facebook_page_token(company_id, page_id)
+    if token_err:
+        return json_error(token_err, 400)
+    query = urllib.parse.urlencode({"fields": "status,permalink_url", "access_token": token})
+    details, details_err = _http_get_json_graph(
+        f"https://graph.facebook.com/{_instagram_graph_version()}/{urllib.parse.quote(video_id, safe='')}?{query}",
+        timeout_sec=20,
+    )
+    if details_err:
+        return json_error(details_err, 400)
+    return JSONResponse({"success": True, "videoId": video_id, "details": details})
 
 
 @app.get("/api/instagram/accounts")
@@ -4277,6 +4443,11 @@ async def instagram_publish(request: Request):
         creation_id=creation_id,
         updated_at=now,
     )
+
+    if post_type in {"reel", "carousel"}:
+        processing_err = _instagram_wait_for_container(creation_id, access_token)
+        if processing_err:
+            return _instagram_fail_job(company_id, job_id, processing_err, status_code=409)
 
     media_id, publish_err = _instagram_publish_container(ig_user_id, access_token, creation_id)
     if publish_err:

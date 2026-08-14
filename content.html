@@ -757,10 +757,17 @@ Want to see it on your website or WhatsApp? Message us.
 
 #AIFlow #AISales #BusinessAutomation #LeadGeneration #SmallBusiness</textarea>
     </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="metaReelUrl">Public Reel URL</label>
+      <input id="metaReelUrl" value="https://ai-flow-platform-v2-saas.onrender.com/media/social/2026-08-14/ai-flow-reel-01.mp4">
+    </div>
     <div class="action-row">
       <label><input type="checkbox" id="publishFacebook" checked> Facebook</label>
       <label><input type="checkbox" id="publishInstagram" checked> Instagram</label>
       <button class="green" onclick="publishStaticCampaign()">Publish Approved Post</button>
+      <label><input type="checkbox" id="metaReelConfirmed"> I reviewed the Reel</label>
+      <button class="green" onclick="publishFacebookReel()">Publish Facebook Reel</button>
+      <button class="dark" onclick="loadLaunchReelToInstagram()">Load Reel into Instagram</button>
     </div>
     <div class="hint" id="metaQuickPublishMessage">Reconnect Meta once if publishing permissions were added after the original connection.</div>
   </div>
@@ -1377,6 +1384,48 @@ async function publishStaticCampaign(){
     setMetaQuickPublishMessage(summary || data.error || out.text || "Publish failed.");
   }catch(e){
     setMetaQuickPublishMessage("Publish request failed.");
+  }
+}
+
+function loadLaunchReelToInstagram(){
+  const url = (document.getElementById("metaReelUrl")?.value || "").trim();
+  const caption = (document.getElementById("metaStaticCaption")?.value || "").trim();
+  setSelectedInstagramPostType("reel");
+  const media = document.getElementById("igMediaUrls");
+  const captionBox = document.getElementById("igCaption");
+  if(media) media.value = url;
+  if(captionBox) captionBox.value = caption;
+  setInstagramPublishMessage("Approved Reel loaded. Review the Instagram account, then publish.");
+  document.getElementById("instagramPublisher")?.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+async function publishFacebookReel(){
+  if(!companyId){
+    setMetaQuickPublishMessage("Select a company first.");
+    return;
+  }
+  const confirmed = document.getElementById("metaReelConfirmed")?.checked === true;
+  if(!confirmed){
+    setMetaQuickPublishMessage("Review and confirm the Reel before publishing.");
+    return;
+  }
+  const videoUrl = (document.getElementById("metaReelUrl")?.value || "").trim();
+  const description = (document.getElementById("metaStaticCaption")?.value || "").trim();
+  setMetaQuickPublishMessage("Uploading approved Reel to Facebook...");
+  try{
+    const res = await fetch("/api/facebook/publish-reel", {
+      method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({companyId, confirmed:true, videoUrl, title:"Your AI Sales Department", description})
+    });
+    const out = await readJsonSafe(res);
+    const data = out.data || {};
+    if(!res.ok || data.error){
+      setMetaQuickPublishMessage(data.error || out.text || "Facebook Reel publish failed.");
+      return;
+    }
+    setMetaQuickPublishMessage("Facebook accepted the Reel. Video ID: " + (data.videoId || "pending") + ". Processing must complete before it counts as published.");
+  }catch(e){
+    setMetaQuickPublishMessage("Facebook Reel publish failed.");
   }
 }
 
