@@ -12,8 +12,21 @@ Required (social integrations):
 - `TIKTOK_CLIENT_SECRET`
 - `TIKTOK_REDIRECT_URI`
 
+WhatsApp Cloud API can use the Meta OAuth connection above. Manual setup additionally supports:
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_BUSINESS_ACCOUNT_ID`
+- `WHATSAPP_VERIFY_TOKEN`
+
 Optional (AI generation):
 - `GROQ_API_KEY`
+
+Google Calendar booking:
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI` (for example `https://<your-render-domain>/google-calendar/callback`)
+
+The Google Cloud OAuth client must enable the Google Calendar API and use the exact redirect URI above.
 
 Notes:
 - Redirect URIs must be **exactly** the same as registered in the provider dashboards.
@@ -55,7 +68,7 @@ AI FLOW supports connecting a TikTok account (basic connect + account display).
 
 `TIKTOK_REDIRECT_URI` must point to the deployed callback endpoint:
 
-`https://<your-render-domain>/api/tiktok/callback`
+`https://<your-render-domain>/tiktok-oauth-callback`
 
 Notes:
 - Tokens are stored server-side in PostgreSQL (`v2_social_tokens`), not exposed to the browser.
