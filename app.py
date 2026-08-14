@@ -1051,7 +1051,34 @@ def page_response(filename: str, media_type: str | None = None, request: Request
     """
     headers = {"Cache-Control": "no-store, max-age=0"}
     user = get_session_user(request) if request else None
-    if user and filename.endswith(".html"):
+    if filename.endswith(".html"):
+        brand = (
+            '<link rel="icon" type="image/png" href="/media/brand/ai-flow-app-icon.png">'
+            '<style>.logo{display:flex!important;align-items:center;gap:9px}'
+            '.ai-flow-brand-icon{width:34px;height:34px;border-radius:10px;object-fit:cover;flex:none;'
+            'box-shadow:0 8px 24px rgba(65,220,255,.18)}'
+            '.brand-signature{position:fixed;left:16px;bottom:12px;z-index:70;display:flex;align-items:center;gap:7px;'
+            'padding:6px 9px;border:1px solid rgba(255,255,255,.12);border-radius:10px;'
+            'background:rgba(4,15,22,.82);backdrop-filter:blur(12px);color:#d7e6eb;'
+            'font:800 10px/1 ui-sans-serif,system-ui;text-decoration:none}'
+            '.brand-signature img{width:22px;height:22px;border-radius:7px;object-fit:cover}'
+            '@media(max-width:900px){.brand-signature{position:static;width:max-content;margin:18px auto}}'
+            '</style>'
+            '<script>document.addEventListener("DOMContentLoaded",function(){'
+            'document.querySelectorAll(".logo").forEach(function(logo){if(logo.querySelector(".ai-flow-brand-icon"))return;'
+            'var img=document.createElement("img");img.src="/media/brand/ai-flow-app-icon.png";'
+            'img.alt="AI FLOW";img.className="ai-flow-brand-icon";logo.prepend(img);});'
+            'if(!document.querySelector(".brand-signature")){var a=document.createElement("a");'
+            'a.href="/";a.className="brand-signature";a.setAttribute("aria-label","AI FLOW home");'
+            'a.innerHTML="<img src=\"/media/brand/ai-flow-app-icon.png\" alt=\"\">Powered by AI FLOW";'
+            'document.body.appendChild(a);}});</script>'
+        )
+        html = (BASE_DIR / filename).read_text(encoding="utf-8")
+        html = html.replace("</head>", brand + "</head>", 1)
+
+        if not user:
+            return HTMLResponse(html, headers=headers)
+
         identity = json.dumps(
             {
                 "email": user.get("email") or "",
@@ -1079,7 +1106,6 @@ def page_response(filename: str, media_type: str | None = None, request: Request
             + "logo.insertAdjacentElement('afterend',box);});"
             + "}catch(e){}})();</script>"
         )
-        html = (BASE_DIR / filename).read_text(encoding="utf-8")
         assistant = '<script src="/app-assistant.js" defer></script>'
         return HTMLResponse(html.replace("</head>", bootstrap + assistant + "</head>", 1), headers=headers)
     return FileResponse(BASE_DIR / filename, media_type=media_type, headers=headers)
@@ -1116,6 +1142,15 @@ def media_response(path: str):
 @app.get("/")
 def home():
     return page_response("index.html")
+
+
+@app.get("/tiktok7cljl2bNmf2SJYQypLqNMYFTXdptPPPd.txt")
+def tiktok_site_verification():
+    return FileResponse(
+        BASE_DIR / "tiktok7cljl2bNmf2SJYQypLqNMYFTXdptPPPd.txt",
+        media_type="text/plain",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/login")
