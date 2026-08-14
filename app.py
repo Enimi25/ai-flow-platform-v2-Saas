@@ -137,8 +137,8 @@ PLATFORM_COMPANY_PROFILE = {
     "address": "1 Raffles Place, Singapore 048616 (temporary mailing address)",
     "supportEmail": "baskinltd@gmail.com",
     "backupEmail": "baskinltd@yahoo.com",
-    "phone": "+972 55 966 5585",
-    "whatsapp": "+972 55 966 5585",
+    "phone": "+971 56 277 1503",
+    "whatsapp": "+971 56 277 1503",
     "registrationStatus": "Registration details pending verification",
     "registrationNumber": "Not configured",
 }
