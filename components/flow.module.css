@@ -25,8 +25,8 @@
 
 .step {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
+  grid-template-columns: auto 1fr;
+  align-items: start;
   gap: 15px;
   width: 100%;
   padding: 17px 19px;
@@ -64,6 +64,9 @@
 
 .stepText { min-width: 0; display: grid; gap: 2px; }
 .stepText em {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   font-style: normal;
   font-size: 11px;
   font-weight: 760;
@@ -71,6 +74,31 @@
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
+
+.stepText em i {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+/* the three facts stay visible whether or not the stage is open: a column of
+   headings with nothing under them is what made this read as empty */
+.quick { display: grid; gap: 6px; margin-top: 10px; }
+
+.quick > span {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.quick svg { color: var(--accent-2); font-size: 11px; margin-top: 3px; }
+.step[data-open="true"] .quick > span { color: var(--text); }
 .stepText b { font-size: 16.5px; letter-spacing: -.025em; }
 .stepText small { font-size: 13px; line-height: 1.5; color: var(--muted); }
 
@@ -235,8 +263,7 @@
 }
 
 @media (max-width: 560px) {
-  .step { grid-template-columns: auto 1fr; padding: 15px 16px; }
-  .stepFact { display: none; }
+  .step { padding: 15px 16px; }
 }
 
 .compareLead {

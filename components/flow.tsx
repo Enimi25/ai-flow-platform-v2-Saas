@@ -29,6 +29,7 @@ const STAGES = [
     title: "A customer writes",
     fact: "23:40, Saturday",
     lead: "We hold the channels, so somebody is always there.",
+    quick: ["Website, Messenger, Instagram, WhatsApp", "Nights, Sundays, holidays", "Any language, typos and all"],
     said: { from: "customer", text: "Скольько стоит чистка? Можно в воскресенье?" },
     detail: [
       "Your website, Facebook Messenger, Instagram and WhatsApp all arrive in one place.",
@@ -44,6 +45,7 @@ const STAGES = [
     title: "The agent answers",
     fact: "4 seconds later",
     lead: "From what you told it, in the language they used.",
+    quick: ["Your prices, your hours, your address", "Under 5 seconds", "Says \"I do not know\" instead of guessing"],
     said: { from: "agent", text: "Чистка — 85. В воскресенье мы закрыты, но есть суббота в 10:00 или 11:00." },
     detail: [
       "It knows your prices, your address, your hours and what you do not do, because you wrote that once in plain language.",
@@ -59,6 +61,7 @@ const STAGES = [
     title: "The lead is kept",
     fact: "Before the chat ends",
     lead: "Nothing depends on anyone remembering to write it down.",
+    quick: ["Name, phone, email, channel", "The whole chat attached", "Saved before they close the window"],
     said: { from: "customer", text: "Анна, +7 916 445 22 10. Давайте субботу в 11." },
     detail: [
       "Name, phone, email, which channel they came from and the entire conversation.",
@@ -74,6 +77,7 @@ const STAGES = [
     title: "The slot is booked",
     fact: "22.08.2026, 11:00",
     lead: "A real appointment, not a promise to call back.",
+    quick: ["Only times that are really free", "Checked again before booking", "Works from a direct message too"],
     said: { from: "agent", text: "Записала вас на субботу, 11:00. До встречи!" },
     detail: [
       "Only times that are genuinely free are ever offered, worked out from your hours and what is already taken.",
@@ -180,11 +184,15 @@ export default function Flow() {
               >
                 <span className={s.stepIcon}><Icon weight="fill" /></span>
                 <span className={s.stepText}>
-                  <em>{stage.step}</em>
+                  <em>{stage.step}<i>{stage.fact}</i></em>
                   <b>{stage.title}</b>
                   <small>{stage.lead}</small>
+                  <span className={s.quick}>
+                    {stage.quick.map((line) => (
+                      <span key={line}><Check weight="bold" />{line}</span>
+                    ))}
+                  </span>
                 </span>
-                <span className={s.stepFact}>{stage.fact}</span>
               </button>
             );
           })}
