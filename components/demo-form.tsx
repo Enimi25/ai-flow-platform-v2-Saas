@@ -24,7 +24,7 @@ export function DemoForm() {
     <form className="demo-form" onSubmit={submit} noValidate>
       <label htmlFor="name">Name</label><input id="name" name="name" autoComplete="name" required minLength={2} />
       <label htmlFor="email">Business email</label><input id="email" name="email" type="email" autoComplete="email" required />
-      <label htmlFor="question">A customer question you receive</label><textarea id="question" name="question" rows={3} required minLength={8} />
+      <label htmlFor="question">What does your business do?</label><textarea id="question" name="question" rows={4} required minLength={8} placeholder="A hair salon on Oxford Street. Cut 45, colour from 110. Tuesday to Sunday, 10 to 20." /><small className="demo-hint">Four lines is enough. This is what the agent learns from.</small>
       <input className="honeypot" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
       <button className="button" type="submit" disabled={state === "loading"}>{state === "loading" ? "Sending..." : <>Request demo <ArrowRight weight="bold" /></>}</button>
       <p className={`form-message ${state}`} aria-live="polite">{message}</p>

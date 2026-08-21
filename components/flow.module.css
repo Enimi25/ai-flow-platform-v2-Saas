@@ -165,7 +165,7 @@
 
 /* --- why this and not the alternatives ---------------------------------- */
 .compare { margin-top: 56px; }
-.compareTitle { margin: 0 0 20px; font-size: clamp(1.3rem, 2vw, 1.7rem); letter-spacing: -.03em; }
+.compareTitle { margin: 0 0 12px; font-size: clamp(1.3rem, 2vw, 1.7rem); letter-spacing: -.03em; }
 
 .tableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-panel); }
 
@@ -195,27 +195,34 @@
   max-width: 34ch;
 }
 
-.table tbody th small {
-  display: block;
-  margin-top: 4px;
-  font-size: 12.5px;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--muted);
-}
+
 
 .table td {
-  padding: 16px 18px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 15px;
   width: 1%;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
-.table td[data-yes="true"] { color: var(--accent-2); }
-.table td[data-yes="true"][data-us="true"] { color: var(--accent); }
-.table td[data-yes="false"] { opacity: .4; }
+/* our column is tinted the whole way down, so the eye follows it */
+.table td[data-us="true"] { background: rgba(195, 245, 60, .045); }
+.table thead th:nth-child(2) { background: rgba(195, 245, 60, .07); }
+
+.cell { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.cell svg { font-size: 14px; flex: none; }
+.cell em { font-style: normal; }
+
+.table td[data-yes="true"] .cell { color: var(--accent-2); }
+.table td[data-yes="true"][data-us="true"] .cell { color: var(--accent); font-weight: 640; }
+.table td[data-yes="false"] .cell { color: var(--danger); }
+.table td[data-yes="false"] .cell em { color: var(--muted); }
+
+/* the last row is the price, and it should land like one */
+.table tr[data-cost="true"] th,
+.table tr[data-cost="true"] td { padding-top: 18px; padding-bottom: 18px; }
+.table tr[data-cost="true"] th { font-size: 15.5px; }
+.table tr[data-cost="true"] .cell { font-size: 15.5px; font-weight: 680; }
 .table tbody tr:last-child th,
 .table tbody tr:last-child td { border-bottom: 0; }
 
@@ -228,4 +235,12 @@
 @media (max-width: 560px) {
   .step { grid-template-columns: auto 1fr; padding: 15px 16px; }
   .stepFact { display: none; }
+}
+
+.compareLead {
+  margin: 0 0 24px;
+  max-width: 66ch;
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--muted);
 }

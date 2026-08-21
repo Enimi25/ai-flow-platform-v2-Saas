@@ -57,10 +57,10 @@ const plans = [
  * the first one.
  */
 const facts = [
-  { figure: "4 sec", label: "to the first reply", note: "While the person is still on the page." },
-  { figure: "24 / 7", label: "covered", note: "Nights, Sundays, the two weeks you are away." },
-  { figure: "4", label: "channels, one inbox", note: "Site, Messenger, Instagram, WhatsApp." },
-  { figure: "1 line", label: "to install", note: "Paste it once. Nothing else changes." },
+  { figure: "4 sec", label: "to answer", note: "They are still on the page when the reply comes." },
+  { figure: "24 / 7", label: "always on", note: "Nights, Sundays, and the two weeks you are away." },
+  { figure: "4", label: "channels, one place", note: "Site, Messenger, Instagram, WhatsApp." },
+  { figure: "1 line", label: "to set up", note: "Paste it once. Nothing else changes." },
 ];
 
 const trades = [
@@ -72,22 +72,37 @@ const trades = [
   { trade: "Tutoring", asked: "Do you teach adults in the evening?" },
 ];
 
-const limits = [
+/** The whole job, listed. This is the section a buyer reads twice. */
+const doing = [
   {
-    title: "It will not invent a price.",
-    body: "If the number is not in what you gave it, it says so and asks how to reach you. A made-up price costs you the customer twice.",
+    title: "We answer your customers",
+    body: "Website, Messenger, Instagram and WhatsApp. In seconds, at any hour, in the language they wrote in. It uses your prices, your address, your hours. If it does not know the answer, it says so and asks for their number. It never guesses.",
+    items: ["Four channels, one inbox", "Under five seconds", "Any language, any hour"],
   },
   {
-    title: "It will not promise a time you have not opened.",
-    body: "Appointments come from your real calendar. If the slot is not free, it is not offered.",
+    title: "We keep every lead",
+    body: "Name, phone, email, where they came from, and the whole chat. Saved before the person even closes the window. A number typed in the middle of a sentence still gets saved. Nobody has to remember to write it down.",
+    items: ["Captured automatically", "Full conversation attached", "Only your workspace sees it"],
   },
   {
-    title: "It hands over when it is out of its depth.",
-    body: "A question it cannot answer becomes a lead with the question attached, in the language the customer wrote in.",
+    title: "We book the appointment",
+    body: "Not a form that says we will call you back. The agent offers times that are really free, from your own opening hours. It checks again before booking, then confirms the exact date. It works from a direct message too.",
+    items: ["Your real hours", "Conflict checked", "Books from social as well"],
   },
   {
-    title: "It never asks for a password or a card number.",
-    body: "Not once, in any wording. The widget says so on screen, under every conversation.",
+    title: "We run your social accounts",
+    body: "Up to three posts a day, in your language, at good hours for your timezone. The queue fills itself up, so there is never a quiet week.",
+    items: ["Written and published", "Never invents a figure", "You can read the queue"],
+  },
+  {
+    title: "We tell you what is happening",
+    body: "One place with your chats, your leads, your calendar, your posts, and a log of everything that happened. Open it in the morning and last night is already there.",
+    items: ["Live activity log", "Leads by channel", "Nothing hidden"],
+  },
+  {
+    title: "We set it up",
+    body: "You tell us what you do, in your own words. We connect your channels, set up the agent, and send you one line for your website. No plugin. Nothing else changes.",
+    items: ["One line to install", "We connect the accounts", "Cancel by deleting the line"],
   },
 ];
 
@@ -148,23 +163,23 @@ const factoryRules = [
 const questions = [
   {
     q: "What languages does it speak?",
-    a: "It replies in whatever language the person writes in, including Russian typed in Latin letters. You write your business description once, in one language; the agent translates as it goes.",
+    a: "Whatever language the customer writes in. You describe your business once, in one language, and the agent handles the rest.",
   },
   {
     q: "What happens when it does not know?",
-    a: "It says it does not know rather than guessing, asks how to reach the person, and files the question so you can answer it yourself. You see it in the activity log the same minute.",
+    a: "It says it does not know, asks for their number, and saves the question for you. You see it in your log the same minute."
   },
   {
     q: "How long does setup take?",
-    a: "Sign in, describe the business in a few lines, paste one line of code into your site. Most of the time goes into the description, not the code.",
+    a: "Sign in, write a few lines about your business, paste one line into your site. The writing takes longer than the code."
   },
   {
     q: "Where do the contact details go?",
-    a: "Into your workspace, and nowhere else. Nobody without your sign-in can read them, and you can export or delete the lot at any time.",
+    a: "Into your own account, and nowhere else. Nobody can read them without your login. You can export or delete everything whenever you want."
   },
   {
     q: "What if I want to stop?",
-    a: "Remove the one line from your site and cancel. No notice period, no call to keep you.",
+    a: "Delete the line from your site and cancel. No notice, no phone call to talk you out of it."
   },
 ];
 
@@ -200,9 +215,8 @@ export default function Home() {
           <h1 className={s.title}>Turn every message into a customer.</h1>
 
           <p className={s.sub}>
-            AI FLOW answers in seconds, learns what the person needs, keeps their
-            contact details and books the appointment. On your site, Messenger,
-            Instagram and WhatsApp.
+            It answers in seconds, saves their phone number, and books them in.
+            On your website, Messenger, Instagram and WhatsApp.
           </p>
 
           <div className={s.heroActions}>
@@ -242,17 +256,17 @@ export default function Home() {
 
       <section className={s.bento} id="platform">
         <div className={s.bentoHead}>
-          <h2 className="h2">One agent. A complete path to sale.</h2>
+          <h2 className="h2">One agent. From question to booking.</h2>
           <p className="body">
-            AI FLOW connects a useful customer reply to the business action that should follow.
+            Someone asks. The agent answers, saves their details, and books them in. That is the whole thing.
           </p>
         </div>
 
         <div className={s.bentoGrid}>
           <article className={`panel ${s.cell} ${s.cellWide}`}>
             <Lightning size={34} weight="fill" />
-            <h3>Reply while intent is high.</h3>
-            <p>Answer the question, understand what the customer needs, and move toward one useful action.</p>
+            <h3>Answer them right away.</h3>
+            <p>People buy when they get an answer fast. Your agent replies in seconds, day or night.</p>
             <div className={s.talk}>
               <p>Do you install on weekends?</p>
               <p className={s.agent}>Yes. Saturday slots are open. Want me to check a time for you?</p>
@@ -263,8 +277,8 @@ export default function Home() {
 
           <article className={`panel ${s.cell} ${s.cellTint}`}>
             <CalendarCheck size={34} weight="fill" />
-            <h3>Book qualified calls</h3>
-            <p>Collect contact details and offer the right appointment while the customer is still reading.</p>
+            <h3>Book the appointment</h3>
+            <p>It takes their phone number and offers a free time, while they are still reading.</p>
             <Link href="/calendar" className={s.cellLink}>Open calendar <ArrowUpRight weight="bold" /></Link>
           </article>
 
@@ -273,8 +287,8 @@ export default function Home() {
               <Strand rungs={22} radius={72} gap={20} step={22} spin={220} />
             </div>
             <ShieldCheck size={34} weight="fill" />
-            <h3>Every channel in one place</h3>
-            <p>Connection health and permissions live in a single protected workspace.</p>
+            <h3>All your channels in one place</h3>
+            <p>Website, Messenger, Instagram and WhatsApp. One login, one list.</p>
             <Link href="/social-accounts" className={s.cellLink}>Open channels <ArrowUpRight weight="bold" /></Link>
           </article>
         </div>
@@ -282,9 +296,9 @@ export default function Home() {
 
       <section className={s.trades} aria-label="Who this is for">
         <div className={s.tradesHead}>
-          <h2 className="h2">The question your business gets every day.</h2>
+          <h2 className="h2">The questions you get every day.</h2>
           <p className="body">
-            The agent learns yours from a description you write once. These are the ones it already handles.
+            You write four lines about your business. The agent takes it from there.
           </p>
         </div>
         <ul className={s.tradeGrid}>
@@ -300,10 +314,10 @@ export default function Home() {
       <section className={s.install} id="install">
         <div className={`panel ${s.installPanel}`}>
           <div>
-            <h2 className="h2">One line, and it is live.</h2>
+            <h2 className="h2">One line, and it works.</h2>
             <p className="body">
-              Paste it before the closing body tag of your site. No plugin, no rebuild, nothing
-              else on the page changes. Sign in and the line comes back with your own id in it.
+              Paste it into your website once. No plugin. Nothing else on the page changes.
+              Sign in and you get the line with your own id in it.
             </p>
             <Link href="/install" className={s.cellLink}>
               Read the setup guide <ArrowUpRight weight="bold" />
@@ -315,8 +329,8 @@ export default function Home() {
 
       <section className={s.plans} id="pricing">
         <div className={s.plansHead}>
-          <h2 className="h2">Start with the channel that matters.</h2>
-          <p className="body">Clear monthly plans. Add deeper integrations as the sales process grows.</p>
+          <h2 className="h2">Simple prices.</h2>
+          <p className="body">Pay monthly. Start small, add channels when you need them.</p>
         </div>
 
         <div className={s.planGrid}>
@@ -343,24 +357,23 @@ export default function Home() {
       <section className={s.factory} id="content-factory">
         <div className={s.factoryHead}>
           <p className="eyebrow">The content factory</p>
-          <h2 className="h2">We take your social accounts over.</h2>
+          <h2 className="h2">We post for you too.</h2>
           <p className="body">
-            Up to three posts a day, written and published without you doing anything. Small
-            businesses do not stop posting because they ran out of ideas — they stop because it is
-            Tuesday, the shop is full, and nobody has twenty minutes. The same agent that answers
-            your customers writes the posts, from the same description you already wrote.
+            Up to three posts a day, written and published on their own. You do nothing.
+            Most small businesses stop posting not because they run out of ideas, but because the
+            shop is full and nobody has twenty minutes. Your agent writes them from the same four
+            lines you already gave it.
           </p>
           <p className={s.factoryHonest}>
-            Reels are the one thing that still needs you: the agent writes the shot list and the
-            caption, you point a phone at the chair for thirty seconds. Instagram and TikTok will
-            not accept a reel without a video file, and we would rather say that than let you find
-            out in a month.
+            One honest note about reels. Instagram and TikTok need a real video file. The agent
+            writes the text and tells you what to film, but you point the phone for thirty seconds.
+            We would rather say this now than let you find out later.
           </p>
         </div>
 
         <div className={s.factoryBody}>
           <div className={s.factoryFeed}>
-            <p className={s.factoryLabel}>Written for a dental clinic that wrote four lines about itself</p>
+            <p className={s.factoryLabel}>Written for a dental clinic that gave us four lines</p>
             {factoryPosts.map((post) => (
               <article key={post.body} className={`panel ${s.post}`}>
                 <header>
@@ -371,7 +384,7 @@ export default function Home() {
               </article>
             ))}
             <p className={s.factoryNote}>
-              Nobody wrote these. Nobody scheduled them either.
+              Nobody wrote these. Nobody picked the times either.
             </p>
           </div>
 
@@ -389,20 +402,25 @@ export default function Home() {
         </div>
       </section>
 
-      <section className={s.limits} aria-label="What the agent will not do">
+      <section className={s.limits} id="what-we-do" aria-label="What we do">
         <div className={s.limitsHead}>
-          <h2 className="h2">What it will not do.</h2>
+          <h2 className="h2">What we do for you.</h2>
           <p className="body">
-            An agent that guesses costs more than one that admits it does not know. These are hard
-            rules, not settings you have to remember to switch on.
+            Six jobs, all running while you work, sleep or travel. You write four lines about
+            your business. We do the rest.
           </p>
         </div>
         <div className={s.limitGrid}>
-          {limits.map((limit) => (
-            <article key={limit.title} className={`panel ${s.limit}`}>
+          {doing.map((job) => (
+            <article key={job.title} className={`panel ${s.limit}`}>
               <ShieldCheck size={26} weight="fill" />
-              <h3>{limit.title}</h3>
-              <p>{limit.body}</p>
+              <h3>{job.title}</h3>
+              <p>{job.body}</p>
+              <ul className={s.jobList}>
+                {job.items.map((item) => (
+                  <li key={item}><Check weight="bold" size={13} />{item}</li>
+                ))}
+              </ul>
             </article>
           ))}
         </div>
@@ -423,9 +441,19 @@ export default function Home() {
       <section className={s.cta} id="demo">
         <div className={`panel ${s.ctaPanel}`}>
           <div className={s.ctaCopy}>
-            <h2 className="h2">Give us one real customer question.</h2>
+            <h2 className="h2">We will set it up for you.</h2>
             <p className="body">
-              We will show how AI FLOW answers it, captures the intent, and creates the next action.
+              Tell us what you do, in four lines. We build your agent, connect your channels,
+              and send you one line to paste. You install nothing and set up nothing.
+            </p>
+            <ol className={s.ctaSteps}>
+              <li><b>You send this.</b> Four lines is enough.</li>
+              <li><b>We build your agent.</b> Your prices, your hours, your language.</li>
+              <li><b>You paste one line.</b> Or send us the site and we do it for you.</li>
+              <li><b>It starts working.</b> Usually the same day.</li>
+            </ol>
+            <p className={s.ctaFoot}>
+              Free to try on your own site. No card needed.
             </p>
           </div>
           <div className={s.ctaForm}>
@@ -436,18 +464,52 @@ export default function Home() {
 
       <footer className={s.foot}>
         <div className={s.footIn}>
-          <Link href="#top" className={s.brandLink}>
-            <span className={s.mark}>AI</span>
-            <span>AI FLOW</span>
-          </Link>
-          <a href="mailto:baskinltd@yahoo.com">baskinltd@yahoo.com</a>
-          <div className={s.footLinks}>
-            <Link href="/about">About</Link>
-            <a href="https://www.facebook.com/61589383208797/" target="_blank" rel="noreferrer">Facebook</a>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-            <Link href="/refunds">Refunds</Link>
+          <div className={s.footBrand}>
+            <Link href="#top" className={s.brandLink}>
+              <span className={s.mark}>AI</span>
+              <span>AI FLOW</span>
+            </Link>
+            <p className={s.slogan}>Turn every message into a customer.</p>
+            <p className={s.footBlurb}>
+              AI sales agents for small business. We answer your customers, save every lead, book
+              appointments and post for you. Day and night, in any language.
+            </p>
+            <div className={s.footChannels}>
+              <span><GlobeHemisphereWest weight="regular" /> Website</span>
+              <span><MetaLogo weight="regular" /> Messenger</span>
+              <span><InstagramLogo weight="regular" /> Instagram</span>
+              <span><WhatsappLogo weight="regular" /> WhatsApp</span>
+            </div>
           </div>
+
+          <nav className={s.footCols} aria-label="Footer">
+            <div>
+              <h3>Product</h3>
+              <Link href="#platform">Platform</Link>
+              <Link href="#how-it-works">How it works</Link>
+              <Link href="#content-factory">Content factory</Link>
+              <Link href="#install">Install</Link>
+              <Link href="#pricing">Pricing</Link>
+            </div>
+            <div>
+              <h3>Company</h3>
+              <Link href="/about">About</Link>
+              <a href="https://www.facebook.com/61589383208797/" target="_blank" rel="noreferrer">Facebook</a>
+              <a href="mailto:baskinltd@yahoo.com">Contact us</a>
+              <Link href="/login">Sign in</Link>
+            </div>
+            <div>
+              <h3>Legal</h3>
+              <Link href="/privacy">Privacy</Link>
+              <Link href="/terms">Terms</Link>
+              <Link href="/refunds">Refunds</Link>
+            </div>
+          </nav>
+        </div>
+
+        <div className={s.footBar}>
+          <span>&copy; {new Date().getFullYear()} AI FLOW. All rights reserved.</span>
+          <a href="mailto:baskinltd@yahoo.com">baskinltd@yahoo.com</a>
         </div>
       </footer>
 

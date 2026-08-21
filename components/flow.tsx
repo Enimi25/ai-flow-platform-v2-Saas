@@ -6,7 +6,7 @@ import {
   ChatCircleDots,
   Check,
   Lightning,
-  Minus,
+  X,
   UserList,
 } from "@phosphor-icons/react";
 import Strand from "./strand";
@@ -86,46 +86,65 @@ const STAGES = [
 
 const COMPARISON = [
   {
-    what: "Answers a question it was not scripted for",
-    us: true,
-    bot: false,
-    hire: true,
-    note: "A button menu can only offer what somebody thought of in advance.",
+    what: "Answers in a few seconds",
+    us: { yes: true, note: "Under 5 sec" },
+    bot: { yes: true, note: "Instant" },
+    hire: { yes: false, note: "When they are free" },
   },
   {
-    what: "Replies at 3am on a Sunday",
-    us: true,
-    bot: true,
-    hire: false,
-    note: "This is where most of the lost enquiries are.",
+    what: "Answers at 3am on a Sunday",
+    us: { yes: true, note: "Always on" },
+    bot: { yes: true, note: "Always on" },
+    hire: { yes: false, note: "Sleeps, like you" },
   },
   {
-    what: "Refuses to invent a price",
-    us: true,
-    bot: true,
-    hire: true,
-    note: "Most AI assistants will happily make one up. Ours answers that it does not know.",
+    what: "Understands a question nobody planned for",
+    us: { yes: true, note: "Reads and thinks" },
+    bot: { yes: false, note: "Only its buttons" },
+    hire: { yes: true, note: "Yes" },
   },
   {
-    what: "Books against your real calendar",
-    us: true,
-    bot: false,
-    hire: true,
-    note: "Not a request form. The appointment exists when the chat ends.",
+    what: "Speaks every language your customers use",
+    us: { yes: true, note: "Any language" },
+    bot: { yes: false, note: "One, usually" },
+    hire: { yes: false, note: "One or two" },
   },
   {
-    what: "Writes and publishes your social posts",
-    us: true,
-    bot: false,
-    hire: true,
-    note: "From your own description, on a schedule, without being asked.",
+    what: "Books into your real calendar",
+    us: { yes: true, note: "Checks free times" },
+    bot: { yes: false, note: "Just a form" },
+    hire: { yes: true, note: "Yes" },
   },
   {
-    what: "Costs less than one day of wages a month",
-    us: true,
-    bot: true,
-    hire: false,
-    note: "$39 to start.",
+    what: "Saves every phone number, every time",
+    us: { yes: true, note: "Never forgets" },
+    bot: { yes: false, note: "Only if asked" },
+    hire: { yes: false, note: "When busy, no" },
+  },
+  {
+    what: "Handles 50 people at the same time",
+    us: { yes: true, note: "All at once" },
+    bot: { yes: true, note: "All at once" },
+    hire: { yes: false, note: "One at a time" },
+  },
+  {
+    what: "Writes and posts on your social accounts",
+    us: { yes: true, note: "3 a day" },
+    bot: { yes: false, note: "No" },
+    hire: { yes: true, note: "If you pay more" },
+  },
+  {
+    what: "Never sick, never quits, never on holiday",
+    us: { yes: true, note: "Always there" },
+    bot: { yes: true, note: "Always there" },
+    hire: { yes: false, note: "People are people" },
+  },
+  {
+    what: "What it costs you a month",
+    us: { yes: true, note: "$39" },
+    bot: { yes: true, note: "$0 to $50" },
+    hire: { yes: false, note: "A full salary" },
+    cost: true,
   },
 ] as const;
 
@@ -189,7 +208,11 @@ export default function Flow() {
       </div>
 
       <div className={s.compare}>
-        <h3 className={s.compareTitle}>Why this rather than the alternatives</h3>
+        <h3 className={s.compareTitle}>Why us, and not the other two</h3>
+        <p className={s.compareLead}>
+          A button chatbot is cheap but stupid. A person is smart but sleeps, gets sick and costs
+          a salary. We are the only column with a tick in every row.
+        </p>
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>
@@ -202,15 +225,14 @@ export default function Flow() {
             </thead>
             <tbody>
               {COMPARISON.map((row) => (
-                <tr key={row.what}>
-                  <th scope="row">
-                    {row.what}
-                    <small>{row.note}</small>
-                  </th>
-                  {[row.us, row.bot, row.hire].map((yes, index) => (
-                    <td key={index} data-yes={yes} data-us={index === 0}>
-                      {yes ? <Check weight="bold" /> : <Minus weight="bold" />}
-                      <span className="sr-only">{yes ? "yes" : "no"}</span>
+                <tr key={row.what} data-cost={"cost" in row ? "true" : undefined}>
+                  <th scope="row">{row.what}</th>
+                  {[row.us, row.bot, row.hire].map((cell, index) => (
+                    <td key={index} data-yes={cell.yes} data-us={index === 0}>
+                      <span className={s.cell}>
+                        {cell.yes ? <Check weight="bold" /> : <X weight="bold" />}
+                        <em>{cell.note}</em>
+                      </span>
                     </td>
                   ))}
                 </tr>
