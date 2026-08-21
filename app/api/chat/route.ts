@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { captureLead, detectContact } from "@/lib/leads/store";
-import { appendTurn } from "@/lib/conversations/store";
+import { appendTurn, recentTurns } from "@/lib/conversations/store";
 import { getSettings } from "@/lib/settings/store";
 import { ask, weigh, tidyText, ESCALATION_RULE, UNSURE, NoModelAvailable } from "@/lib/model";
 import { safeRecord } from "@/lib/activity";
@@ -69,6 +69,13 @@ export async function POST(request: Request) {
 
   const settings = await getSettings(companyId);
 
+  // everything before this message, so the agent stops repeating itself
+  const history = await recentTurns(companyId, visitorId, 10).catch(() => []);
+  const earlier = history.slice(0, -1);
+  const askedAlready = earlier.some(
+    (turn) => turn.role === "agent" && /phone|email|reach you|телефон|почт|связ/i.test(turn.text),
+  );
+
   const system = [
     `You are ${settings.assistantName || "the assistant"} answering customers for ${settings.companyName || "this business"}.`,
     settings.businessDescription
@@ -81,8 +88,13 @@ export async function POST(request: Request) {
     `- ${ESCALATION_RULE}`,
     `- Your goal in the conversation: ${settings.goal}.`,
     contact.found
-      ? "- The customer just gave their contact details. Confirm you have them and say what happens next."
-      : `- When it fits naturally, ask: ${settings.leadQuestion}`,
+      ? "- The customer just gave their contact details. Confirm you have them, say what happens next, and do not ask again."
+      : askedAlready
+        ? "- You have already asked how to reach them. Do not ask a second time. Answer what they asked and leave it there."
+        : `- Once you have actually helped with something, and only then, ask: ${settings.leadQuestion}. Never open with it.`,
+    "- A greeting gets a greeting and an offer to help. Never answer hello with a request for contact details.",
+    "- If they ask to speak to a person, say yes. Take a phone number or an email so a colleague can come back to them. Never tell a customer that an AI is available instead.",
+    "- Never ask the same question twice in a row.",
     "- Never ask for a password or card details.",
     "- Reply in the language the customer wrote in.",
   ].join("\n");
@@ -90,7 +102,14 @@ export async function POST(request: Request) {
   try {
     const answer = await ask({
       system,
-      user: message,
+      user: earlier.length
+        ? [
+            "Conversation so far:",
+            ...earlier.map((turn) => `${turn.role === "agent" ? "You" : "Customer"}: ${turn.text}`),
+            "",
+            `Customer: ${message}`,
+          ].join("\n")
+        : message,
       temperature: 0.4,
       maxTokens: 400,
       weight: weigh(message),

@@ -309,3 +309,129 @@
   .cellWide { min-height: 360px; }
   .footIn { flex-direction: column; align-items: flex-start; }
 }
+
+/* --- what changes: a quiet band of four, not a stat wall ---------------- */
+.facts { max-width: var(--page); margin-inline: auto; padding: 0 var(--gutter); }
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  overflow: hidden;
+}
+
+.fact { padding: 26px 24px; background: var(--surface); display: grid; gap: 5px; align-content: start; }
+.figure { font-size: clamp(1.7rem, 2.6vw, 2.3rem); letter-spacing: -.04em; line-height: 1; margin: 0; }
+.factLabel { margin: 0; font-size: 14px; font-weight: 640; color: var(--text); }
+.factNote { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+/* --- who it is for ------------------------------------------------------ */
+.trades { max-width: var(--page); margin-inline: auto; padding: clamp(60px, 8vh, 100px) var(--gutter) 0; }
+.tradesHead { max-width: 700px; }
+.tradesHead p { margin: 16px 0 0; }
+
+.tradeGrid {
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.trade {
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  display: grid;
+  gap: 9px;
+  align-content: start;
+  transition: border-color .18s var(--ease), transform .18s var(--ease);
+}
+
+.trade:hover { border-color: var(--accent-2); transform: translateY(-2px); }
+.tradeName { font-size: 12px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--accent-2); }
+.trade p { margin: 0; font-size: 15.5px; line-height: 1.5; color: var(--text); }
+
+/* --- the install line --------------------------------------------------- */
+.install { max-width: var(--page); margin-inline: auto; padding: clamp(60px, 8vh, 100px) var(--gutter) 0; }
+
+.installPanel {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  gap: clamp(28px, 4vw, 54px);
+  align-items: center;
+}
+
+.installPanel h2 { margin: 0; }
+.installPanel .body { margin: 16px 0 0; }
+.installPanel a { margin-top: 20px; }
+
+/* --- the hard rules ----------------------------------------------------- */
+.limits { max-width: var(--page); margin-inline: auto; padding: clamp(60px, 8vh, 100px) var(--gutter) 0; }
+.limitsHead { max-width: 700px; }
+.limitsHead p { margin: 16px 0 0; }
+
+.limitGrid { margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.limit { display: grid; gap: 12px; align-content: start; }
+.limit svg { color: var(--accent-2); }
+.limit h3 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+.limit p { margin: 0; font-size: 15px; line-height: 1.62; color: var(--muted); }
+
+/* --- questions ---------------------------------------------------------- */
+.faq { max-width: 860px; margin-inline: auto; padding: clamp(60px, 8vh, 100px) var(--gutter) 0; }
+.faqList { margin-top: 32px; border-top: 1px solid var(--line); }
+
+.q { border-bottom: 1px solid var(--line); }
+
+.q summary {
+  padding: 20px 34px 20px 0;
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -.02em;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  transition: color .16s var(--ease);
+}
+
+.q summary::-webkit-details-marker { display: none; }
+.q summary:hover { color: var(--accent-2); }
+
+/* a plus that becomes a minus, drawn rather than shipped as an icon */
+.q summary::after,
+.q summary::before {
+  content: "";
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--muted);
+  transition: transform .22s var(--ease), background .16s var(--ease);
+}
+
+.q summary::before { transform: translateY(-50%) rotate(90deg); }
+.q summary::after { transform: translateY(-50%); }
+.q[open] summary::before { transform: translateY(-50%) rotate(0deg); }
+.q[open] summary::after,
+.q[open] summary::before { background: var(--accent-2); }
+
+.q p { margin: 0 0 22px; padding-right: 34px; font-size: 15.5px; line-height: 1.68; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .factGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tradeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .installPanel { grid-template-columns: 1fr; }
+  .limitGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .factGrid { grid-template-columns: 1fr; }
+  .tradeGrid { grid-template-columns: 1fr; }
+}

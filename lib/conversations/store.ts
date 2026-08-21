@@ -27,6 +27,20 @@ export async function listConversations(companyId: string) {
     .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }
 
+/**
+ * The tail of a visitor's thread, oldest first.
+ *
+ * Without this the model sees one message at a time and has no idea it already
+ * asked for a phone number, so it asks again — which is exactly how a helpful
+ * assistant turns into a form.
+ */
+export async function recentTurns(companyId: string, visitorId: string, limit = 10) {
+  const thread = (await readAll()).find(
+    (item) => item.companyId === companyId && item.visitorId === visitorId,
+  );
+  return (thread?.turns ?? []).filter((turn) => turn.text !== "[contact captured]").slice(-limit);
+}
+
 /** One thread per visitor, so a returning customer continues instead of starting over. */
 export function appendTurn(input: {
   companyId: string;
