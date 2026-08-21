@@ -67,6 +67,22 @@ export async function connectionFor(companyId: string, channel: Channel) {
   return { accountId: entry.id ?? "", accessToken: entry.token, accountName: undefined, own: false as const };
 }
 
+/**
+ * Which workspace owns a Page or Instagram account.
+ *
+ * Meta's webhook names the account, not the customer, so an inbound message can
+ * only be routed by walking the connections back to whoever linked it.
+ */
+export async function connectionByAccount(accountId: string, channel?: Channel) {
+  const all = await readAll();
+  for (const entry of Object.values(all)) {
+    if (entry.accountId !== accountId) continue;
+    if (channel && entry.channel !== channel) continue;
+    return { ...entry, accessToken: open(entry.accessToken) };
+  }
+  return null;
+}
+
 export async function connectionsFor(companyId: string) {
   const all = await readAll();
   return (["facebook", "instagram", "tiktok"] as Channel[]).map((channel) => {
