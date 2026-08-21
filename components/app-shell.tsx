@@ -10,6 +10,7 @@ import {
   House,
   Pulse as PulseIcon,
   MegaphoneSimple,
+  PhoneCall,
   PlugsConnected,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
@@ -17,7 +18,7 @@ import type { Session } from "@/lib/session";
 import { LogoutButton } from "./logout-button";
 import styles from "./app-shell.module.css";
 
-type Section = "overview" | "conversations" | "leads" | "calendar" | "content" | "activity" | "install" | "analytics" | "billing" | "social" | "settings";
+type Section = "overview" | "conversations" | "leads" | "calendar" | "content" | "activity" | "install" | "analytics" | "billing" | "social" | "calls" | "settings";
 
 const items = [
   { id: "overview" as Section, label: "Overview", href: "/dashboard", icon: House },
@@ -25,6 +26,7 @@ const items = [
   { id: "leads" as Section, label: "Leads", href: "/leads", icon: UsersThree },
   { id: "calendar" as Section, label: "Calendar", href: "/calendar", icon: CalendarBlank },
   { id: "content" as Section, label: "Content", href: "/content", icon: MegaphoneSimple },
+  { id: "calls" as Section, label: "Calls", href: "/calls", icon: PhoneCall },
   { id: "activity" as Section, label: "Activity", href: "/activity", icon: PulseIcon },
   { id: "install" as Section, label: "Install", href: "/install", icon: Code },
   { id: "social" as Section, label: "Social accounts", href: "/social-accounts", icon: PlugsConnected },
