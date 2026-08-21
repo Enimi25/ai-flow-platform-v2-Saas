@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle, LinkSimple, Trash, ArrowSquareOut } from "@phosphor-icons/react";
+import { CheckCircle, LinkSimple, Trash, ArrowSquareOut, MagicWand } from "@phosphor-icons/react";
 import s from "./connections.module.css";
 
 type Row = { channel: "facebook" | "instagram" | "tiktok"; connected: boolean; accountName: string | null; connectedAt: string | null };
@@ -38,6 +38,9 @@ export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
   const [accountName, setAccountName] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [metaToken, setMetaToken] = useState("");
+  const [finding, setFinding] = useState(false);
+  const [found, setFound] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch("/api/content/connect");
@@ -77,8 +80,56 @@ export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
     void load();
   }
 
+  async function discover(event: React.FormEvent) {
+    event.preventDefault();
+    setFinding(true);
+    setFound("");
+    const response = await fetch("/api/content/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: metaToken }),
+    });
+    const data = await response.json();
+    setFinding(false);
+    if (!response.ok) return setFound(data.error ?? "Could not read that token.");
+    setFound(
+      `Connected ${data.connected.map((c: { channel: string; account: string }) => `${c.channel} (${c.account})`).join(" and ")}.`,
+    );
+    setMetaToken("");
+    void load();
+  }
+
   return (
     <div className={s.wrap}>
+      <form className={s.magic} onSubmit={discover}>
+        <div className={s.magicHead}>
+          <MagicWand size={22} weight="fill" />
+          <div>
+            <h2>Connect Facebook and Instagram at once</h2>
+            <p>
+              Paste one Page Access Token. The Page id and the Instagram account behind
+              it are read from Meta, so there is nothing else to look up.
+            </p>
+          </div>
+        </div>
+        <div className={s.magicRow}>
+          <input
+            type="password"
+            value={metaToken}
+            onChange={(event) => setMetaToken(event.target.value)}
+            placeholder="EAAG…"
+            autoComplete="off"
+            aria-label="Meta access token"
+            required
+          />
+          <button className="btn" type="submit" disabled={finding || !canEdit}>
+            {finding ? "Reading…" : "Find my accounts"}
+          </button>
+        </div>
+        <p className={s.magicNote}>
+          {found || "Meta for Developers, Graph API Explorer, pick your Page, then Generate Access Token."}
+        </p>
+      </form>
       <ul className={s.list}>
         {rows.map((row) => {
           const meta = META[row.channel];

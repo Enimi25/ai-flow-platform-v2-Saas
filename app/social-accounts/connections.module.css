@@ -41,3 +41,26 @@
 .note { color: var(--muted); font-size: 14px; }
 
 @media (max-width: 700px) { .list li { grid-template-columns: 1fr; } }
+
+.magic {
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: var(--r-panel);
+  background:
+    radial-gradient(120% 100% at 100% 0%, var(--accent-dim), transparent 60%),
+    var(--surface);
+  display: grid;
+  gap: 14px;
+}
+.magicHead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 13px; align-items: start; }
+.magicHead svg { color: var(--accent); margin-top: 3px; }
+.magicHead h2 { font-size: 18px; letter-spacing: -.03em; margin: 0 0 6px; }
+.magicHead p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 62ch; }
+.magicRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.magicRow input {
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--bg); color: var(--text); outline: none; font: inherit;
+}
+.magicRow input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.magicNote { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+@media (max-width: 640px) { .magicRow { grid-template-columns: 1fr; } }
