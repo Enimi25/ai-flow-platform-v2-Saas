@@ -8,22 +8,45 @@ import s from "./flow.module.css";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/**
+ * One real conversation, carried through all four stages.
+ *
+ * The section used to be a large animation beside four one-line captions, which
+ * read as decoration. Showing the actual messages is what makes the claim
+ * legible: the same enquiry moves down the page and arrives as an appointment.
+ */
 const STAGES = [
   {
+    step: "01",
     title: "A customer writes",
-    body: "Someone messages your website, Messenger, Instagram, or WhatsApp. Any hour, any language.",
+    body: "Someone messages your site, Messenger, Instagram or WhatsApp. Any hour, any language.",
+    fact: "23:40, Saturday",
+    said: { from: "customer", text: "Скольько стоит чистка? Можно в воскресенье?" },
+    note: "Typed in Russian, at midnight, with a typo. All three are normal.",
   },
   {
+    step: "02",
     title: "The agent answers",
-    body: "It replies in seconds, answers the real question, and finds out what the customer actually wants.",
+    body: "It replies from what you told it, in the language they used, and never invents a price.",
+    fact: "4 seconds later",
+    said: { from: "agent", text: "Чистка — 85. В воскресенье мы закрыты, но есть суббота в 10:00 или 11:00." },
+    note: "It knew Sunday was shut because your opening hours say so.",
   },
   {
+    step: "03",
     title: "The lead is kept",
-    body: "Name, phone, email, source, and the full message land in your sheet before the chat ends.",
+    body: "Name, phone, channel and the whole conversation are filed before the chat ends.",
+    fact: "Saved automatically",
+    said: { from: "customer", text: "Анна, +7 916 445 22 10. Давайте субботу в 11." },
+    note: "A phone number typed mid-sentence still lands in your leads.",
   },
   {
+    step: "04",
     title: "The slot is booked",
-    body: "The agent writes the appointment straight into your calendar and follows up if nobody shows.",
+    body: "The appointment goes into the calendar, checked against what is already taken.",
+    fact: "22.08.2026, 11:00",
+    said: { from: "agent", text: "Записала вас на субботу, 11:00. До встречи!" },
+    note: "If someone took that slot a second earlier, it says so and offers the next.",
   },
 ];
 
@@ -101,8 +124,11 @@ export default function Flow() {
             {STAGES.map((stage, i) => (
               <div key={stage.title} className={s.slot} data-side={i % 2 === 0 ? "l" : "r"}>
                 <i className={s.tick} />
+                <p className={s.step}>{stage.step}<span>{stage.fact}</span></p>
                 <h3>{stage.title}</h3>
-                <p>{stage.body}</p>
+                <p className={s.body}>{stage.body}</p>
+                <p className={s.said} data-from={stage.said.from}>{stage.said.text}</p>
+                <p className={s.note}>{stage.note}</p>
               </div>
             ))}
           </div>

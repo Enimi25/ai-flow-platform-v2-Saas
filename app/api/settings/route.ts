@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { defaults, getSettings, saveSettings, type Settings } from "@/lib/settings/store";
+import { defaults, getSettings, saveSettings, DAY_KEYS, type DayHours, type OpeningHours, type Settings } from "@/lib/settings/store";
 import { safeRecord } from "@/lib/activity";
 
 export async function GET() {
@@ -22,6 +22,40 @@ export async function PUT(request: Request) {
   const text = (value: unknown, fallback: string, max = 400) =>
     typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 
+  const clock = (value: unknown) =>
+    typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : null;
+
+  /** A day is only kept if it opens before it closes; anything else is shut. */
+  const day = (value: unknown, fallback: DayHours): DayHours => {
+    if (value === null) return null;
+    if (!value || typeof value !== "object") return fallback;
+    const open = clock((value as Record<string, unknown>).open);
+    const close = clock((value as Record<string, unknown>).close);
+    if (!open || !close || open >= close) return null;
+    return { open, close };
+  };
+
+  const openingHours: OpeningHours = { ...current.openingHours };
+  if (body.openingHours && typeof body.openingHours === "object") {
+    for (const key of DAY_KEYS) {
+      openingHours[key] = day(
+        (body.openingHours as Record<string, unknown>)[key],
+        current.openingHours[key],
+      );
+    }
+  }
+
+  // an unknown timezone would make every offered slot silently wrong
+  const zone = typeof body.timezone === "string" ? body.timezone : current.timezone;
+  const timezone = (() => {
+    try {
+      new Intl.DateTimeFormat("en-GB", { timeZone: zone });
+      return zone;
+    } catch {
+      return current.timezone;
+    }
+  })();
+
   const next: Settings = {
     ...defaults(companyId),
     ...current,
@@ -35,6 +69,14 @@ export async function PUT(request: Request) {
     welcome: text(body.welcome, current.welcome, 300),
     leadQuestion: text(body.leadQuestion, current.leadQuestion, 300),
     businessDescription: text(body.businessDescription, current.businessDescription, 2000),
+    openingHours,
+    timezone,
+    slotMinutes:
+      typeof body.slotMinutes === "number" && body.slotMinutes >= 15 && body.slotMinutes <= 240
+        ? Math.round(body.slotMinutes)
+        : current.slotMinutes,
+    bookingEnabled:
+      typeof body.bookingEnabled === "boolean" ? body.bookingEnabled : current.bookingEnabled,
     companyId,
   };
 

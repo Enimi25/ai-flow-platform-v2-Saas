@@ -102,3 +102,70 @@
   }
   .rail[data-enhanced] .slot[data-side="l"] .tick { margin-left: 0; }
 }
+
+/* --- the stages carry a real conversation, not four captions ----------- */
+.step {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: .1em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.step span {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.body { margin: 0 0 14px; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
+
+/* the message itself, shaped like the bubble it would be in the widget */
+.said {
+  margin: 0 0 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  max-width: 40ch;
+}
+
+.said[data-from="customer"] {
+  background: var(--surface-high);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-bottom-right-radius: 5px;
+}
+
+.said[data-from="agent"] {
+  background: linear-gradient(103deg, rgba(195, 245, 60, .16), rgba(62, 207, 178, .16));
+  border: 1px solid rgba(62, 207, 178, .3);
+  color: var(--text);
+  border-bottom-left-radius: 5px;
+}
+
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  opacity: .82;
+  max-width: 40ch;
+}
+
+.slot[data-side="r"] .said { margin-left: auto; }
+.slot[data-side="r"] .note,
+.slot[data-side="r"] .body { margin-left: auto; }
+
+@media (max-width: 900px) {
+  .said, .note, .body { max-width: none; }
+  .slot[data-side="r"] .said,
+  .slot[data-side="r"] .note,
+  .slot[data-side="r"] .body { margin-left: 0; }
+}

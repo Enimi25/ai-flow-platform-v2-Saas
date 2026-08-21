@@ -5,6 +5,8 @@ import { getSettings } from "@/lib/settings/store";
 import { ask, weigh, tidyText, ESCALATION_RULE, UNSURE, NoModelAvailable } from "@/lib/model";
 import { safeRecord } from "@/lib/activity";
 import { houseCompanyId } from "@/lib/workspace/store";
+import { freeSlots } from "@/lib/booking/slots";
+import { confirmBooking, bookingLine, BOOK_MARK, ANY_MARK } from "@/lib/booking/confirm";
 
 /** One short line, in the customer's own language, when a person has to take over. */
 async function handover(question: string, leadQuestion: string) {
@@ -74,10 +76,29 @@ export async function POST(request: Request) {
 
   // everything before this message, so the agent stops repeating itself
   const history = await recentTurns(companyId, visitorId, 10).catch(() => []);
+
+  // Contact details given three turns ago are still given. Reading only the
+  // current message is why the agent asked Anna for a phone number she had
+  // already typed, and why the booking was saved without her name.
+  const known = history
+    .filter((turn) => turn.role === "customer")
+    .map((turn) => detectContact(turn.text))
+    .reduce(
+      (all, one) => ({
+        email: all.email || one.email,
+        phone: all.phone || one.phone,
+        found: all.found || one.found,
+      }),
+      { email: contact.email, phone: contact.phone, found: contact.found },
+    );
   const earlier = history.slice(0, -1);
   const askedAlready = earlier.some(
     (turn) => turn.role === "agent" && /phone|email|reach you|телефон|почт|связ/i.test(turn.text),
   );
+
+  // Real openings, so the agent offers a time that exists instead of inventing
+  // one. Without this "book the appointment" is a claim, not a feature.
+  const slots = await freeSlots(settings, { limit: 6 }).catch(() => []);
 
   const system = [
     `You are ${settings.assistantName || "the assistant"} answering customers for ${settings.companyName || "this business"}.`,
@@ -90,8 +111,8 @@ export async function POST(request: Request) {
     "- Answer only from what the business description says. Never invent a price, an address, an opening hour or a promise.",
     `- ${ESCALATION_RULE}`,
     `- Your goal in the conversation: ${settings.goal}.`,
-    contact.found
-      ? "- The customer just gave their contact details. Confirm you have them, say what happens next, and do not ask again."
+    known.found
+      ? `- You already have their details (${[known.phone, known.email].filter(Boolean).join(", ")}). Never ask for them again.`
       : askedAlready
         ? "- You have already asked how to reach them. Do not ask a second time. Answer what they asked and leave it there."
         : `- Once you have actually helped with something, and only then, ask: ${settings.leadQuestion}. Never open with it.`,
@@ -100,6 +121,21 @@ export async function POST(request: Request) {
     "- Never ask the same question twice in a row.",
     "- Never ask for a password or card details.",
     "- Reply in the language the customer wrote in.",
+    ...(slots.length
+      ? [
+          "",
+          "Appointments you can actually offer, and nothing else:",
+          ...slots.map((slot, index) => `  ${index + 1}. ${slot.label}  (${slot.startsAt})`),
+          "",
+          "Offer two or three of these when someone wants to book. Never invent a different time.",
+          "Once the customer settles on one AND has given a name or a way to reach them, confirm it in",
+          "your own words and finish the message with [[BOOK:n]] where n is that appointment's number",
+          "from the list above. Just the number: [[BOOK:3]]. Never write the date inside the marker.",
+          "Write it only at that moment, never while still offering.",
+          "Name a time exactly as it is written above. Do not translate the weekday loosely.",
+          "After a booking is confirmed, say so and stop. Ask nothing further.",
+        ]
+      : []),
   ].join("\n");
 
   try {
@@ -122,9 +158,31 @@ export async function POST(request: Request) {
     // not a failure, and it is the moment to ask for a way to reach them. The
     // sentence is written rather than templated so it lands in the language the
     // customer actually wrote in.
-    const reply = answer.unsure
+    let booked: Awaited<ReturnType<typeof confirmBooking>> = null;
+    const marked = answer.unsure ? null : answer.text.match(BOOK_MARK);
+    const chosen = marked ? slots[Number(marked[1]) - 1] : undefined;
+    if (chosen) {
+      booked = await confirmBooking({
+        settings,
+        startsAt: chosen.startsAt,
+        customerEmail: known.email || undefined,
+        // the phone is often all a walk-in trade ever gives
+        customerName: known.phone || undefined,
+      }).catch(() => null);
+    }
+
+    let reply = answer.unsure
       ? await handover(message, settings.leadQuestion)
-      : tidyText(answer.text.replaceAll(UNSURE, "")).slice(0, 2_000);
+      : tidyText(answer.text.replaceAll(UNSURE, "").replace(ANY_MARK, "")).trim().slice(0, 2_000);
+
+    // the marker said yes but the calendar said no: somebody took the slot
+    // between the offer and the answer, and the customer has to hear that
+    if (marked && !booked) {
+      reply = `${reply}\n\nThat time has just gone. Shall I look at the next one?`.trim();
+    }
+    if (booked) {
+      reply = `${reply}\n\n✓ ${bookingLine(settings, booked.startsAt)}`.trim();
+    }
 
     if (answer.unsure) {
       safeRecord({
