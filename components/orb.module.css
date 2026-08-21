@@ -1,0 +1,19 @@
+.wrap { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* A soft light behind the shell, so the points sit in something rather than on
+   flat black. Drawn in CSS because a blur this wide is cheap here and costly
+   on the canvas. */
+.bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(70vmin, 760px);
+  height: min(70vmin, 760px);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(195, 245, 60, .16), transparent 58%),
+    radial-gradient(circle at 44% 68%, rgba(62, 207, 178, .14), transparent 60%);
+  filter: blur(44px);
+}

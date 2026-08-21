@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -15,6 +14,7 @@ import {
 import { DemoForm } from "@/components/demo-form";
 import { SalesChat } from "@/components/sales-chat";
 import Strand from "@/components/strand";
+import { Orb } from "@/components/orb";
 import Flow from "@/components/flow";
 import s from "./landing.module.css";
 
@@ -72,29 +72,29 @@ export default function Home() {
       </header>
 
       <section className={s.hero} id="top">
-        <div className={s.heroCopy}>
-          <h1 className="display">Turn messages into customers.</h1>
-          <p className="body">
-            Reply faster, qualify leads, and book appointments from your website and customer messages.
+        <Orb className={s.orb} />
+
+        <div className={s.heroInner}>
+          <p className={s.badge}>
+            <i className={s.dot} /> AI sales agents for small business
           </p>
+
+          <h1 className={s.title}>Turn every message into a customer.</h1>
+
+          <p className={s.sub}>
+            AI FLOW answers in seconds, learns what the person needs, keeps their
+            contact details and books the appointment. On your site, Messenger,
+            Instagram and WhatsApp.
+          </p>
+
           <div className={s.heroActions}>
-            <Link href="#demo" className="btn">Request demo <ArrowRight weight="bold" /></Link>
-            <Link href="/login" className="btn btn-ghost">Open workspace <ArrowUpRight weight="bold" /></Link>
+            <Link href="#demo" className="btn">
+              Get started <ArrowRight weight="bold" />
+            </Link>
+            <Link href="#how-it-works" className={s.quiet}>
+              See how it works <ArrowUpRight weight="bold" />
+            </Link>
           </div>
-        </div>
-        <div className={s.heroArt}>
-          <div className={s.heroGlow}>
-            <Strand rungs={30} radius={150} gap={26} step={20} spin={340} />
-          </div>
-          <Image
-            src="/ai-flow-product-hero.png"
-            alt="AI FLOW workspace showing captured leads, connected channels, and booked appointments"
-            width={1536}
-            height={1152}
-            priority
-            sizes="(max-width: 900px) 100vw, 52vw"
-            className={s.heroShot}
-          />
         </div>
       </section>
 
