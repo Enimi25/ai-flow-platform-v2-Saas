@@ -1,0 +1,26 @@
+.card { max-width: 560px; margin-top: 30px; padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); }
+.icon { color: var(--accent); }
+.card h2 { font-size: 25px; letter-spacing: -.035em; margin: 18px 0 8px; }
+.muted { color: var(--muted); line-height: 1.55; margin: 0; }
+.error { color: var(--danger); margin: 0 0 20px; }
+
+.list { list-style: none; margin: 26px 0; padding: 0; display: grid; gap: 8px; }
+.list button {
+  width: 100%;
+  min-height: 62px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  text-align: left;
+}
+.list button:hover { border-color: var(--muted); }
+.list button[data-on] { border-color: var(--accent); background: var(--accent-dim); }
+.list button svg { color: var(--accent); flex: none; }
+.list b { display: block; font-size: 15px; }
+.list small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }

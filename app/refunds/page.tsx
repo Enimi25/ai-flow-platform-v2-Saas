@@ -1,0 +1,7 @@
+import Link from "next/link";
+
+export const metadata = { title: "Refunds and cancellations | AI FLOW" };
+
+export default function RefundsPage() {
+  return <main className="legal-page"><Link href="/" className="brand"><span className="brand-mark">AI</span><span>AI FLOW</span></Link><article><h1>Refund and cancellation policy</h1><p>Effective 21 August 2026. This policy applies to AI FLOW subscriptions and setup services purchased directly from AI FLOW.</p><h2>Cancel a subscription</h2><p>You may cancel a recurring subscription at any time before the next renewal by emailing <a href="mailto:baskinltd@yahoo.com">baskinltd@yahoo.com</a>. Access continues through the end of the paid billing period unless we confirm otherwise.</p><h2>Refund requests</h2><p>Request a refund within 14 days of the initial subscription payment. Include the account email and reason for the request. Approved refunds are returned to the original payment method. Fees for completed custom setup work are not refundable once delivery has begun.</p><h2>Renewals and duplicate charges</h2><p>Renewal payments are generally non-refundable after a new billing period begins. Contact us promptly about duplicate or incorrect charges so we can investigate and correct them.</p><h2>Processing time</h2><p>We respond to refund requests within five business days. After approval, the payment provider and your bank determine when the funds appear in your account.</p><Link href="/" className="text-link">Back to home</Link></article></main>;
+}

@@ -1,0 +1,100 @@
+/* The Strand: two backbones twisting around each other.
+   One is the customer, one is the agent. The rungs are the exchange. */
+
+/* clipping lives on its own 2D layer. overflow on the perspective element
+   flattens the scene and the strand vanishes. */
+.clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1000px;
+  perspective-origin: 50% 50%;
+}
+
+.turn,
+.spin,
+.turn > div {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spin { animation: turn 34s linear infinite; }
+}
+
+.rung {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--r) * 2);
+  height: 1px;
+  margin-left: calc(var(--r) * -1);
+  transform-style: preserve-3d;
+  transform:
+    translateY(calc((var(--i) - (var(--n) - 1) / 2) * var(--gap)))
+    rotateY(calc(var(--i) * var(--step)));
+  background: linear-gradient(
+    90deg,
+    rgba(233, 240, 233, .30),
+    rgba(233, 240, 233, .07) 30%,
+    var(--accent-dim) 64%,
+    rgba(195, 245, 60, .46)
+  );
+}
+
+/* left end = the customer, neutral. right end = the agent, lit. */
+.rung::before,
+.rung::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+}
+
+.rung::before {
+  left: -4px;
+  background: var(--text);
+  opacity: .5;
+}
+
+.rung::after {
+  right: -4px;
+  background: var(--accent);
+  box-shadow: 0 0 14px 2px rgba(195, 245, 60, .4);
+}
+
+/* every 6th rung carries a heavier pulse, so the eye can track the turn */
+.rung[data-beat="1"]::after {
+  background: var(--accent-2);
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  right: -6px;
+  box-shadow: 0 0 22px 4px rgba(62, 207, 178, .55);
+}
+
+/* dissolve the ends into the page instead of cutting them off */
+.fog {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 58% 52% at 50% 50%,
+    transparent 26%,
+    color-mix(in srgb, var(--bg) 72%, transparent) 62%,
+    var(--bg) 84%
+  );
+}
+
+@keyframes turn {
+  to { transform: rotateY(360deg); }
+}

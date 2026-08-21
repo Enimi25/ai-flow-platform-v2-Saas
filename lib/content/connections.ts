@@ -1,0 +1,81 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { seal, open } from "@/lib/google/crypto";
+import type { Channel } from "./types";
+
+export type Connection = {
+  companyId: string;
+  channel: Channel;
+  /** Page id, IG user id, or the TikTok open id, depending on the channel. */
+  accountId: string;
+  accessToken: string;
+  accountName?: string;
+  connectedAt: string;
+};
+
+const FILE = path.join(process.cwd(), ".data", "connections.json");
+const key = (companyId: string, channel: Channel) => `${companyId}:${channel}`;
+
+async function readAll(): Promise<Record<string, Connection>> {
+  try {
+    return JSON.parse(await fs.readFile(FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export async function saveConnection(input: Omit<Connection, "connectedAt">) {
+  const all = await readAll();
+  all[key(input.companyId, input.channel)] = {
+    ...input,
+    accessToken: seal(input.accessToken),
+    connectedAt: new Date().toISOString(),
+  };
+  await fs.mkdir(path.dirname(FILE), { recursive: true });
+  await fs.writeFile(FILE, JSON.stringify(all, null, 2), "utf8");
+}
+
+export async function removeConnection(companyId: string, channel: Channel) {
+  const all = await readAll();
+  delete all[key(companyId, channel)];
+  await fs.writeFile(FILE, JSON.stringify(all, null, 2), "utf8");
+}
+
+/**
+ * A workspace's own account first. The platform's env credentials are the
+ * fallback, which is what AI FLOW itself posts through.
+ */
+export async function connectionFor(companyId: string, channel: Channel) {
+  const stored = (await readAll())[key(companyId, channel)];
+  if (stored) {
+    return {
+      accountId: stored.accountId,
+      accessToken: open(stored.accessToken),
+      accountName: stored.accountName,
+      own: true as const,
+    };
+  }
+
+  const fallback: Record<Channel, { id?: string; token?: string }> = {
+    facebook: { id: process.env.FACEBOOK_PAGE_ID, token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN },
+    instagram: { id: process.env.INSTAGRAM_USER_ID, token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN },
+    tiktok: { id: process.env.TIKTOK_OPEN_ID, token: process.env.TIKTOK_ACCESS_TOKEN },
+  };
+
+  const entry = fallback[channel];
+  if (!entry.token) return null;
+  return { accountId: entry.id ?? "", accessToken: entry.token, accountName: undefined, own: false as const };
+}
+
+export async function connectionsFor(companyId: string) {
+  const all = await readAll();
+  return (["facebook", "instagram", "tiktok"] as Channel[]).map((channel) => {
+    const stored = all[key(companyId, channel)];
+    return {
+      channel,
+      connected: Boolean(stored),
+      accountName: stored?.accountName ?? null,
+      connectedAt: stored?.connectedAt ?? null,
+    };
+  });
+}

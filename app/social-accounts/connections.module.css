@@ -1,0 +1,43 @@
+.wrap { margin-top: 30px; display: grid; gap: 18px; max-width: 900px; }
+
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.list li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center;
+  padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel);
+}
+.list li[data-on] { border-color: color-mix(in srgb, var(--accent) 38%, var(--line)); }
+
+.info p { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.title b { font-size: 16px; letter-spacing: -.02em; }
+
+.on, .off { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--r-pill); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.on { background: var(--accent-dim); color: var(--accent); }
+.off { background: var(--surface-soft); color: var(--muted); }
+.account { font-family: var(--font-geist-mono), monospace; font-size: 12px; }
+
+.ghost {
+  min-height: 40px; padding: 0 16px;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: transparent; color: var(--text);
+  font-size: 14px; font-weight: 640;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.ghost:hover { background: var(--surface-soft); }
+
+.form { padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); display: grid; gap: 8px; }
+.form h2 { font-size: 19px; letter-spacing: -.03em; margin: 0 0 6px; }
+.where { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.where a { color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
+.form label { font-size: 13px; font-weight: 660; margin-top: 10px; }
+.form input {
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--bg); color: var(--text); outline: none; font: inherit;
+}
+.form input::placeholder { color: var(--muted); }
+.form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.note { color: var(--muted); font-size: 14px; }
+
+@media (max-width: 700px) { .list li { grid-template-columns: 1fr; } }

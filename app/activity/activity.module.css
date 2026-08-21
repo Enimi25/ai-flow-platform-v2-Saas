@@ -1,0 +1,57 @@
+.wrap { margin-top: 30px; display: grid; grid-template-columns: minmax(0, .62fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.brains { grid-column: 1; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); }
+.brains h2 { font-size: 19px; letter-spacing: -.03em; margin: 0 0 5px; }
+.brainsLede { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+.chain { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.chain li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.rank { width: 24px; height: 24px; border-radius: 8px; background: var(--surface-soft); color: var(--muted); display: grid; place-items: center; font-family: var(--font-geist-mono), monospace; font-size: 11px; font-weight: 700; }
+.chain li[data-on] .rank { background: var(--accent-grad); color: var(--accent-contrast); }
+.chain b { display: block; font-size: 14px; }
+.chain small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-family: var(--font-geist-mono), monospace; overflow-wrap: anywhere; }
+.up, .down { padding: 4px 10px; border-radius: var(--r-pill); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.up { background: var(--accent-dim); color: var(--accent); }
+.down { background: var(--surface-soft); color: var(--muted); }
+
+.setup, .feed { grid-row: 1 / span 2; grid-column: 2; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); }
+.setupHead, .feedHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.setupHead h2, .feedHead h2 { font-size: 19px; letter-spacing: -.03em; margin: 0 0 5px; }
+.setupHead p { margin: 0; color: var(--muted); font-size: 14px; }
+.setupHead b { font-size: 26px; letter-spacing: -.03em; }
+
+.bar { height: 6px; margin: 20px 0 18px; border-radius: var(--r-pill); background: var(--surface-soft); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent-grad); transition: width .5s var(--ease); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.steps li { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.steps li svg { flex: none; }
+.steps li[data-done] { color: var(--text); }
+.steps li[data-done] svg { color: var(--accent); }
+
+.feedHead button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: var(--r-control); background: transparent; color: var(--muted); display: grid; place-items: center; }
+.feedHead button:hover { color: var(--text); border-color: var(--muted); }
+
+.log { list-style: none; margin: 20px 0 0; padding: 0; display: grid; }
+.log li { display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 0; border-top: 1px solid var(--line); }
+.log li:first-child { border-top: 0; padding-top: 0; }
+.log time { font-size: 12px; color: var(--muted); padding-top: 1px; }
+.log li svg { color: var(--muted); margin-top: 1px; }
+.log li[data-level="success"] svg { color: var(--accent); }
+.log li[data-level="warn"] svg { color: var(--warn-ink); }
+.log li[data-level="error"] svg { color: var(--danger); }
+.log b { display: block; font-size: 14px; font-weight: 660; }
+.log span { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.log code { font-family: var(--font-geist-mono), monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.empty { min-height: 180px; margin-top: 20px; display: grid; place-items: center; text-align: center; padding: 24px; border-radius: var(--r-control); background: var(--bg); }
+.empty p { margin: 0; color: var(--muted); max-width: 46ch; line-height: 1.55; }
+
+.skeleton { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 12px; }
+.skeleton li { height: 46px; border-radius: var(--r-control); background: linear-gradient(90deg, var(--surface-soft), var(--surface-high), var(--surface-soft)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.skeleton li:nth-child(2) { animation-delay: .1s; }
+.skeleton li:nth-child(3) { animation-delay: .2s; }
+.skeleton li:nth-child(4) { animation-delay: .3s; }
+
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .skeleton li { animation: none; } .bar i { transition: none; } }

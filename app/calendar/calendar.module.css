@@ -1,0 +1,46 @@
+.wrap { margin-top: 30px; display: grid; gap: 18px; }
+.muted { margin: 0; color: var(--muted); line-height: 1.6; }
+
+.status {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel);
+}
+.status[data-on] { border-color: color-mix(in srgb, var(--accent) 38%, var(--line)); }
+.status svg { color: var(--muted); }
+.status[data-on] svg { color: var(--accent); }
+.status b { font-size: 16px; letter-spacing: -.02em; }
+.status p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+.warn {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  padding: 14px 18px; border-radius: var(--r-panel);
+  background: var(--warn-bg); color: var(--warn-ink); font-size: 14px;
+}
+
+.panel { padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); }
+.panel h2 { font-size: 18px; letter-spacing: -.03em; margin: 0 0 18px; }
+
+.list { list-style: none; margin: 0; padding: 0; display: grid; }
+.list li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 16px; align-items: center;
+  padding: 15px 0; border-top: 1px solid var(--line);
+}
+.list li:first-child { border-top: 0; padding-top: 0; }
+.list li[data-past] { opacity: .6; }
+.list b { display: block; font-size: 15px; }
+.list span { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; }
+.list time { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.tag, .paid {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.tag { background: var(--warn-bg); color: var(--warn-ink); }
+.paid { background: var(--accent-dim); color: var(--accent); }
+.link { color: var(--accent); font-size: 13px; font-weight: 650; }
+
+@media (max-width: 820px) {
+  .status { grid-template-columns: auto minmax(0, 1fr); }
+  .list li { grid-template-columns: 1fr; gap: 8px; }
+}

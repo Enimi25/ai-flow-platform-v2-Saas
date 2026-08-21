@@ -1,0 +1,57 @@
+.dog { display: block; overflow: visible; }
+
+.head { transform-origin: 48px 60px; }
+.earLeft { transform-origin: 21px 34px; }
+.earRight { transform-origin: 75px 34px; }
+.eyes { transform-origin: 48px 45px; }
+.muzzle { transform-origin: 48px 61px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* always alive: a slow breath and an occasional blink */
+  .head { animation: breathe 4.6s ease-in-out infinite; }
+  .eyes { animation: blink 5.2s ease-in-out infinite; }
+
+  .dog[data-mood="listening"] .head { animation: tilt 2.4s ease-in-out infinite; }
+  .dog[data-mood="listening"] .earLeft { animation: perk 2.4s ease-in-out infinite; }
+
+  .dog[data-mood="thinking"] .earRight { animation: flick .9s ease-in-out infinite; }
+  .dog[data-mood="thinking"] .eyes { animation: blink 1.6s ease-in-out infinite; }
+
+  .dog[data-mood="speaking"] .muzzle { animation: talk .26s ease-in-out infinite; }
+  .dog[data-mood="speaking"] .head { animation: nod .52s ease-in-out infinite; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-1.2px) scale(1.012); }
+}
+
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(.12); }
+}
+
+@keyframes tilt {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-7deg); }
+}
+
+@keyframes perk {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50%      { transform: rotate(-12deg) translateY(-3px); }
+}
+
+@keyframes flick {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(9deg); }
+}
+
+@keyframes talk {
+  0%, 100% { transform: scaleY(.7); }
+  50%      { transform: scaleY(1.35); }
+}
+
+@keyframes nod {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(1px) rotate(1.4deg); }
+}

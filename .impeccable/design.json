@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-11T00:00:00+07:00",
+  "title": "Design System: AI FLOW Workspace",
+  "extensions": {
+    "colorMeta": {
+      "charcoal": { "role": "neutral", "displayName": "Navigation Charcoal", "canonical": "#18201c", "tonalRamp": ["oklch(15% 0.018 155)", "oklch(25% 0.018 155)", "oklch(35% 0.016 155)", "oklch(47% 0.014 155)", "oklch(60% 0.012 155)", "oklch(72% 0.010 155)", "oklch(84% 0.007 155)", "oklch(95% 0.004 155)"] },
+      "charcoal-hover": { "role": "neutral", "displayName": "Raised Charcoal", "canonical": "#243029", "tonalRamp": ["oklch(15% 0.022 155)", "oklch(25% 0.022 155)", "oklch(35% 0.020 155)", "oklch(47% 0.017 155)", "oklch(60% 0.014 155)", "oklch(72% 0.011 155)", "oklch(84% 0.008 155)", "oklch(95% 0.004 155)"] },
+      "workspace": { "role": "neutral", "displayName": "Cool Workspace", "canonical": "#f4f6f3", "tonalRamp": ["oklch(15% 0.008 145)", "oklch(25% 0.008 145)", "oklch(35% 0.007 145)", "oklch(47% 0.006 145)", "oklch(60% 0.005 145)", "oklch(72% 0.004 145)", "oklch(84% 0.003 145)", "oklch(95% 0.002 145)"] },
+      "surface": { "role": "neutral", "displayName": "Clear Surface", "canonical": "#ffffff", "tonalRamp": ["oklch(15% 0 0)", "oklch(25% 0 0)", "oklch(35% 0 0)", "oklch(47% 0 0)", "oklch(60% 0 0)", "oklch(72% 0 0)", "oklch(84% 0 0)", "oklch(95% 0 0)"] },
+      "surface-soft": { "role": "neutral", "displayName": "Soft Utility", "canonical": "#edf2ee", "tonalRamp": ["oklch(15% 0.010 150)", "oklch(25% 0.010 150)", "oklch(35% 0.009 150)", "oklch(47% 0.008 150)", "oklch(60% 0.006 150)", "oklch(72% 0.005 150)", "oklch(84% 0.004 150)", "oklch(95% 0.002 150)"] },
+      "text-muted": { "role": "neutral", "displayName": "Muted Copy", "canonical": "#647069", "tonalRamp": ["oklch(15% 0.014 155)", "oklch(25% 0.014 155)", "oklch(35% 0.013 155)", "oklch(47% 0.012 155)", "oklch(60% 0.010 155)", "oklch(72% 0.008 155)", "oklch(84% 0.006 155)", "oklch(95% 0.003 155)"] },
+      "border": { "role": "neutral", "displayName": "Quiet Divider", "canonical": "#d6dcd8", "tonalRamp": ["oklch(15% 0.008 155)", "oklch(25% 0.008 155)", "oklch(35% 0.007 155)", "oklch(47% 0.006 155)", "oklch(60% 0.005 155)", "oklch(72% 0.004 155)", "oklch(84% 0.003 155)", "oklch(95% 0.002 155)"] },
+      "emerald": { "role": "primary", "displayName": "Operational Emerald", "canonical": "#1f7356", "tonalRamp": ["oklch(15% 0.070 160)", "oklch(25% 0.090 160)", "oklch(35% 0.105 160)", "oklch(47% 0.110 160)", "oklch(60% 0.100 160)", "oklch(72% 0.080 160)", "oklch(84% 0.050 160)", "oklch(95% 0.020 160)"] },
+      "emerald-bright": { "role": "primary", "displayName": "Focus Mint", "canonical": "#5bc49a", "tonalRamp": ["oklch(15% 0.075 160)", "oklch(25% 0.095 160)", "oklch(35% 0.115 160)", "oklch(47% 0.125 160)", "oklch(60% 0.115 160)", "oklch(72% 0.095 160)", "oklch(84% 0.060 160)", "oklch(95% 0.025 160)"] },
+      "emerald-soft": { "role": "primary", "displayName": "Selected Mint", "canonical": "#edf5f0", "tonalRamp": ["oklch(15% 0.025 155)", "oklch(25% 0.030 155)", "oklch(35% 0.032 155)", "oklch(47% 0.030 155)", "oklch(60% 0.025 155)", "oklch(72% 0.018 155)", "oklch(84% 0.010 155)", "oklch(95% 0.004 155)"] },
+      "warning-surface": { "role": "tertiary", "displayName": "Setup Warning Wash", "canonical": "#fff0e4", "tonalRamp": ["oklch(15% 0.040 55)", "oklch(25% 0.050 55)", "oklch(35% 0.055 55)", "oklch(47% 0.050 55)", "oklch(60% 0.040 55)", "oklch(72% 0.030 55)", "oklch(84% 0.018 55)", "oklch(95% 0.007 55)"] },
+      "warning-text": { "role": "tertiary", "displayName": "Setup Warning Ink", "canonical": "#7c3f16", "tonalRamp": ["oklch(15% 0.075 55)", "oklch(25% 0.095 55)", "oklch(35% 0.110 55)", "oklch(47% 0.105 55)", "oklch(60% 0.085 55)", "oklch(72% 0.060 55)", "oklch(84% 0.035 55)", "oklch(95% 0.014 55)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Workspace Display", "purpose": "Large page titles that orient each task surface." },
+      "title": { "displayName": "Panel Title", "purpose": "Agenda dates and primary panel headings." },
+      "body": { "displayName": "Operational Body", "purpose": "Requirements, descriptions, and task guidance." },
+      "label": { "displayName": "Utility Label", "purpose": "Statuses, metadata, and compact interface labels." }
+    },
+    "shadows": [
+      { "name": "ambient-panel", "value": "0 18px 48px rgba(24,32,28,.07)", "purpose": "Primary agenda, channel, and detail panels." },
+      { "name": "ambient-panel-soft", "value": "0 18px 48px rgba(24,32,28,.06)", "purpose": "Supporting connection and availability panels." }
+    ],
+    "motion": [],
+    "breakpoints": [
+      { "name": "task-stack", "value": "1080px" },
+      { "name": "icon-rail", "value": "1040px" },
+      { "name": "mobile-nav", "value": "680px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Connection Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Starts a provider connection or sign-in prerequisite.",
+      "html": "<button class=\"ds-btn-primary\">Connect calendar</button>",
+      "css": ".ds-btn-primary { min-height: 44px; padding: 0 15px; border: 0; border-radius: 12px; background: #1f7356; color: #f5fff9; font: 690 13px var(--font-geist, sans-serif); } .ds-btn-primary:hover { background: #15513d; } .ds-btn-primary:focus-visible { outline: 3px solid #5bc49a; outline-offset: 3px; } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Disabled Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Shows an unavailable action without hiding its dependency.",
+      "html": "<button class=\"ds-btn-secondary\" disabled>New appointment</button>",
+      "css": ".ds-btn-secondary { min-height: 44px; padding: 0 15px; border: 1px solid #d1d8d3; border-radius: 12px; background: #fff; color: #26332c; font: 690 13px var(--font-geist, sans-serif); } .ds-btn-secondary:hover:not(:disabled) { background: #f4f6f3; } .ds-btn-secondary:focus-visible { outline: 3px solid #5bc49a; outline-offset: 3px; } .ds-btn-secondary:disabled { opacity: .5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Sidebar Navigation Item",
+      "kind": "nav",
+      "description": "The default, hover, and active language of desktop navigation.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" href=\"#\">Overview</a><a class=\"ds-nav-item ds-nav-active\" href=\"#\" aria-current=\"page\">Calendar</a></nav>",
+      "css": ".ds-nav { width: 216px; padding: 12px; background: #18201c; display: grid; gap: 5px; } .ds-nav-item { height: 46px; padding: 0 12px; border-radius: 12px; color: #aeb9b3; display: flex; align-items: center; text-decoration: none; font: 620 14px var(--font-geist, sans-serif); } .ds-nav-item:hover { background: #243029; color: #f3f7f4; } .ds-nav-item:focus-visible { outline: 3px solid #5bc49a; outline-offset: 3px; } .ds-nav-active { background: #f3f7f4; color: #18201c; }"
+    },
+    {
+      "name": "Preview Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Names non-live data directly in a quiet utility style.",
+      "html": "<span class=\"ds-chip\">Preview data</span>",
+      "css": ".ds-chip { display: inline-block; padding: 7px 9px; border-radius: 9px; background: #edf2ee; color: #526159; font: 600 11px var(--font-geist, sans-serif); }"
+    },
+    {
+      "name": "Agenda Event",
+      "kind": "custom",
+      "description": "A compact appointment block with explicit source and duration.",
+      "html": "<article class=\"ds-event\"><div><h3>Website demo request</h3><p>Example lead <span>Website</span></p></div><small>30 min</small></article>",
+      "css": ".ds-event { padding: 15px 16px; border-radius: 13px; background: #edf5f0; color: #18201c; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; font-family: var(--font-geist, sans-serif); } .ds-event h3 { margin: 0 0 6px; font-size: 15px; } .ds-event p { margin: 0; color: #617068; font-size: 12px; } .ds-event p span { margin-left: 8px; color: #1f7356; } .ds-event small { color: #607068; white-space: nowrap; }"
+    },
+    {
+      "name": "Channel Selection Row",
+      "kind": "custom",
+      "description": "A selectable provider row with explicit disconnected state.",
+      "html": "<button class=\"ds-channel\"><span class=\"ds-channel-icon\">F</span><span><b>Facebook Messenger</b><small>Reply to messages from your connected Page.</small></span><em>Not connected</em></button>",
+      "css": ".ds-channel { width: 100%; min-height: 104px; padding: 18px 24px; border: 0; border-top: 1px solid #e2e7e3; background: #edf5f0; color: #18201c; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 14px; align-items: center; text-align: left; font-family: var(--font-geist, sans-serif); } .ds-channel:hover { background: #e6f2eb; } .ds-channel:focus-visible { outline: 3px solid #5bc49a; outline-offset: -3px; } .ds-channel-icon { width: 44px; height: 44px; border-radius: 13px; background: #e8efea; color: #1f7356; display: grid; place-items: center; font-weight: 700; } .ds-channel b, .ds-channel small { display: block; } .ds-channel b { font-size: 15px; } .ds-channel small { margin-top: 5px; color: #68736d; line-height: 1.4; } .ds-channel em { padding: 7px 10px; border-radius: 9px; background: #f3ede8; color: #7b6556; font: normal 12px var(--font-geist, sans-serif); }"
+    },
+    {
+      "name": "Setup Warning",
+      "kind": "custom",
+      "description": "Explains incomplete provider setup and the recovery action.",
+      "html": "<aside class=\"ds-warning\"><strong>Connection setup is not complete</strong><p>Add the OAuth URL and provider credentials, then try again.</p></aside>",
+      "css": ".ds-warning { padding: 16px 18px; border-radius: 14px; background: #fff0e4; color: #7c3f16; font-family: var(--font-geist, sans-serif); } .ds-warning strong { font-size: 14px; } .ds-warning p { margin: 3px 0 0; font-size: 13px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Operations Desk",
+    "overview": "AI FLOW feels like a focused operations desk: a stable dark frame holds a quiet, cool workspace where account state, appointments, and required actions are easy to scan. The system is practical and restrained rather than decorative, using hierarchy, spacing, and explicit language to make operational truth visible.\n\nThe interface is dense enough for daily work without feeling cramped. Large, tightly set page titles orient the user; white panels organize task content; the emerald accent appears only where it signals a useful action, keyboard focus, or healthy state. Unconfigured and preview states are named honestly instead of being disguised as live data.",
+    "keyCharacteristics": [
+      "Dark charcoal navigation frame with a cool neutral workspace.",
+      "Restrained emerald action and status language.",
+      "Rounded, compact controls and calm white panels.",
+      "Explicit preview, disabled, protected, and unconfigured states.",
+      "Task-first responsive composition with persistent mobile navigation."
+    ],
+    "rules": [
+      { "name": "The One Signal Rule", "body": "Emerald is the only interactive accent; reserve it for action, focus, availability, or confirmed health.", "section": "colors" },
+      { "name": "The Honest State Rule", "body": "Warning amber communicates incomplete setup, while neutral copy states “Not connected,” “Preview data,” or disabled status explicitly; color never carries status alone.", "section": "colors" },
+      { "name": "The Scan First Rule", "body": "Lead with short headings and state labels; explanatory copy follows in quieter type and remains concise.", "section": "typography" },
+      { "name": "The Flat Frame Rule", "body": "Never shadow the sidebar, top bar, date rail, banners, or bottom navigation; their depth comes from tonal contrast and borders.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the charcoal navigation frame stable while task content changes inside the cool neutral workspace.",
+      "Do use emerald sparingly for primary action, focus, confirmed health, and availability.",
+      "Do name preview, disconnected, protected, disabled, and incomplete-setup states in visible text.",
+      "Do preserve agenda-first and selection-first order when columns stack on smaller screens.",
+      "Do use 12–16px radii for controls and panels, with compact 9px badges where appropriate."
+    ],
+    "donts": [
+      "Don't use multiple competing accent colors or decorative gradients.",
+      "Don't present preview appointments or unconfigured providers as live customer data.",
+      "Don't hide required recovery actions behind color, icons, tooltips, or provider jargon.",
+      "Don't add shadows to every surface; depth is mostly tonal and structural.",
+      "Don't replace visible keyboard focus with subtle border changes."
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+/* The widget lives in an iframe on somebody else's site, so it paints its own
+   ground and never inherits from the host page. */
+html, body { height: 100%; }
+body { margin: 0; background: var(--surface); }
