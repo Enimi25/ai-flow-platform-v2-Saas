@@ -190,6 +190,12 @@ export default function Flow() {
           })}
         </div>
 
+        {/* the helix sits between the two columns rather than behind one of
+            them: it is the thing people remember the page by */}
+        <div className={s.helix} aria-hidden="true">
+          <Strand rungs={34} radius={92} gap={18} step={18} spin={540} />
+        </div>
+
         <div className={s.detail} role="tabpanel" aria-label={active.title}>
           <p className={s.said} data-from={active.said.from}>{active.said.text}</p>
 
@@ -200,10 +206,6 @@ export default function Flow() {
           </ul>
 
           <p className={s.proof}>{active.proof}</p>
-
-          <div className={s.helix} aria-hidden="true">
-            <Strand rungs={26} radius={78} gap={17} step={17} spin={360} />
-          </div>
         </div>
       </div>
 
