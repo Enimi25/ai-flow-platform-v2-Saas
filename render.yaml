@@ -1,0 +1,56 @@
+# Render Blueprint for the AI FLOW workspace.
+# New + → Blueprint → connect this repository. Render reads this file.
+services:
+  - type: web
+    name: ai-flow
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/activity
+    envVars:
+      # Secrets are set in the Render dashboard, never committed here.
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: "24"
+      - key: MODEL_PROVIDERS
+        value: groq,openrouter
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_LIGHT_MODEL
+        value: openai/gpt-oss-20b
+      - key: OPENROUTER_MODEL
+        value: nvidia/nemotron-3-super-120b-a12b:free
+      - key: OPENROUTER_LIGHT_MODEL
+        value: openai/gpt-oss-20b:free
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: FACEBOOK_PAGE_ID
+        sync: false
+      - key: FACEBOOK_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_USER_ID
+        sync: false
+      - key: PUBLIC_SITE_URL
+        sync: false
