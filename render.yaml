@@ -53,4 +53,4 @@ services:
       - key: INSTAGRAM_USER_ID
         sync: false
       - key: PUBLIC_SITE_URL
-        sync: false
+        value: https://aiflow.forum
