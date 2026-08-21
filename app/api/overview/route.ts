@@ -11,7 +11,8 @@ import { isEmailReady } from "@/lib/email/send";
 
 export async function GET() {
   const session = await getSession();
-  const companyId = session?.companyId ?? "preview";
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const [leads, posts, bookings, events, connections] = await Promise.all([
     listLeads(companyId),

@@ -1,0 +1,59 @@
+.mascot {
+  display: block;
+  position: relative;
+  flex: none;
+  filter: drop-shadow(0 14px 26px rgba(0, 0, 0, .45));
+  cursor: pointer;
+  transform-origin: 50% 100%;
+}
+
+.mascot > svg { width: 100%; height: 100%; }
+
+.mascot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* the art loads a frame or two after mount; fading in beats a pop */
+.mascot[data-pending="true"] { opacity: 0; }
+.mascot { transition: opacity .3s var(--ease); }
+
+.mascot:hover { animation: perk .5s var(--ease); }
+.mascot:active { transform: scale(.97); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .mascot { animation: bob 3.4s ease-in-out infinite; }
+  .mascot[data-mood="listening"] { animation: lean 2.6s ease-in-out infinite; }
+  .mascot[data-mood="thinking"]  { animation: ponder 2.2s ease-in-out infinite; }
+  .mascot[data-mood="speaking"]  { animation: chat .52s ease-in-out infinite; }
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-4px) rotate(-.7deg); }
+}
+
+@keyframes lean {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-5px) rotate(-3deg); }
+}
+
+@keyframes ponder {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  45%      { transform: translateY(-3px) rotate(2.4deg); }
+}
+
+@keyframes chat {
+  0%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+  50%      { transform: translateY(-2px) scale(1.015, .99) rotate(.8deg); }
+}
+
+@keyframes perk {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-9px) rotate(-4deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}

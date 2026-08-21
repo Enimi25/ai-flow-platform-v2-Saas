@@ -17,7 +17,7 @@
   gap: 11px;
 }
 
-.avatar { width: 44px; height: 44px; flex: none; display: grid; place-items: center; }
+.avatar { width: 40px; height: 40px; flex: none; border-radius: 11px; background: var(--accent-grad); color: var(--accent-contrast); display: grid; place-items: center; font-size: 13px; font-weight: 760; }
 .who { min-width: 0; flex: 1; display: grid; gap: 2px; }
 .who b { font-size: 15px; letter-spacing: -.02em; }
 .who small { font-size: 12px; color: var(--muted); }

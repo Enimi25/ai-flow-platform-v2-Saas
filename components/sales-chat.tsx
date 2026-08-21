@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, SpeakerHigh, SpeakerSlash, X } from "@phosphor-icons/react";
-import { Dalmatian, type Mood } from "./dalmatian";
+import { ArrowUp, ChatCircleDots, SpeakerHigh, SpeakerSlash, X } from "@phosphor-icons/react";
+import type { Mood } from "./moods";
+import { Mascot } from "./mascot";
+import { hush, say, warmVoices } from "./speech";
 import s from "./sales-chat.module.css";
 
 type Message = { role: "agent" | "customer"; text: string };
@@ -48,22 +50,25 @@ export function SalesChat() {
   const [name, setName] = useState<string | undefined>();
   const [typing, setTyping] = useState("");
   const [loading, setLoading] = useState(false);
-  const [voice, setVoice] = useState(true);
+  const [voice, setVoice] = useState(false);
   const [teaser, setTeaser] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [talking, setTalking] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const revealTimer = useRef<number | null>(null);
 
-  const mood: Mood = loading ? "thinking" : typing ? "speaking" : open ? "listening" : "idle";
+  const mood: Mood =
+    talking || typing ? "speaking" : loading ? "thinking" : open ? "listening" : "idle";
 
   // restore the previous visit
   useEffect(() => {
     const saved = load();
     setName(saved.name);
     setMessages(saved.messages.length ? saved.messages : [{ role: "agent", text: OPENER }]);
-    setVoice(localStorage.getItem(`${STORE}_voice`) !== "off");
+    setVoice(localStorage.getItem(`${STORE}_voice`) === "on");
+    warmVoices();
     setReady(true);
   }, []);
 
@@ -90,12 +95,9 @@ export function SalesChat() {
 
   const speak = useCallback(
     (text: string) => {
-      if (!voice || typeof window === "undefined" || !window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.04;
-      utterance.pitch = 1.12;
-      window.speechSynthesis.speak(utterance);
+      if (!voice) return;
+      setTalking(false);
+      say(text, { onStart: () => setTalking(true), onEnd: () => setTalking(false) });
     },
     [voice],
   );
@@ -123,7 +125,7 @@ export function SalesChat() {
 
   useEffect(() => () => {
     if (revealTimer.current) window.clearTimeout(revealTimer.current);
-    window.speechSynthesis?.cancel();
+    hush();
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -163,7 +165,7 @@ export function SalesChat() {
     setVoice((current) => {
       const next = !current;
       localStorage.setItem(`${STORE}_voice`, next ? "on" : "off");
-      if (!next) window.speechSynthesis?.cancel();
+      if (!next) { hush(); setTalking(false); }
       return next;
     });
   }
@@ -171,7 +173,7 @@ export function SalesChat() {
   function launch() {
     setTeaser(null);
     setOpen((value) => {
-      if (value) window.speechSynthesis?.cancel();
+      if (value) { hush(); setTalking(false); }
       return !value;
     });
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -182,7 +184,7 @@ export function SalesChat() {
       {open && (
         <section className={s.panel} aria-label="AI FLOW assistant">
           <header className={s.head}>
-            <span className={s.headAvatar}><Dalmatian mood={mood} size={44} /></span>
+            <span className={s.headAvatar} data-mood={mood} aria-hidden="true">AI</span>
             <div className={s.who}>
               <b>Flo</b>
               <small>{name ? `talking with ${name}` : "AI FLOW assistant"}</small>
@@ -226,9 +228,18 @@ export function SalesChat() {
         </button>
       )}
 
-      <button className={s.launcher} type="button" aria-expanded={open} onClick={launch}>
-        <Dalmatian mood={open ? "listening" : "idle"} size={40} />
-        <span>{open ? "Close" : "Ask Flo"}</span>
+      {/* Flo stands on the button when shut and on the panel's top edge when
+          open, so he stays in view and keeps talking either way */}
+      <Mascot className={s.flo} mood={mood} size={150} open={open} onClick={launch} />
+
+      <button
+        className={s.launcher}
+        type="button"
+        aria-expanded={open}
+        aria-label={open ? "Close the chat" : "Chat with Flo"}
+        onClick={launch}
+      >
+        {open ? <X weight="bold" /> : <ChatCircleDots weight="fill" />}
       </button>
     </div>
   );

@@ -4,21 +4,27 @@ import { listPosts, savePost } from "@/lib/content/store";
 import { channelReadiness } from "@/lib/content/publishers";
 import { CHANNELS, type Channel, type Post } from "@/lib/content/types";
 
+/** Null when nobody is signed in: the queue holds a company's own drafts, so
+ *  falling back to a shared workspace would hand them to anyone who asked. */
 function workspaceOf(session: Awaited<ReturnType<typeof getSession>>) {
-  return session?.companyId ?? "preview";
+  return session?.companyId ?? null;
 }
 
 export async function GET() {
   const session = await getSession();
+  const companyId = workspaceOf(session);
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
   return NextResponse.json({
-    posts: await listPosts(workspaceOf(session)),
-    readiness: await channelReadiness(workspaceOf(session)),
+    posts: await listPosts(companyId),
+    readiness: await channelReadiness(companyId),
   });
 }
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session) {
+  const companyId = workspaceOf(session);
+  if (!companyId) {
     return NextResponse.json({ error: "Sign in to queue a post." }, { status: 401 });
   }
 
@@ -37,7 +43,7 @@ export async function POST(request: Request) {
 
   const post: Post = {
     id: crypto.randomUUID(),
-    companyId: workspaceOf(session),
+    companyId,
     channel: body.channel as Channel,
     body: body.body.trim(),
     mediaUrl: body.mediaUrl?.trim() || undefined,

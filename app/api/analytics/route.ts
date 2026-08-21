@@ -18,7 +18,8 @@ function bucketByDay(items: { createdAt: string }[], days = 14) {
 
 export async function GET() {
   const session = await getSession();
-  const companyId = session?.companyId ?? "preview";
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const [leads, posts, bookings] = await Promise.all([
     listLeads(companyId),

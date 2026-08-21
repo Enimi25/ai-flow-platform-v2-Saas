@@ -4,7 +4,10 @@ import { listConversations } from "@/lib/conversations/store";
 
 export async function GET() {
   const session = await getSession();
-  const threads = await listConversations(session?.companyId ?? "preview");
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const threads = await listConversations(companyId);
   return NextResponse.json({
     threads,
     total: threads.length,

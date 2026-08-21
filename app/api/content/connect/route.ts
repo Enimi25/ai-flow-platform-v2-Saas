@@ -6,7 +6,10 @@ import { safeRecord } from "@/lib/activity";
 
 export async function GET() {
   const session = await getSession();
-  return NextResponse.json({ connections: await connectionsFor(session?.companyId ?? "preview") });
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  return NextResponse.json({ connections: await connectionsFor(companyId) });
 }
 
 /** Attaches a workspace's own account so its posts stop using the platform's. */

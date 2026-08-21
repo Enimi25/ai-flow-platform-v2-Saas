@@ -1,32 +1,34 @@
-.root { position: relative; z-index: 100; }
+.root {
+  --panel-h: min(560px, calc(100dvh - 260px)); position: relative; z-index: 100; }
 
 /* --- launcher ---------------------------------------------------------- */
 .launcher {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  min-height: 56px;
-  padding: 0 20px 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
-  transition: transform .18s var(--ease), border-color .18s var(--ease);
+  z-index: 61;
+  width: 60px;
+  height: 60px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: var(--accent-contrast);
+  display: grid;
+  place-items: center;
+  font-size: 25px;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .5);
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease);
 }
 
-.launcher:hover { transform: translateY(-2px); border-color: var(--accent); }
+.launcher:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 16px 38px rgba(0, 0, 0, .55); }
 .launcher:active { transform: translateY(0) scale(.985); }
 
 /* --- the nudge that appears once, above the launcher ------------------- */
 .teaser {
   position: fixed;
   right: 24px;
-  bottom: 92px;
+  bottom: 190px;
   max-width: 258px;
   padding: 14px 16px;
   border: 1px solid var(--line);
@@ -50,9 +52,9 @@
 .panel {
   position: fixed;
   right: 24px;
-  bottom: 92px;
+  bottom: 100px;
   width: min(390px, calc(100vw - 32px));
-  height: min(600px, calc(100dvh - 132px));
+  height: var(--panel-h);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
   background: var(--surface);
@@ -74,13 +76,17 @@
 }
 
 .headAvatar {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex: none;
-  border-radius: 50%;
-  background: transparent;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: var(--accent-contrast);
   display: grid;
   place-items: center;
+  font-size: 13px;
+  font-weight: 760;
+  letter-spacing: .02em;
 }
 
 .who { min-width: 0; flex: 1; display: grid; gap: 2px; }
@@ -213,4 +219,29 @@
   .panel, .teaser { animation: none; }
   .caret, .dots span { animation: none; }
   .launcher { transition: none; }
+}
+
+
+/* --- Flo's two perches ------------------------------------------------- */
+.flo {
+  position: fixed;
+  right: 0;
+  bottom: 54px;
+  z-index: 62;
+  transition: bottom .4s var(--ease), right .4s var(--ease);
+}
+
+/* on the panel's top edge, overlapping it, so he reads as standing on the
+   window rather than floating beside it */
+.flo[data-open="true"] {
+  bottom: calc(100px + var(--panel-h) - 30px);
+  right: 24px;
+}
+
+@media (max-width: 560px) {
+  .root { --panel-h: min(520px, calc(100dvh - 240px)); }
+  .launcher { right: 16px; bottom: 16px; }
+  .panel { right: 16px; bottom: 90px; }
+  .flo { right: 3px; bottom: 46px; width: 86px !important; height: 120px !important; }
+  .flo[data-open="true"] { bottom: calc(90px + var(--panel-h) - 24px); right: 18px; }
 }

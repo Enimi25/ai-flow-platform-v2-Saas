@@ -1,0 +1,79 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { Mood } from "./moods";
+import s from "./mascot.module.css";
+
+/**
+ * Flo on screen.
+ *
+ * The character is artwork, not geometry: a rendered PNG with a transparent
+ * background, dropped in at /public/flo/. Hand-authored SVG cannot reach that
+ * finish, so the drawn dalmatian is only the fallback for when the art is
+ * missing. Everything that makes Flo feel alive — the breathing bob, the cocked
+ * head, the jaw moving while the voice runs — is CSS on top of the image, so it
+ * works the same either way.
+ *
+ * Two frames are enough for speech: mouth shut and mouth open, alternated on a
+ * short cycle. Give it only flo.png and it falls back to a nod.
+ */
+const REST = "/flo/flo.png";
+const TALK = "/flo/flo-talking.png";
+
+export function Mascot({
+  mood = "idle",
+  size = 150,
+  className,
+  open,
+  onClick,
+}: {
+  mood?: Mood;
+  size?: number;
+  className?: string;
+  open?: boolean;
+  onClick?: () => void;
+}) {
+  const [art, setArt] = useState<"unknown" | "yes" | "no">("unknown");
+  const [talkFrame, setTalkFrame] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    const probe = new Image();
+    probe.onload = () => live && setArt("yes");
+    probe.onerror = () => live && setArt("no");
+    probe.src = REST;
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // the two-frame mouth, only while the voice is actually running
+  useEffect(() => {
+    if (mood !== "speaking" || art !== "yes") {
+      setTalkFrame(false);
+      return;
+    }
+    const timer = window.setInterval(() => setTalkFrame((f) => !f), 165);
+    return () => window.clearInterval(timer);
+  }, [mood, art]);
+
+  if (art === "no") return null;
+
+  return (
+    <span
+      className={[s.mascot, className].filter(Boolean).join(" ")}
+      data-mood={mood}
+      data-open={open ? "true" : "false"}
+      data-pending={art === "unknown" ? "true" : undefined}
+      style={{ width: Math.round(size * 0.72), height: size }}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
+      aria-label={onClick ? "Open the chat with Flo" : undefined}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={talkFrame ? TALK : REST} alt="" draggable={false} onError={() => setArt("no")} />
+    </span>
+  );
+}

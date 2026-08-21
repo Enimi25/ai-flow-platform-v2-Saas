@@ -7,7 +7,8 @@ import { isGoogleReady } from "@/lib/google/oauth";
 
 export async function GET() {
   const session = await getSession();
-  const companyId = session?.companyId ?? "preview";
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   await releaseExpired();
   const bookings = await listBookings(companyId);

@@ -8,7 +8,8 @@ import { modelStatus } from "@/lib/model";
 
 export async function GET() {
   const session = await getSession();
-  const companyId = session?.companyId ?? "preview";
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   const channels = await channelReadiness(companyId);
 
   const steps = [

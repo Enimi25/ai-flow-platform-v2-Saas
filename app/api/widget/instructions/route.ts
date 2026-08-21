@@ -8,7 +8,8 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   const session = await getSession();
-  const companyId = session?.companyId ?? "preview";
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const { to, platform } = (await request.json().catch(() => ({}))) as { to?: string; platform?: string };
   if (!to || !emailPattern.test(to)) {

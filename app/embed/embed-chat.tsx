@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
-import { Dalmatian, type Mood } from "@/components/dalmatian";
+import type { Mood } from "@/components/moods";
+import { hush, say, warmVoices } from "@/components/speech";
 import s from "./embed.module.css";
 
 type Message = { role: "agent" | "customer"; text: string };
@@ -31,20 +32,23 @@ export function EmbedChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [typing, setTyping] = useState("");
   const [loading, setLoading] = useState(false);
-  const [voice, setVoice] = useState(true);
+  const [voice, setVoice] = useState(false);
+  const [talking, setTalking] = useState(false);
   const [ready, setReady] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const timer = useRef<number | null>(null);
 
-  const mood: Mood = loading ? "thinking" : typing ? "speaking" : "listening";
+  const mood: Mood =
+    talking || typing ? "speaking" : loading ? "thinking" : "listening";
 
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(store) || "[]") as Message[];
       setMessages(saved.length ? saved.slice(-30) : [{ role: "agent", text: welcome }]);
-      setVoice(localStorage.getItem(`${store}_voice`) !== "off");
+      setVoice(localStorage.getItem(`${store}_voice`) === "on");
+      warmVoices();
     } catch {
       setMessages([{ role: "agent", text: welcome }]);
     }
@@ -61,17 +65,14 @@ export function EmbedChat({
 
   useEffect(() => () => {
     if (timer.current) window.clearTimeout(timer.current);
-    window.speechSynthesis?.cancel();
+    hush();
   }, []);
 
   const reveal = useCallback(
     (text: string) => {
-      if (voice && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.04;
-        utterance.pitch = 1.12;
-        window.speechSynthesis.speak(utterance);
+      if (voice) {
+        setTalking(false);
+        say(text, { onStart: () => setTalking(true), onEnd: () => setTalking(false) });
       }
       let index = 0;
       const step = () => {
@@ -118,7 +119,7 @@ export function EmbedChat({
     setVoice((current) => {
       const next = !current;
       localStorage.setItem(`${store}_voice`, next ? "on" : "off");
-      if (!next) window.speechSynthesis?.cancel();
+      if (!next) { hush(); setTalking(false); }
       return next;
     });
   }
@@ -126,7 +127,7 @@ export function EmbedChat({
   return (
     <div className={s.shell}>
       <header className={s.head}>
-        <span className={s.avatar}><Dalmatian mood={mood} size={44} /></span>
+        <span className={s.avatar} data-mood={mood} aria-hidden="true">AI</span>
         <div className={s.who}>
           <b>{assistantName}</b>
           <small>Usually replies in seconds</small>

@@ -5,7 +5,10 @@ import { safeRecord } from "@/lib/activity";
 
 export async function GET() {
   const session = await getSession();
-  return NextResponse.json({ settings: await getSettings(session?.companyId ?? "preview") });
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  return NextResponse.json({ settings: await getSettings(companyId) });
 }
 
 export async function PUT(request: Request) {

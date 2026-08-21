@@ -4,7 +4,10 @@ import { listLeads, setStatus, captureLead, SOURCES, type Source, type LeadStatu
 
 export async function GET() {
   const session = await getSession();
-  const leads = await listLeads(session?.companyId ?? "preview");
+  const companyId = session?.companyId;
+  if (!companyId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const leads = await listLeads(companyId);
   const counts = leads.reduce<Record<string, number>>((totals, lead) => {
     totals[lead.status] = (totals[lead.status] ?? 0) + 1;
     return totals;
