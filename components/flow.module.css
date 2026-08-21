@@ -1,176 +1,8 @@
-/* The descent: the strand turns while the four moments of a conversation pass
-   by it. Scroll drives the turn, so the motion carries the explanation.
+.rail { max-width: var(--page); margin-inline: auto; padding: clamp(60px, 8vh, 100px) var(--gutter); }
 
-   The readable two column layout is the base. The pinned sequence switches on
-   only once the script has confirmed it can run it, so no copy is ever hidden
-   behind an animation that never starts. */
+.head { max-width: 760px; }
+.head .h2 { margin: 10px 0 0; }
 
-.rail { position: relative; }
-
-.sticky { display: grid; gap: 8px; }
-
-.head {
-  width: 100%;
-  max-width: var(--page);
-  margin-inline: auto;
-  padding: clamp(40px, 5.5vh, 68px) var(--gutter) 0;
-}
-
-.head p { margin: 16px 0 0; }
-
-.scene { position: relative; }
-
-.slots {
-  max-width: var(--page);
-  margin-inline: auto;
-  padding: clamp(36px, 6vh, 64px) var(--gutter) clamp(72px, 10vh, 120px);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(28px, 4vw, 56px);
-}
-
-.slot h3 {
-  font-size: clamp(1.45rem, 2.4vw, 2rem);
-  line-height: 1.05;
-  letter-spacing: -.035em;
-  margin: 0 0 12px;
-}
-
-.slot p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
-  font-size: 15px;
-  max-width: 46ch;
-}
-
-.tick {
-  display: block;
-  width: 34px;
-  height: 1px;
-  background: var(--accent);
-  margin-bottom: 18px;
-}
-
-@media (max-width: 760px) {
-  .slots { grid-template-columns: 1fr; }
-}
-
-/* --- enhanced: the stage is pinned and scroll plays the sequence -------- */
-
-.rail[data-enhanced] .sticky {
-  height: 100dvh;
-  overflow: hidden;
-  grid-template-rows: auto 1fr;
-  gap: 0;
-}
-
-.rail[data-enhanced] .slots {
-  position: absolute;
-  inset: 0;
-  display: block;
-  max-width: var(--page);
-  margin-inline: auto;
-  padding: 0 var(--gutter);
-}
-
-.rail[data-enhanced] .slot {
-  position: absolute;
-  top: 50%;
-  width: min(340px, 34vw);
-  margin-top: -70px;
-  opacity: 0;
-  visibility: hidden;
-}
-
-.rail[data-enhanced] .slot[data-side="l"] { left: var(--gutter); text-align: right; }
-.rail[data-enhanced] .slot[data-side="r"] { right: var(--gutter); }
-.rail[data-enhanced] .slot[data-side="l"] .tick { margin-left: auto; }
-.rail[data-enhanced] .slot p { max-width: none; }
-
-@media (max-width: 900px) {
-  .rail[data-enhanced] .slot,
-  .rail[data-enhanced] .slot[data-side="l"],
-  .rail[data-enhanced] .slot[data-side="r"] {
-    left: var(--gutter);
-    right: var(--gutter);
-    width: auto;
-    text-align: left;
-    top: auto;
-    bottom: 10vh;
-    margin-top: 0;
-  }
-  .rail[data-enhanced] .slot[data-side="l"] .tick { margin-left: 0; }
-}
-
-/* --- the stages carry a real conversation, not four captions ----------- */
-.step {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 760;
-  letter-spacing: .1em;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.step span {
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: none;
-  color: var(--muted);
-}
-
-.body { margin: 0 0 14px; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
-
-/* the message itself, shaped like the bubble it would be in the widget */
-.said {
-  margin: 0 0 10px;
-  padding: 11px 14px;
-  border-radius: 14px;
-  font-size: 14.5px;
-  line-height: 1.5;
-  max-width: 40ch;
-}
-
-.said[data-from="customer"] {
-  background: var(--surface-high);
-  border: 1px solid var(--line);
-  color: var(--text);
-  border-bottom-right-radius: 5px;
-}
-
-.said[data-from="agent"] {
-  background: linear-gradient(103deg, rgba(195, 245, 60, .16), rgba(62, 207, 178, .16));
-  border: 1px solid rgba(62, 207, 178, .3);
-  color: var(--text);
-  border-bottom-left-radius: 5px;
-}
-
-.note {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--muted);
-  opacity: .82;
-  max-width: 40ch;
-}
-
-.slot[data-side="r"] .said { margin-left: auto; }
-.slot[data-side="r"] .note,
-.slot[data-side="r"] .body { margin-left: auto; }
-
-@media (max-width: 900px) {
-  .said, .note, .body { max-width: none; }
-  .slot[data-side="r"] .said,
-  .slot[data-side="r"] .note,
-  .slot[data-side="r"] .body { margin-left: 0; }
-}
-
-/* the promise the four stages exist to back up */
 .strap {
   margin: 18px 0 0;
   max-width: 62ch;
@@ -178,5 +10,222 @@
   line-height: 1.62;
   color: var(--muted);
 }
-
 .strap b { color: var(--text); font-weight: 660; }
+
+/* --- the four stages, all on screen, one open --------------------------- */
+.board {
+  margin-top: 42px;
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.steps { display: grid; gap: 10px; }
+
+.step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  padding: 17px 19px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
+}
+
+.step:hover { border-color: var(--accent-2); transform: translateX(2px); }
+
+.step[data-open="true"] {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--surface-high), var(--surface-high)) padding-box,
+    var(--accent-grad) border-box;
+  border: 1px solid transparent;
+}
+
+.stepIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--surface-high);
+  color: var(--muted);
+  font-size: 19px;
+  transition: background .18s var(--ease), color .18s var(--ease);
+}
+.step[data-open="true"] .stepIcon { background: var(--accent-grad); color: var(--accent-contrast); }
+
+.stepText { min-width: 0; display: grid; gap: 2px; }
+.stepText em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: .12em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.stepText b { font-size: 16.5px; letter-spacing: -.025em; }
+.stepText small { font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+.stepFact {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- what the open stage says ------------------------------------------ */
+.detail {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background:
+    radial-gradient(120% 90% at 88% 8%, rgba(62, 207, 178, .07), transparent 62%),
+    var(--surface);
+  min-height: 100%;
+}
+
+.said {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 20px;
+  padding: 13px 16px;
+  border-radius: 15px;
+  max-width: 44ch;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.said[data-from="customer"] {
+  background: var(--surface-high);
+  border: 1px solid var(--line);
+  border-bottom-right-radius: 5px;
+}
+
+.said[data-from="agent"] {
+  margin-left: auto;
+  background: linear-gradient(103deg, rgba(195, 245, 60, .17), rgba(62, 207, 178, .17));
+  border: 1px solid rgba(62, 207, 178, .32);
+  border-bottom-left-radius: 5px;
+}
+
+.points {
+  position: relative;
+  z-index: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 13px;
+}
+
+.points li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 11px;
+  align-items: start;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 58ch;
+}
+
+.points li svg { color: var(--accent-2); font-size: 14px; margin-top: 4px; }
+
+.proof {
+  position: relative;
+  z-index: 1;
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  max-width: 58ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* the helix stays as atmosphere, behind the words rather than beside them */
+.helix {
+  position: absolute;
+  right: -70px;
+  bottom: -70px;
+  opacity: .3;
+  pointer-events: none;
+}
+
+/* --- why this and not the alternatives ---------------------------------- */
+.compare { margin-top: 56px; }
+.compareTitle { margin: 0 0 20px; font-size: clamp(1.3rem, 2vw, 1.7rem); letter-spacing: -.03em; }
+
+.tableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-panel); }
+
+.table { width: 100%; border-collapse: collapse; min-width: 680px; background: var(--surface); }
+
+.table thead th {
+  padding: 15px 18px;
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.table thead th:nth-child(2) { color: var(--accent); }
+
+.table tbody th {
+  padding: 16px 18px;
+  text-align: left;
+  font-size: 14.5px;
+  font-weight: 620;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+  max-width: 34ch;
+}
+
+.table tbody th small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.table td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 15px;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.table td[data-yes="true"] { color: var(--accent-2); }
+.table td[data-yes="true"][data-us="true"] { color: var(--accent); }
+.table td[data-yes="false"] { opacity: .4; }
+.table tbody tr:last-child th,
+.table tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 980px) {
+  .board { grid-template-columns: 1fr; }
+  .helix { display: none; }
+  .said[data-from="agent"] { margin-left: 0; }
+}
+
+@media (max-width: 560px) {
+  .step { grid-template-columns: auto 1fr; padding: 15px 16px; }
+  .stepFact { display: none; }
+}

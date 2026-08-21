@@ -1,141 +1,222 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useState } from "react";
+import {
+  CalendarCheck,
+  ChatCircleDots,
+  Check,
+  Lightning,
+  Minus,
+  UserList,
+} from "@phosphor-icons/react";
 import Strand from "./strand";
 import s from "./flow.module.css";
 
-gsap.registerPlugin(ScrollTrigger);
-
 /**
- * One real conversation, carried through all four stages.
+ * How it works, as something you can open rather than something you scroll past.
  *
- * The section used to be a large animation beside four one-line captions, which
- * read as decoration. Showing the actual messages is what makes the claim
- * legible: the same enquiry moves down the page and arrives as an appointment.
+ * This was a pinned scroll animation that revealed one caption at a time beside
+ * a large helix. On any given screen it read as empty: a lot of motion, four
+ * short lines, and no way to ask it anything. Everything is on the page now, and
+ * the stage you tap opens.
  */
+
 const STAGES = [
   {
+    key: "writes",
     step: "01",
+    icon: ChatCircleDots,
     title: "A customer writes",
-    body: "We run the channels. Someone writes to your site, Messenger, Instagram or WhatsApp — the agent is already there.",
     fact: "23:40, Saturday",
+    lead: "We hold the channels, so somebody is always there.",
     said: { from: "customer", text: "Скольько стоит чистка? Можно в воскресенье?" },
-    note: "Typed in Russian, at midnight, with a typo. All three are normal.",
+    detail: [
+      "Your website, Facebook Messenger, Instagram and WhatsApp all arrive in one place.",
+      "Any hour, including the ones you are asleep for. Half of all enquiries land outside working hours and most of those never get answered at all.",
+      "Any language, and Russian typed in Latin letters counts as Russian. Typos too.",
+    ],
+    proof: "You connect an account once. After that nobody on your side touches it.",
   },
   {
+    key: "answers",
     step: "02",
+    icon: Lightning,
     title: "The agent answers",
-    body: "It replies from what you told it, in the language they used, and never invents a price.",
     fact: "4 seconds later",
+    lead: "From what you told it, in the language they used.",
     said: { from: "agent", text: "Чистка — 85. В воскресенье мы закрыты, но есть суббота в 10:00 или 11:00." },
-    note: "It knew Sunday was shut because your opening hours say so.",
+    detail: [
+      "It knows your prices, your address, your hours and what you do not do, because you wrote that once in plain language.",
+      "It knew Sunday was shut without being told twice: the answer comes from your real opening hours, not from a guess.",
+      "When it does not know, it says so and asks how to reach you. It will not invent a price to keep the conversation going.",
+    ],
+    proof: "Ask it something it was never told. It refuses instead of guessing. That is the whole difference.",
   },
   {
+    key: "lead",
     step: "03",
+    icon: UserList,
     title: "The lead is kept",
-    body: "Name, phone, channel and the whole conversation are filed before the chat ends.",
-    fact: "Saved automatically",
+    fact: "Before the chat ends",
+    lead: "Nothing depends on anyone remembering to write it down.",
     said: { from: "customer", text: "Анна, +7 916 445 22 10. Давайте субботу в 11." },
-    note: "A phone number typed mid-sentence still lands in your leads.",
+    detail: [
+      "Name, phone, email, which channel they came from and the entire conversation.",
+      "A phone number typed in the middle of a sentence still lands in your leads. So does one given three messages earlier.",
+      "Every workspace sees only its own. Nobody without your sign-in can read a single contact.",
+    ],
+    proof: "Open Leads tomorrow morning and last night's enquiries are already sitting there.",
   },
   {
+    key: "booked",
     step: "04",
+    icon: CalendarCheck,
     title: "The slot is booked",
-    body: "The appointment goes into the calendar, checked against what is already taken.",
     fact: "22.08.2026, 11:00",
+    lead: "A real appointment, not a promise to call back.",
     said: { from: "agent", text: "Записала вас на субботу, 11:00. До встречи!" },
-    note: "If someone took that slot a second earlier, it says so and offers the next.",
+    detail: [
+      "Only times that are genuinely free are ever offered, worked out from your hours and what is already taken.",
+      "The slot is checked again at the moment of booking. If somebody took it a second earlier, the customer hears that and gets the next one.",
+      "The confirmation carries the exact date and time, so a misunderstanding is visible instead of turning up a day late.",
+    ],
+    proof: "It books from a direct message too. An Instagram customer is not a lesser customer.",
   },
-];
+] as const;
+
+const COMPARISON = [
+  {
+    what: "Answers a question it was not scripted for",
+    us: true,
+    bot: false,
+    hire: true,
+    note: "A button menu can only offer what somebody thought of in advance.",
+  },
+  {
+    what: "Replies at 3am on a Sunday",
+    us: true,
+    bot: true,
+    hire: false,
+    note: "This is where most of the lost enquiries are.",
+  },
+  {
+    what: "Refuses to invent a price",
+    us: true,
+    bot: true,
+    hire: true,
+    note: "Most AI assistants will happily make one up. Ours answers that it does not know.",
+  },
+  {
+    what: "Books against your real calendar",
+    us: true,
+    bot: false,
+    hire: true,
+    note: "Not a request form. The appointment exists when the chat ends.",
+  },
+  {
+    what: "Writes and publishes your social posts",
+    us: true,
+    bot: false,
+    hire: true,
+    note: "From your own description, on a schedule, without being asked.",
+  },
+  {
+    what: "Costs less than one day of wages a month",
+    us: true,
+    bot: true,
+    hire: false,
+    note: "$39 to start.",
+  },
+] as const;
 
 export default function Flow() {
-  const rail = useRef<HTMLElement>(null);
-  const sticky = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (!rail.current || !sticky.current) return;
-
-    // Switch to the pinned layout before the timeline is built, otherwise
-    // ScrollTrigger measures the static heights and the pin lasts zero pixels.
-    const section = rail.current;
-    section.dataset.enhanced = "true";
-
-    const ctx = gsap.context(() => {
-      const moments = gsap.utils.toArray<HTMLElement>(`.${s.slot}`);
-      const turn = rail.current!.querySelector<HTMLElement>("[data-strand-turn]");
-      const spin = Number(turn?.dataset.spin ?? 720);
-
-      const timeline = gsap.timeline({
-        scrollTrigger: {
-          trigger: rail.current,
-          start: "top top",
-          end: () => `+=${window.innerHeight * (STAGES.length - 0.6)}`,
-          pin: sticky.current,
-          scrub: 1,
-          invalidateOnRefresh: true,
-        },
-      });
-
-      if (turn) {
-        timeline.fromTo(
-          turn,
-          { rotateY: 0 },
-          { rotateY: spin, ease: "none", duration: STAGES.length },
-          0,
-        );
-      }
-
-      // each moment owns one unit of the timeline: rise, hold, leave
-      moments.forEach((moment, i) => {
-        timeline
-          .fromTo(
-            moment,
-            { autoAlpha: 0, y: 46 },
-            { autoAlpha: 1, y: 0, duration: 0.28, ease: "power2.out" },
-            i,
-          )
-          .to(moment, { autoAlpha: 0, y: -46, duration: 0.28, ease: "power2.in" }, i + 0.72);
-      });
-    }, rail);
-
-    // webfonts change the header height, so re-measure once they settle
-    document.fonts?.ready.then(() => ScrollTrigger.refresh());
-
-    return () => {
-      ctx.revert();
-      delete section.dataset.enhanced;
-    };
-  }, []);
+  const [open, setOpen] = useState<string>(STAGES[0].key);
+  const active = STAGES.find((stage) => stage.key === open) ?? STAGES[0];
 
   return (
-    <section ref={rail} className={s.rail} id="how-it-works">
-      <div ref={sticky} className={s.sticky}>
-        <div className={s.head}>
-          <p className="eyebrow">One conversation, end to end</p>
-          <h2 className="h2">Every message follows the same path.</h2>
-          <p className={s.strap}>
-            We run your social channels for you. Whoever writes, whenever they write, the agent
-            answers and books them in. <b>Not one missed customer, 24/7, 365 days a year.</b>
-          </p>
+    <section className={s.rail} id="how-it-works">
+      <div className={s.head}>
+        <p className="eyebrow">One conversation, end to end</p>
+        <h2 className="h2">Every message follows the same path.</h2>
+        <p className={s.strap}>
+          We run your social channels for you. Whoever writes, whenever they write, the agent
+          answers and books them in. <b>Not one missed customer, 24/7, 365 days a year.</b>
+        </p>
+      </div>
+
+      <div className={s.board}>
+        <div className={s.steps} role="tablist" aria-label="How it works">
+          {STAGES.map((stage) => {
+            const Icon = stage.icon;
+            const isOpen = stage.key === open;
+            return (
+              <button
+                key={stage.key}
+                type="button"
+                role="tab"
+                aria-selected={isOpen}
+                className={s.step}
+                data-open={isOpen}
+                onClick={() => setOpen(stage.key)}
+              >
+                <span className={s.stepIcon}><Icon weight="fill" /></span>
+                <span className={s.stepText}>
+                  <em>{stage.step}</em>
+                  <b>{stage.title}</b>
+                  <small>{stage.lead}</small>
+                </span>
+                <span className={s.stepFact}>{stage.fact}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className={s.scene}>
-          <Strand rungs={38} radius={112} gap={19} step={19} spin={720} idle={false} />
-          <div className={s.slots}>
-            {STAGES.map((stage, i) => (
-              <div key={stage.title} className={s.slot} data-side={i % 2 === 0 ? "l" : "r"}>
-                <i className={s.tick} />
-                <p className={s.step}>{stage.step}<span>{stage.fact}</span></p>
-                <h3>{stage.title}</h3>
-                <p className={s.body}>{stage.body}</p>
-                <p className={s.said} data-from={stage.said.from}>{stage.said.text}</p>
-                <p className={s.note}>{stage.note}</p>
-              </div>
+        <div className={s.detail} role="tabpanel" aria-label={active.title}>
+          <p className={s.said} data-from={active.said.from}>{active.said.text}</p>
+
+          <ul className={s.points}>
+            {active.detail.map((line) => (
+              <li key={line}><Check weight="bold" />{line}</li>
             ))}
+          </ul>
+
+          <p className={s.proof}>{active.proof}</p>
+
+          <div className={s.helix} aria-hidden="true">
+            <Strand rungs={26} radius={78} gap={17} step={17} spin={360} />
           </div>
+        </div>
+      </div>
+
+      <div className={s.compare}>
+        <h3 className={s.compareTitle}>Why this rather than the alternatives</h3>
+        <div className={s.tableWrap}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th scope="col">What you actually need</th>
+                <th scope="col">AI FLOW</th>
+                <th scope="col">A chatbot with buttons</th>
+                <th scope="col">Hiring someone</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON.map((row) => (
+                <tr key={row.what}>
+                  <th scope="row">
+                    {row.what}
+                    <small>{row.note}</small>
+                  </th>
+                  {[row.us, row.bot, row.hire].map((yes, index) => (
+                    <td key={index} data-yes={yes} data-us={index === 0}>
+                      {yes ? <Check weight="bold" /> : <Minus weight="bold" />}
+                      <span className="sr-only">{yes ? "yes" : "no"}</span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
