@@ -78,7 +78,7 @@
   height: 44px;
   flex: none;
   border-radius: 50%;
-  background: var(--bg);
+  background: transparent;
   display: grid;
   place-items: center;
 }

@@ -1,57 +1,111 @@
 .dog { display: block; overflow: visible; }
 
-.head { transform-origin: 48px 60px; }
-.earLeft { transform-origin: 21px 34px; }
-.earRight { transform-origin: 75px 34px; }
-.eyes { transform-origin: 48px 45px; }
-.muzzle { transform-origin: 48px 61px; }
+/* Origins are viewBox user units, and every one of them is a joint: the head
+   pivots at the neck, the ears where they meet the skull, the tail at the rump.
+   Pivot anywhere else and the pup swims instead of moving. */
+.head     { transform-origin: 108px 118px; transform: rotate(5deg); }
+.earLeft  { transform-origin: 82px 56px; }
+.earRight { transform-origin: 140px 62px; }
+.eyes     { transform-origin: 108px 70px; }
+.brows    { transform-origin: 108px 46px; }
+.jaw      { transform-origin: 108px 98px; }
+.tongue   { transform-origin: 108px 106px; }
+.tail     { transform-origin: 76px 198px; }
+.body     { transform-origin: 112px 214px; }
+.scarf    { transform-origin: 108px 116px; }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* always alive: a slow breath and an occasional blink */
-  .head { animation: breathe 4.6s ease-in-out infinite; }
-  .eyes { animation: blink 5.2s ease-in-out infinite; }
+  /* always alive, even at rest */
+  .dog       { animation: bob 3.4s ease-in-out infinite; }
+  .head      { animation: cock 4.6s ease-in-out infinite; }
+  .eyes      { animation: blink 5.4s ease-in-out infinite; }
+  .tail      { animation: wag 1.15s ease-in-out infinite; }
+  .earLeft   { animation: swing 4.6s ease-in-out infinite; }
+  .tongue    { animation: pant 1.6s ease-in-out infinite; }
 
-  .dog[data-mood="listening"] .head { animation: tilt 2.4s ease-in-out infinite; }
-  .dog[data-mood="listening"] .earLeft { animation: perk 2.4s ease-in-out infinite; }
+  .dog[data-mood="listening"] .head    { animation: cockDeep 2.6s ease-in-out infinite; }
+  .dog[data-mood="listening"] .earLeft { animation: perk 2.6s ease-in-out infinite; }
+  .dog[data-mood="listening"] .brows   { animation: raise 2.6s ease-in-out infinite; }
+  .dog[data-mood="listening"] .tail    { animation: wag .72s ease-in-out infinite; }
 
   .dog[data-mood="thinking"] .earRight { animation: flick .9s ease-in-out infinite; }
-  .dog[data-mood="thinking"] .eyes { animation: blink 1.6s ease-in-out infinite; }
+  .dog[data-mood="thinking"] .eyes     { animation: glance 2.2s ease-in-out infinite; }
+  .dog[data-mood="thinking"] .tail     { animation: wag 2.4s ease-in-out infinite; }
 
-  .dog[data-mood="speaking"] .muzzle { animation: talk .26s ease-in-out infinite; }
-  .dog[data-mood="speaking"] .head { animation: nod .52s ease-in-out infinite; }
+  .dog[data-mood="speaking"] .jaw    { animation: talk .26s ease-in-out infinite; }
+  .dog[data-mood="speaking"] .tongue { animation: pant .26s ease-in-out infinite; }
+  .dog[data-mood="speaking"] .head   { animation: nod .52s ease-in-out infinite; }
+  .dog[data-mood="speaking"] .tail   { animation: wag .5s ease-in-out infinite; }
+  .dog[data-mood="speaking"] .dogBody,
+  .dog[data-mood="speaking"] .body   { animation: bounce .52s ease-in-out infinite; }
 }
 
-@keyframes breathe {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50%      { transform: translateY(-1.2px) scale(1.012); }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2.2px); }
+}
+
+@keyframes cock {
+  0%, 100% { transform: rotate(5deg); }
+  50%      { transform: rotate(2deg) translateY(-1px); }
+}
+
+@keyframes cockDeep {
+  0%, 100% { transform: rotate(5deg); }
+  50%      { transform: rotate(11deg) translateY(-1.5px); }
+}
+
+@keyframes nod {
+  0%, 100% { transform: rotate(5deg) translateY(0); }
+  50%      { transform: rotate(6.6deg) translateY(1.4px); }
 }
 
 @keyframes blink {
-  0%, 92%, 100% { transform: scaleY(1); }
-  95%           { transform: scaleY(.12); }
+  0%, 91%, 100% { transform: scaleY(1); }
+  94%           { transform: scaleY(.08); }
 }
 
-@keyframes tilt {
+@keyframes glance {
+  0%, 100% { transform: translate(0, 0); }
+  45%      { transform: translate(3px, -3px); }
+}
+
+@keyframes raise {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2.4px); }
+}
+
+@keyframes swing {
   0%, 100% { transform: rotate(0deg); }
-  50%      { transform: rotate(-7deg); }
+  50%      { transform: rotate(4deg); }
 }
 
 @keyframes perk {
   0%, 100% { transform: rotate(0deg) translateY(0); }
-  50%      { transform: rotate(-12deg) translateY(-3px); }
+  50%      { transform: rotate(-9deg) translateY(-3px); }
 }
 
 @keyframes flick {
   0%, 100% { transform: rotate(0deg); }
-  50%      { transform: rotate(9deg); }
+  50%      { transform: rotate(8deg); }
+}
+
+@keyframes wag {
+  0%, 100% { transform: rotate(-9deg); }
+  50%      { transform: rotate(11deg); }
 }
 
 @keyframes talk {
-  0%, 100% { transform: scaleY(.7); }
-  50%      { transform: scaleY(1.35); }
+  0%, 100% { transform: scaleY(.55); }
+  50%      { transform: scaleY(1.28); }
 }
 
-@keyframes nod {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(1px) rotate(1.4deg); }
+@keyframes pant {
+  0%, 100% { transform: scaleY(.9) translateY(0); }
+  50%      { transform: scaleY(1.12) translateY(1.5px); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50%      { transform: scaleY(.985) translateY(1px); }
 }

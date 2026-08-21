@@ -126,7 +126,7 @@ export function EmbedChat({
   return (
     <div className={s.shell}>
       <header className={s.head}>
-        <span className={s.avatar}><Dalmatian mood={mood} size={36} /></span>
+        <span className={s.avatar}><Dalmatian mood={mood} size={44} /></span>
         <div className={s.who}>
           <b>{assistantName}</b>
           <small>Usually replies in seconds</small>

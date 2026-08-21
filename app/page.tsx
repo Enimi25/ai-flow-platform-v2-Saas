@@ -14,8 +14,8 @@ import {
 import { DemoForm } from "@/components/demo-form";
 import { SalesChat } from "@/components/sales-chat";
 import Strand from "@/components/strand";
-import { Scene } from "@/components/scene";
-import { Spiral } from "@/components/spiral";
+import { Orb } from "@/components/orb";
+import Flow from "@/components/flow";
 import s from "./landing.module.css";
 
 const plans = [
@@ -66,13 +66,13 @@ export default function Home() {
           </nav>
           <div className={s.mastRight}>
             <Link href="/login" className={s.signin}>Sign in</Link>
-            <Link href="#demo" className={s.pearl}>Request demo</Link>
+            <Link href="#demo" className="btn btn-sm">Request demo</Link>
           </div>
         </div>
       </header>
 
       <section className={s.hero} id="top">
-        <Scene className={s.orb} />
+        <Orb className={s.orb} />
 
         <div className={s.heroInner}>
           <p className={s.badge}>
@@ -88,7 +88,7 @@ export default function Home() {
           </p>
 
           <div className={s.heroActions}>
-            <Link href="#demo" className={s.pearlBig}>
+            <Link href="#demo" className="btn">
               Get started <ArrowRight weight="bold" />
             </Link>
             <Link href="#how-it-works" className={s.quiet}>
@@ -96,15 +96,6 @@ export default function Home() {
             </Link>
           </div>
         </div>
-
-        <nav className={s.rail2} aria-label="What are you looking for">
-          <span>What are you looking for?</span>
-          <Link href="#platform">&rarr; Website agent</Link>
-          <Link href="#how-it-works">&rarr; Social channels</Link>
-          <Link href="/install">&rarr; Install the widget</Link>
-          <Link href="#pricing">&rarr; Pricing</Link>
-          <Link href="#demo">&rarr; Ask me anything</Link>
-        </nav>
       </section>
 
       <section className={s.rail} aria-label="Supported channels">
@@ -117,7 +108,7 @@ export default function Home() {
         </div>
       </section>
 
-      <Spiral />
+      <Flow />
 
       <section className={s.bento} id="platform">
         <div className={s.bentoHead}>

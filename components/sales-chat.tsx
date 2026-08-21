@@ -182,7 +182,7 @@ export function SalesChat() {
       {open && (
         <section className={s.panel} aria-label="AI FLOW assistant">
           <header className={s.head}>
-            <span className={s.headAvatar}><Dalmatian mood={mood} size={38} /></span>
+            <span className={s.headAvatar}><Dalmatian mood={mood} size={44} /></span>
             <div className={s.who}>
               <b>Flo</b>
               <small>{name ? `talking with ${name}` : "AI FLOW assistant"}</small>
@@ -227,7 +227,7 @@ export function SalesChat() {
       )}
 
       <button className={s.launcher} type="button" aria-expanded={open} onClick={launch}>
-        <Dalmatian mood={open ? "listening" : "idle"} size={34} />
+        <Dalmatian mood={open ? "listening" : "idle"} size={40} />
         <span>{open ? "Close" : "Ask Flo"}</span>
       </button>
     </div>
