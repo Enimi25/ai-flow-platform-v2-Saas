@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendEmail, EmailNotConfigured, isEmailReady } from "@/lib/email/send";
 import { proposalEmail } from "@/lib/email/proposal";
 import { safeRecord } from "@/lib/activity";
+import { houseCompanyId } from "@/lib/workspace/store";
 import { captureLead } from "@/lib/leads/store";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,11 +29,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Check the form fields and try again." }, { status: 422 });
   }
 
+  const house = await houseCompanyId();
   const origin = new URL(request.url).origin;
   const siteUrl = process.env.PUBLIC_SITE_URL || origin;
 
   await captureLead({
-    companyId: "preview",
+    companyId: house,
     name,
     email,
     message: question,
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
   }).catch(() => {});
 
   safeRecord({
-    companyId: "preview",
+    companyId: house,
     kind: "demo.requested",
     level: "info",
     title: `Demo requested by ${email}`,
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
     });
 
     safeRecord({
-      companyId: "preview",
+      companyId: house,
       kind: "demo.proposal_sent",
       level: "success",
       title: `Proposal emailed to ${email}`,
@@ -97,7 +99,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const missing = error instanceof EmailNotConfigured ? error.missing : undefined;
     safeRecord({
-      companyId: "preview",
+      companyId: house,
       kind: "demo.proposal_failed",
       level: "error",
       title: `Proposal to ${email} did not send`,

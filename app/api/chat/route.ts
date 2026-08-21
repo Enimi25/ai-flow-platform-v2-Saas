@@ -4,6 +4,7 @@ import { appendTurn, recentTurns } from "@/lib/conversations/store";
 import { getSettings } from "@/lib/settings/store";
 import { ask, weigh, tidyText, ESCALATION_RULE, UNSURE, NoModelAvailable } from "@/lib/model";
 import { safeRecord } from "@/lib/activity";
+import { houseCompanyId } from "@/lib/workspace/store";
 
 /** One short line, in the customer's own language, when a person has to take over. */
 async function handover(question: string, leadQuestion: string) {
@@ -39,7 +40,9 @@ export async function POST(request: Request) {
 
   const payload = body as { message?: unknown; companyId?: unknown; visitorId?: unknown };
   const message = typeof payload?.message === "string" ? payload.message.trim().slice(0, 600) : "";
-  const companyId = typeof payload?.companyId === "string" ? payload.companyId.slice(0, 80) : "preview";
+  // no company id means the widget on our own site, which belongs to the house
+  const companyId =
+    typeof payload?.companyId === "string" && payload.companyId ? payload.companyId.slice(0, 80) : await houseCompanyId();
   const visitorId = typeof payload?.visitorId === "string" ? payload.visitorId.slice(0, 80) : "anonymous";
 
   if (message.length < 2) return NextResponse.json({ message: "Enter a question and try again." }, { status: 422 });

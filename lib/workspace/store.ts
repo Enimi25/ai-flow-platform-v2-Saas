@@ -49,6 +49,21 @@ export async function workspaceFor(email: string): Promise<Workspace> {
   return workspace;
 }
 
+/**
+ * The workspace that owns aiflow.forum itself.
+ *
+ * Leads from our own landing page and demo form used to be filed under a
+ * literal "preview", which no account owns — so they were invisible to the one
+ * person who needed to see them. They belong to whoever runs the platform,
+ * which is the first account created.
+ */
+export async function houseCompanyId() {
+  const all = Object.values(await readAll());
+  if (!all.length) return "preview";
+  const oldest = all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  return oldest.companyId;
+}
+
 export async function workspaceById(companyId: string) {
   return (await readAll())[companyId] ?? null;
 }

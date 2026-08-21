@@ -3,6 +3,7 @@ import { setSession } from "@/lib/session";
 import { createAccount } from "@/lib/accounts/store";
 import { workspaceFor } from "@/lib/workspace/store";
 import { safeRecord } from "@/lib/activity";
+import { adoptPreviewRecords } from "@/lib/workspace/adopt";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,6 +38,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Secure session is not configured." }, { status: 503 });
   }
 
+  // the platform owner inherits everything the site collected before accounts
+  const adopted = account.role === "admin" ? await adoptPreviewRecords(workspace.companyId) : 0;
+  if (adopted) {
+    safeRecord({
+      companyId: workspace.companyId,
+      kind: "account.adopted",
+      level: "success",
+      title: `Recovered ${adopted} records collected before sign-up`,
+      detail: "Leads, conversations and activity from the site are now in this workspace.",
+    });
+  }
+
   safeRecord({
     companyId: workspace.companyId,
     kind: "account.created",
@@ -45,5 +58,5 @@ export async function POST(request: Request) {
     detail: account.email,
   });
 
-  return NextResponse.json({ ok: true, role: account.role, companyId: workspace.companyId });
+  return NextResponse.json({ ok: true, role: account.role, companyId: workspace.companyId, adopted });
 }
