@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     "- If they ask to speak to a person, say yes. Take a phone number or an email so a colleague can come back to them. Never tell a customer that an AI is available instead.",
     "- Never ask the same question twice in a row.",
     "- Never ask for a password or card details.",
-    "- Reply in the language the customer wrote in.",
+    "- Reply in the language the customer wrote in. If they typed Russian in Latin letters, answer in normal Cyrillic.",
     ...(slots.length
       ? [
           "",

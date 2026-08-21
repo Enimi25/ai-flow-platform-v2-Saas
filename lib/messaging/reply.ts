@@ -62,6 +62,7 @@ export async function answerMessage(input: {
       ? "They just gave their contact details. Confirm you have them and say what happens next."
       : `When it fits, ask: ${settings.leadQuestion}`,
     "Never ask for a password or card details. Reply in the language they wrote in.",
+    "If they typed Russian in Latin letters, answer in normal Cyrillic.",
     ...(slots.length
       ? [
           "",

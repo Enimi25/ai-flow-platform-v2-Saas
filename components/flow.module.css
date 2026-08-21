@@ -169,3 +169,14 @@
   .slot[data-side="r"] .note,
   .slot[data-side="r"] .body { margin-left: 0; }
 }
+
+/* the promise the four stages exist to back up */
+.strap {
+  margin: 18px 0 0;
+  max-width: 62ch;
+  font-size: clamp(15px, 1.35vw, 17px);
+  line-height: 1.62;
+  color: var(--muted);
+}
+
+.strap b { color: var(--text); font-weight: 660; }

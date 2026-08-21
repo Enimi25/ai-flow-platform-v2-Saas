@@ -19,7 +19,7 @@ const STAGES = [
   {
     step: "01",
     title: "A customer writes",
-    body: "Someone messages your site, Messenger, Instagram or WhatsApp. Any hour, any language.",
+    body: "We run the channels. Someone writes to your site, Messenger, Instagram or WhatsApp — the agent is already there.",
     fact: "23:40, Saturday",
     said: { from: "customer", text: "Скольько стоит чистка? Можно в воскресенье?" },
     note: "Typed in Russian, at midnight, with a typo. All three are normal.",
@@ -116,6 +116,10 @@ export default function Flow() {
         <div className={s.head}>
           <p className="eyebrow">One conversation, end to end</p>
           <h2 className="h2">Every message follows the same path.</h2>
+          <p className={s.strap}>
+            We run your social channels for you. Whoever writes, whenever they write, the agent
+            answers and books them in. <b>Not one missed customer, 24/7, 365 days a year.</b>
+          </p>
         </div>
 
         <div className={s.scene}>
