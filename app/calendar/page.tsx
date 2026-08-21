@@ -15,7 +15,7 @@ export default async function CalendarPage() {
         <header className={styles.heading}>
           <div>
             <h1>Calendar</h1>
-            <p>Appointments the agent booked and paid for, newest first.</p>
+            <p>Appointments the agent agreed with customers, newest first.</p>
           </div>
           <span className={styles.badge}>{session ? "Live" : "Preview mode"}</span>
         </header>

@@ -54,7 +54,7 @@ export function CalendarClient() {
         )}
       </section>
 
-      {!data.paymentsReady && (
+      {false && (
         <p className={s.warn}>
           <WarningCircle size={18} weight="fill" />
           Payments are not connected, so a customer cannot finish a booking yet.
@@ -83,7 +83,7 @@ export function CalendarClient() {
         <h2>Upcoming</h2>
         {data.upcoming.length === 0 ? (
           <p className={s.muted}>
-            Nothing booked yet. A paid appointment lands here and in your calendar at the same moment.
+            Nothing booked yet. When the agent agrees a time with a customer, it lands here straight away.
           </p>
         ) : (
           <ul className={s.list}>

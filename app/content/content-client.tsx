@@ -20,6 +20,14 @@ function localNow() {
   return now.toISOString().slice(0, 16);
 }
 
+/** People type "www.rbc.ru". The browser rejected it with "Please enter a URL"
+ *  and no way to tell what was wrong, so the address is fixed up instead. */
+function tidyUrl(value: string) {
+  const clean = value.trim();
+  if (!clean) return "";
+  return /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+}
+
 export function ContentClient({ canPost }: { canPost: boolean }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
@@ -50,7 +58,7 @@ export function ContentClient({ canPost }: { canPost: boolean }) {
     const response = await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel, body, mediaUrl, scheduledAt: new Date(scheduledAt).toISOString() }),
+      body: JSON.stringify({ channel, body, mediaUrl: tidyUrl(mediaUrl), scheduledAt: new Date(scheduledAt).toISOString() }),
     });
     const data = await response.json();
     setBusy(false);
@@ -170,7 +178,8 @@ export function ContentClient({ canPost }: { canPost: boolean }) {
           </label>
           <input
             id="post-media"
-            type="url"
+            type="text"
+            inputMode="url"
             value={mediaUrl}
             onChange={(event) => setMediaUrl(event.target.value)}
             placeholder="https://..."
