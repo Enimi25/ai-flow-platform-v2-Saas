@@ -24,7 +24,7 @@ export function defaults(companyId: string): Settings {
     timezone: "Europe/London",
     bookingEnabled: true,
     contentAuto: false,
-    contentPerWeek: 3,
+    contentPerWeek: 7,
     updatedAt: new Date().toISOString(),
   };
 }

@@ -91,6 +91,60 @@ const limits = [
   },
 ];
 
+/**
+ * Real output, not marketing copy about output. These came out of the generator
+ * for a dental clinic that had written four lines about itself, which is the
+ * whole claim in one exhibit.
+ */
+const factoryPosts = [
+  {
+    channel: "Facebook",
+    when: "Saturday, 11:00",
+    body: "Вы проснулись с резкой болью в зубе и не знаете, что делать? Мы принимаем срочные случаи с болью без записи утром. Приходите на Ленина 8, осмотр 1500 руб.",
+  },
+  {
+    channel: "Instagram",
+    when: "Saturday, 17:00",
+    body: "После праздников зубы потеряли белизну, а пятна от кофе не уходят? Профессиональная чистка - 5500 руб. Записывайтесь, мы работаем в субботу до 14:00.",
+  },
+  {
+    channel: "Facebook",
+    when: "Sunday, 11:00",
+    body: "Перед началом учебного года стоит показать ребёнка стоматологу. Осмотр 1500 руб, принимаем с понедельника по пятницу с 9:00.",
+  },
+];
+
+const factoryRules = [
+  {
+    rule: "It writes from what you wrote",
+    body: "Your description is the only source. Prices, hours and services come from there, so a post can never advertise something you do not do.",
+  },
+  {
+    rule: "It invents nothing",
+    body: "No made-up discounts, no invented statistics, no fake customer quotes. If there is no figure, the post carries none.",
+  },
+  {
+    rule: "It writes in your language",
+    body: "Whatever language your description is in. A Russian business gets Russian posts, not translated English ones.",
+  },
+  {
+    rule: "It posts at sensible hours",
+    body: "Late morning and late afternoon, in your timezone, spread across days rather than dumped in one afternoon.",
+  },
+  {
+    rule: "It only posts where you are connected",
+    body: "Nothing is queued for a channel you have not linked, so you never find failures waiting for you at midnight.",
+  },
+  {
+    rule: "Up to three a day, or one a week",
+    body: "You set the pace and it holds it. The queue tops itself up before it runs dry, so there is never a week where nothing went out.",
+  },
+  {
+    rule: "You stay in charge",
+    body: "Everything sits in a queue you can read, edit or delete before it goes out. Turn the whole thing off in one switch.",
+  },
+];
+
 const questions = [
   {
     q: "What languages does it speak?",
@@ -283,6 +337,55 @@ export default function Home() {
               <Link href="#demo" className={plan.featured ? "btn" : "btn btn-ghost"}>Request demo</Link>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className={s.factory} id="content-factory">
+        <div className={s.factoryHead}>
+          <p className="eyebrow">The content factory</p>
+          <h2 className="h2">We take your social accounts over.</h2>
+          <p className="body">
+            Up to three posts a day, written and published without you doing anything. Small
+            businesses do not stop posting because they ran out of ideas — they stop because it is
+            Tuesday, the shop is full, and nobody has twenty minutes. The same agent that answers
+            your customers writes the posts, from the same description you already wrote.
+          </p>
+          <p className={s.factoryHonest}>
+            Reels are the one thing that still needs you: the agent writes the shot list and the
+            caption, you point a phone at the chair for thirty seconds. Instagram and TikTok will
+            not accept a reel without a video file, and we would rather say that than let you find
+            out in a month.
+          </p>
+        </div>
+
+        <div className={s.factoryBody}>
+          <div className={s.factoryFeed}>
+            <p className={s.factoryLabel}>Written for a dental clinic that wrote four lines about itself</p>
+            {factoryPosts.map((post) => (
+              <article key={post.body} className={`panel ${s.post}`}>
+                <header>
+                  <span className={s.postChannel}>{post.channel}</span>
+                  <span className={s.postWhen}>{post.when}</span>
+                </header>
+                <p>{post.body}</p>
+              </article>
+            ))}
+            <p className={s.factoryNote}>
+              Nobody wrote these. Nobody scheduled them either.
+            </p>
+          </div>
+
+          <ul className={s.factoryRules}>
+            {factoryRules.map((item) => (
+              <li key={item.rule}>
+                <Check weight="bold" />
+                <div>
+                  <b>{item.rule}</b>
+                  <p>{item.body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

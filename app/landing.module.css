@@ -435,3 +435,64 @@
   .factGrid { grid-template-columns: 1fr; }
   .tradeGrid { grid-template-columns: 1fr; }
 }
+
+/* --- the content factory ------------------------------------------------ */
+.factory { max-width: var(--page); margin-inline: auto; padding: clamp(60px, 8vh, 100px) var(--gutter) 0; }
+.factoryHead { max-width: 760px; }
+.factoryHead .body { margin: 16px 0 0; }
+
+.factoryHonest {
+  margin: 16px 0 0;
+  padding: 14px 18px;
+  border-left: 2px solid var(--accent-2);
+  background: var(--surface-soft);
+  border-radius: 0 12px 12px 0;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--muted);
+  max-width: 68ch;
+}
+
+.factoryBody {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(24px, 3.5vw, 46px);
+  align-items: start;
+}
+
+.factoryLabel {
+  margin: 0 0 14px;
+  font-size: 11.5px;
+  font-weight: 720;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.post { margin-bottom: 12px; padding: 18px 20px; display: grid; gap: 10px; }
+.post header { display: flex; align-items: center; gap: 10px; }
+
+.postChannel {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-high);
+  font-size: 11.5px;
+  font-weight: 660;
+  color: var(--text);
+}
+
+.postWhen { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.post p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+
+.factoryNote { margin: 14px 0 0; font-size: 13.5px; color: var(--muted); font-style: italic; }
+
+.factoryRules { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; }
+.factoryRules li { display: grid; grid-template-columns: auto 1fr; gap: 13px; align-items: start; }
+.factoryRules svg { color: var(--accent-2); font-size: 15px; margin-top: 4px; }
+.factoryRules b { display: block; font-size: 15.5px; letter-spacing: -.015em; }
+.factoryRules p { margin: 5px 0 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .factoryBody { grid-template-columns: 1fr; }
+}
