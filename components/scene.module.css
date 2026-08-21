@@ -1,0 +1,68 @@
+.wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: blur(0.35px) saturate(1.55);
+}
+
+/* Wet floor: a bright line at the horizon, fading down into the dark. */
+.floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 62%;
+  bottom: 0;
+  background:
+    linear-gradient(180deg, rgba(206, 142, 236, .16), transparent 46%),
+    linear-gradient(180deg, transparent, rgba(10, 5, 26, .86) 70%);
+}
+
+.floor::before {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(230, 226, 250, .32), transparent);
+  filter: blur(1px);
+}
+
+/* Volumetric light, so the strands hang in air rather than on a flat plane. */
+.haze {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 46% at 50% 22%, rgba(128, 116, 220, .20), transparent 62%),
+    radial-gradient(48% 38% at 34% 54%, rgba(246, 168, 214, .10), transparent 60%),
+    radial-gradient(52% 40% at 68% 48%, rgba(188, 226, 246, .10), transparent 60%);
+  filter: blur(28px);
+}
+
+/* Chromatic split: the same scene drawn twice, nudged and tinted, which is what
+   gives the edges the prism fringe the reference has everywhere. */
+.wrap::before,
+.wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: .5;
+}
+.wrap::before { background: linear-gradient(97deg, rgba(255, 92, 210, .07), transparent 42%); transform: translateX(1.5px); }
+.wrap::after  { background: linear-gradient(263deg, rgba(88, 224, 255, .07), transparent 42%); transform: translateX(-1.5px); }
+
+/* Moire, the fine diagonal weave visible across the reference screens. */
+.weave {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .16;
+  background-image: repeating-linear-gradient(112deg, rgba(255,255,255,.5) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}

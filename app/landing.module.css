@@ -6,10 +6,36 @@
   top: 0;
   z-index: 50;
   height: 72px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border-bottom: 1px solid rgba(230, 226, 250, .12);
+  background: rgba(11, 7, 34, .62);
   backdrop-filter: blur(16px);
 }
+
+/* On the violet ground the brand lime would fight the scene, so the masthead
+   speaks in pearl and the accent is kept for the workspace. */
+.mast .mark { background: rgba(230, 226, 250, .92); color: #150e33; }
+.mast .brandLink { color: #f2effd; }
+.mastNav a { color: rgba(230, 226, 250, .6); }
+.mastNav a:hover { color: #f6a8d6; }
+.signin { color: rgba(230, 226, 250, .7); }
+.signin:hover { color: #f2effd; }
+/* Pearl, not lime: on the violet ground the brand accent fights the scene. */
+.pearl, .pearlBig {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: var(--r-pill);
+  background: rgba(230, 226, 250, .93);
+  color: #150e33;
+  font-weight: 680;
+  white-space: nowrap;
+  transition: background .2s var(--ease), transform .12s var(--ease);
+}
+.pearl { min-height: 40px; padding: 0 18px; font-size: 14px; }
+.pearlBig { min-height: 52px; padding: 0 26px; font-size: 15px; }
+.pearl:hover, .pearlBig:hover { background: #ffffff; }
+.pearl:active, .pearlBig:active { transform: translateY(1px) scale(.985); }
 
 .mastIn {
   height: 100%;
@@ -43,7 +69,7 @@
 .signin { font-size: 14px; font-weight: 650; color: var(--muted); }
 .signin:hover { color: var(--text); }
 
-/* --- hero: one centred moment with the shell behind it ----------------- */
+/* --- hero: a room, not a page ------------------------------------------ */
 .hero {
   position: relative;
   min-height: calc(100dvh - 72px);
@@ -51,6 +77,10 @@
   place-items: center;
   overflow: hidden;
   isolation: isolate;
+  /* the reference never sits on black: the ground is deep violet */
+  background:
+    radial-gradient(80% 60% at 50% 12%, #241a52 0%, transparent 62%),
+    linear-gradient(180deg, #150e33 0%, #0b0722 58%, #070417 100%);
 }
 
 .orb { z-index: -1; }
@@ -58,13 +88,13 @@
 .heroInner {
   position: relative;
   width: 100%;
-  max-width: 860px;
+  max-width: 900px;
   margin-inline: auto;
   padding: clamp(48px, 9vh, 110px) var(--gutter);
   text-align: center;
   display: grid;
   justify-items: center;
-  gap: 26px;
+  gap: 24px;
 }
 
 .badge {
@@ -73,37 +103,45 @@
   gap: 9px;
   margin: 0;
   padding: 8px 16px 8px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(230, 226, 250, .22);
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  background: rgba(20, 14, 46, .5);
   backdrop-filter: blur(10px);
-  color: var(--muted);
-  font-size: 13px;
-  letter-spacing: -.01em;
+  color: rgba(230, 226, 250, .78);
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px 1px rgba(195, 245, 60, .6);
+  background: #f6a8d6;
+  box-shadow: 0 0 12px 2px rgba(246, 168, 214, .7);
 }
 
+/* Iridescent chrome type with a prism fringe, the way the reference sets its
+   display lines. The two shadows are the split, not a glow. */
 .title {
   margin: 0;
-  max-width: 16ch;
-  font-size: clamp(2.6rem, 6.6vw, 4.9rem);
-  line-height: 1.02;
+  max-width: 15ch;
+  font-size: clamp(2.7rem, 7vw, 5.2rem);
+  line-height: .98;
   letter-spacing: -.045em;
   text-wrap: balance;
+  background: linear-gradient(104deg, #bce2f6 4%, #e6e2fa 28%, #f6a8d6 52%, #ce8eec 74%, #8074dc 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 1.5px 0 0 rgba(255, 92, 210, .22), -1.5px 0 0 rgba(88, 224, 255, .22);
 }
 
 .sub {
   margin: 0;
-  max-width: 54ch;
-  color: var(--muted);
-  font-size: clamp(1rem, 1.25vw, 1.12rem);
+  max-width: 52ch;
+  color: rgba(230, 226, 250, .68);
+  font-size: clamp(1rem, 1.25vw, 1.1rem);
   line-height: 1.6;
 }
 
@@ -113,25 +151,61 @@
   gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
+/* Both actions read as one control, the way the reference pairs WORK and CONTACT. */
 .quiet {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   min-height: 50px;
   padding: 0 22px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(230, 226, 250, .26);
   border-radius: var(--r-pill);
-  color: var(--text);
-  font-weight: 640;
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  color: rgba(230, 226, 250, .9);
+  font-weight: 620;
+  letter-spacing: .02em;
+  background: rgba(20, 14, 46, .4);
   backdrop-filter: blur(10px);
   transition: border-color .2s var(--ease), background .2s var(--ease);
 }
 
-.quiet:hover { border-color: var(--muted); background: var(--surface-soft); }
+.quiet:hover { border-color: rgba(230, 226, 250, .55); background: rgba(40, 28, 82, .5); }
+
+/* The left rail from the reference: a short list of what people come looking for. */
+.rail2 {
+  position: absolute;
+  left: clamp(20px, 4vw, 54px);
+  bottom: clamp(28px, 7vh, 74px);
+  display: grid;
+  gap: 9px;
+  text-align: left;
+  z-index: 1;
+}
+
+.rail2 span {
+  color: rgba(230, 226, 250, .42);
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.rail2 a {
+  color: rgba(230, 226, 250, .72);
+  font-size: 12.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-family: var(--font-geist-mono), monospace;
+  display: inline-flex;
+  gap: 8px;
+  transition: color .18s var(--ease), transform .18s var(--ease);
+}
+
+.rail2 a:hover { color: #f6a8d6; transform: translateX(3px); }
+
+@media (max-width: 900px) { .rail2 { display: none; } }
 
 /* --- channel rail ----------------------------------------------------- */
 .rail { border-block: 1px solid var(--line); }

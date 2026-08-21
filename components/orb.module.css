@@ -1,19 +1,39 @@
 .wrap { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-/* A soft light behind the shell, so the points sit in something rather than on
-   flat black. Drawn in CSS because a blur this wide is cheap here and costly
-   on the canvas. */
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* the blur is what turns crisp strokes into light */
+  filter: blur(0.6px) saturate(1.25);
+}
+
+/* Wide, soft light behind the ring so the strokes sit inside something. */
 .bloom {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(70vmin, 760px);
-  height: min(70vmin, 760px);
+  width: min(88vmin, 940px);
+  height: min(88vmin, 940px);
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 38%, rgba(195, 245, 60, .16), transparent 58%),
-    radial-gradient(circle at 44% 68%, rgba(62, 207, 178, .14), transparent 60%);
-  filter: blur(44px);
+    radial-gradient(circle at 52% 34%, rgba(195, 245, 60, .15), transparent 54%),
+    radial-gradient(circle at 34% 66%, rgba(34, 168, 210, .15), transparent 56%),
+    radial-gradient(circle at 68% 62%, rgba(62, 207, 178, .14), transparent 54%);
+  filter: blur(56px);
+}
+
+/* A dim centre, so the ring reads as hollow rather than as a filled ball. */
+.core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(52vmin, 560px);
+  height: min(52vmin, 560px);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--bg) 34%, transparent 72%);
 }
