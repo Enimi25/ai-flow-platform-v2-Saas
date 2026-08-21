@@ -11,8 +11,18 @@ export async function register() {
 
   const { runDue } = await import("@/lib/content/runner");
   const { releaseExpired } = await import("@/lib/booking/store");
+  const { runAutopilot } = await import("@/lib/content/autopilot");
+  const { seedHouseWorkspace } = await import("@/lib/workspace/seed");
+
+  if (await seedHouseWorkspace().catch(() => false)) {
+    console.log("[scheduler] described AI FLOW to its own agent");
+  }
 
   const tick = async () => {
+    // top the queues up before publishing, so a fresh workspace is not idle
+    const filled = await runAutopilot().catch(() => null);
+    if (filled?.queued) console.log(`[scheduler] queued ${filled.queued} new posts`);
+
     try {
       const result = await runDue();
       if (result.picked) {

@@ -26,7 +26,7 @@ function offsetMinutes(instant: Date, zone: string) {
 }
 
 /** The UTC instant for a wall-clock time on a given local date in `zone`. */
-function instantFor(year: number, month: number, day: number, hour: number, minute: number, zone: string) {
+export function instantFor(year: number, month: number, day: number, hour: number, minute: number, zone: string) {
   const guess = Date.UTC(year, month - 1, day, hour, minute);
   // one correction is enough except on the hour a DST change lands, where the
   // second pass settles it

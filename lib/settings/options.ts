@@ -52,5 +52,8 @@ export type Settings = {
   slotMinutes: number;
   timezone: string;
   bookingEnabled: boolean;
+  /** The content factory tops the queue up on its own when this is on. */
+  contentAuto: boolean;
+  contentPerWeek: number;
   updatedAt: string;
 };

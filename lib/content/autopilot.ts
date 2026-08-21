@@ -1,0 +1,139 @@
+import path from "node:path";
+import { promises as fs } from "node:fs";
+import { getSettings } from "@/lib/settings/store";
+import { connectionsFor } from "./connections";
+import { listPosts, savePost } from "./store";
+import { generatePosts, isGeneratorReady } from "./generate";
+import { CHANNELS, type Channel, type Post } from "./types";
+import { safeRecord } from "@/lib/activity";
+import { instantFor } from "@/lib/booking/slots";
+
+/**
+ * Keeps every workspace's queue full.
+ *
+ * The factory could already publish, and the scheduler already ran, but nothing
+ * ever put a post in the queue: generation sat behind a button. So the machine
+ * turned over publishing an empty list.
+ *
+ * Only channels a business has actually connected are topped up. Generating for
+ * a channel with no token just fills the queue with posts that will fail at
+ * midnight and wake somebody up for nothing.
+ */
+
+const WORKSPACES = path.join(process.cwd(), ".data", "workspaces.json");
+const HOURS = [11, 17];
+const EVERY = 6 * 60 * 60 * 1000;
+
+/** TikTok needs a video, so a text-only autopilot cannot feed it. */
+const TEXT_CHANNELS: Channel[] = ["facebook", "instagram"];
+
+let lastRun = 0;
+
+async function allCompanyIds() {
+  try {
+    const raw = JSON.parse(await fs.readFile(WORKSPACES, "utf8")) as Record<string, { companyId: string }>;
+    return Object.values(raw).map((workspace) => workspace.companyId);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The next few posting moments after the last one already queued.
+ *
+ * In the business's own timezone: setHours() would use the server's, and a
+ * clinic in Moscow would have found its lunchtime posts going out at seven in
+ * the morning.
+ */
+function slotsAfter(from: Date, count: number, zone: string) {
+  const out: string[] = [];
+  const day = new Date(from);
+
+  for (let ahead = 0; ahead < 30 && out.length < count; ahead += 1) {
+    const cursor = new Date(day.getTime() + ahead * 86_400_000);
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(cursor);
+    const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+    for (const hour of HOURS) {
+      if (out.length >= count) break;
+      const at = instantFor(get("year"), get("month"), get("day"), hour, 0, zone);
+      if (at > from) out.push(at.toISOString());
+    }
+  }
+  return out;
+}
+
+async function topUp(companyId: string) {
+  const settings = await getSettings(companyId);
+  if (!settings.contentAuto) return 0;
+  if (!settings.businessDescription) return 0;
+
+  const links = await connectionsFor(companyId).catch(() => []);
+  // connectionsFor lists every channel with a flag, so the flag is what counts
+  const connected = CHANNELS.filter(
+    (channel) =>
+      TEXT_CHANNELS.includes(channel) &&
+      links.some((link) => link.channel === channel && link.connected),
+  );
+  if (!connected.length) return 0;
+
+  const posts = await listPosts(companyId);
+  const now = new Date();
+  let made = 0;
+
+  for (const channel of connected) {
+    const pending = posts.filter(
+      (post) => post.channel === channel && post.status === "scheduled" && new Date(post.scheduledAt) > now,
+    );
+    const want = Math.max(0, settings.contentPerWeek - pending.length);
+    if (!want) continue;
+
+    const last = pending
+      .map((post) => new Date(post.scheduledAt))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+
+    const drafts = await generatePosts({ companyId, channel, count: want }).catch(() => []);
+    const when = slotsAfter(last && last > now ? last : now, drafts.length, settings.timezone || "Europe/London");
+
+    for (const [index, draft] of drafts.entries()) {
+      const post: Post = {
+        id: crypto.randomUUID(),
+        companyId,
+        channel,
+        body: draft.body,
+        scheduledAt: when[index],
+        status: "scheduled",
+        createdAt: new Date().toISOString(),
+      };
+      await savePost(post);
+      made += 1;
+    }
+  }
+
+  if (made) {
+    safeRecord({
+      companyId,
+      kind: "content.queued",
+      level: "success",
+      title: `Queued ${made} post${made === 1 ? "" : "s"}`,
+      detail: "The content factory topped the schedule up on its own.",
+    });
+  }
+
+  return made;
+}
+
+/** Called by the scheduler. Cheap to call often; it works every six hours. */
+export async function runAutopilot(now = Date.now()) {
+  if (!isGeneratorReady()) return { skipped: "no model" as const, queued: 0 };
+  if (now - lastRun < EVERY) return { skipped: "too soon" as const, queued: 0 };
+  lastRun = now;
+
+  let queued = 0;
+  for (const companyId of await allCompanyIds()) {
+    queued += await topUp(companyId).catch(() => 0);
+  }
+  return { skipped: null, queued };
+}

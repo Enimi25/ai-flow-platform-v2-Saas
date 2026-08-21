@@ -23,6 +23,8 @@ export function defaults(companyId: string): Settings {
     slotMinutes: 60,
     timezone: "Europe/London",
     bookingEnabled: true,
+    contentAuto: false,
+    contentPerWeek: 3,
     updatedAt: new Date().toISOString(),
   };
 }

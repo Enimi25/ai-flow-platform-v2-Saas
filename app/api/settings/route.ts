@@ -77,6 +77,11 @@ export async function PUT(request: Request) {
         : current.slotMinutes,
     bookingEnabled:
       typeof body.bookingEnabled === "boolean" ? body.bookingEnabled : current.bookingEnabled,
+    contentAuto: typeof body.contentAuto === "boolean" ? body.contentAuto : current.contentAuto,
+    contentPerWeek:
+      typeof body.contentPerWeek === "number" && body.contentPerWeek >= 1 && body.contentPerWeek <= 21
+        ? Math.round(body.contentPerWeek)
+        : current.contentPerWeek,
     companyId,
   };
 
