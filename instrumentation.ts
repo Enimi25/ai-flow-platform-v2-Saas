@@ -13,6 +13,7 @@ export async function register() {
   const { releaseExpired } = await import("@/lib/booking/store");
   const { runAutopilot } = await import("@/lib/content/autopilot");
   const { seedHouseWorkspace } = await import("@/lib/workspace/seed");
+  const { runSequence } = await import("@/lib/email/sequence");
 
   if (await seedHouseWorkspace().catch(() => false)) {
     console.log("[scheduler] described AI FLOW to its own agent");
@@ -22,6 +23,9 @@ export async function register() {
     // top the queues up before publishing, so a fresh workspace is not idle
     const filled = await runAutopilot().catch(() => null);
     if (filled?.queued) console.log(`[scheduler] queued ${filled.queued} new posts`);
+
+    const mailed = await runSequence().catch(() => null);
+    if (mailed?.sent) console.log(`[scheduler] sent ${mailed.sent} follow ups`);
 
     try {
       const result = await runDue();

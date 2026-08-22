@@ -4,6 +4,7 @@ import { proposalEmail } from "@/lib/email/proposal";
 import { safeRecord } from "@/lib/activity";
 import { houseCompanyId } from "@/lib/workspace/store";
 import { previewConversation } from "@/lib/email/preview";
+import { enrol } from "@/lib/email/sequence";
 import { captureLead } from "@/lib/leads/store";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -43,6 +44,14 @@ export async function POST(request: Request) {
     message: question,
     source: "demo",
   }).catch(() => {});
+
+  // three more touches over three weeks, stopped the moment they reply
+  await enrol({
+    email,
+    name,
+    business: question,
+    companyId: house,
+  }).catch(() => null);
 
   safeRecord({
     companyId: house,
