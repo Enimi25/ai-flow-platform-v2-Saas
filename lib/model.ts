@@ -152,13 +152,14 @@ function openAiCompatible(id: string, config: {
           signal: AbortSignal.timeout(config.timeoutMs ?? 45_000),
         });
 
-      let response = await send();
-
       // A rate limit is not a broken provider, it is a busy second. Walking
       // straight past it to the next rung is how ten people at once turned
-      // into five who got nothing at all.
-      if (response.status === 429 || response.status === 503) {
-        await new Promise((wake) => setTimeout(wake, 700 + Math.floor(Math.random() * 500)));
+      // into five who got nothing at all. Two short waits cover almost every
+      // per-minute cap; a customer will not sit through a third.
+      let response = await send();
+      for (let attempt = 0; attempt < 2 && (response.status === 429 || response.status === 503); attempt += 1) {
+        const wait = 600 * (attempt + 1) + Math.floor(Math.random() * 400);
+        await new Promise((wake) => setTimeout(wake, wait));
         response = await send();
       }
 

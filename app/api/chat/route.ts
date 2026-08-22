@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/settings/store";
 import { ask, weigh, tidyText, ESCALATION_RULE, UNSURE, NoModelAvailable } from "@/lib/model";
 import { safeRecord } from "@/lib/activity";
 import { answerLanguage } from "@/lib/language";
+import { busyReply } from "@/lib/busy";
 import { houseCompanyId } from "@/lib/workspace/store";
 import { freeSlots } from "@/lib/booking/slots";
 import { confirmBooking, bookingLine, BOOK_MARK, ANY_MARK } from "@/lib/booking/confirm";
@@ -221,13 +222,13 @@ export async function POST(request: Request) {
         companyId,
         kind: "chat.no_model",
         level: "error",
-        title: "The assistant could not answer a customer",
-        detail: error.tried.join(" | ").slice(0, 200),
+        title: "Every model was busy — a customer got the holding reply",
+        detail: `${error.tried.join(" | ").slice(0, 160)}. If this repeats, the free tier is the ceiling.`,
       });
-      return NextResponse.json(
-        { message: "I cannot reach my brain right now. Leave an email and a person will come back to you." },
-        { status: 503 },
-      );
+
+      // 200, not 503: the widget shows this as the agent speaking, because to
+      // the customer it is. The lead is still captured on the next message.
+      return NextResponse.json({ reply: busyReply(message), via: "busy", weight: "light" });
     }
     return NextResponse.json({ message: "The assistant is unavailable right now." }, { status: 502 });
   }
