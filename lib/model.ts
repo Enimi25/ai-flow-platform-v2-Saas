@@ -32,6 +32,20 @@ export type Answer = {
  * instead of guessing. The ladder treats that as a reason to climb, so a small
  * local model can take the easy questions and hand the rest upward.
  */
+/**
+ * Reasoning that escaped into the answer.
+ *
+ * Tagged blocks are easy. The dangerous ones are models that think in plain
+ * prose — "Okay, the user just said" reads as an answer to every check that
+ * looks for markup, and goes straight to the customer.
+ */
+const REASONING_OPENERS =
+  /^\s*(<think>|okay,? (the|so)\b|the user (is |just |wants|asked)|let me (think|see|check)|first,? (i|let)|we need to|i need to (figure|work out|determine))/i;
+
+export function leaksReasoning(text: string) {
+  return text.includes("<think>") || REASONING_OPENERS.test(text);
+}
+
 export const UNSURE = "[[UNSURE]]";
 
 export const ESCALATION_RULE =
@@ -75,6 +89,8 @@ export function weigh(text: string): Weight {
  * way out rather than hoped for in the prompt.
  */
 export function tidyText(text: string) {
+  // some models emit narrow no-break spaces, which break wrapping in a bubble
+  text = text.replace(/[\u202f\u2009\u00a0]/g, " ");
   return text
     .replace(/[—–]/g, "-")
     .replace(/‑/g, "-")
@@ -108,34 +124,55 @@ function openAiCompatible(id: string, config: {
     ready: () => Boolean(config.key && config.heavy),
     models: () => ({ light: config.light || config.heavy || "", heavy: config.heavy || "" }),
     async run(ask, model) {
-      const response = await fetch(config.url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.key}`,
-          "Content-Type": "application/json",
-          ...config.headers,
-        },
-        body: JSON.stringify({
-          model,
-          temperature: ask.temperature ?? 0.8,
-          // Every current model reasons before answering. Left alone it either
-          // spends the whole budget thinking and returns an empty string, or
-          // leaks its <think> block into the customer's chat bubble.
-          reasoning_format: "hidden",
-          max_tokens: Math.max(ask.maxTokens ?? 1800, 400),
-          messages: [
-            { role: "system", content: ask.system },
-            { role: "user", content: ask.user },
-          ],
-        }),
-        signal: AbortSignal.timeout(config.timeoutMs ?? 45_000),
-      });
+      const body: Record<string, unknown> = {
+        model,
+        temperature: ask.temperature ?? 0.8,
+        max_tokens: Math.max(ask.maxTokens ?? 1800, 600),
+        messages: [
+          { role: "system", content: ask.system },
+          { role: "user", content: ask.user },
+        ],
+      };
+
+      // Every current model reasons before answering, and each vendor turns it
+      // off with a different key. Sending Groq's to OpenRouter does nothing,
+      // which is how "Okay, the user just said..." reached a customer.
+      if (id === "openrouter") body.reasoning = { exclude: true };
+      else body.reasoning_format = "hidden";
+
+      const send = () =>
+        fetch(config.url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.key}`,
+            "Content-Type": "application/json",
+            ...config.headers,
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(config.timeoutMs ?? 45_000),
+        });
+
+      let response = await send();
+
+      // A rate limit is not a broken provider, it is a busy second. Walking
+      // straight past it to the next rung is how ten people at once turned
+      // into five who got nothing at all.
+      if (response.status === 429 || response.status === 503) {
+        await new Promise((wake) => setTimeout(wake, 700 + Math.floor(Math.random() * 500)));
+        response = await send();
+      }
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error?.message ?? `${id} ${response.status}`);
-      const text = payload?.choices?.[0]?.message?.content;
+
+      const choice = payload?.choices?.[0];
+      const text = choice?.message?.content;
       if (!text || !text.trim()) throw new Error(`${id} returned an empty answer`);
-      if (text.includes("<think>")) throw new Error(`${id} leaked its reasoning`);
+      if (leaksReasoning(text)) throw new Error(`${id} leaked its reasoning`);
+      // cut off mid-thought: whatever is there is not an answer
+      if (choice?.finish_reason === "length" && text.length < 40) {
+        throw new Error(`${id} ran out of room before answering`);
+      }
       return text;
     },
   };
