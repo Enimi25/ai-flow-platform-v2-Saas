@@ -22,6 +22,8 @@ const RU_WORDS = new RegExp(
       "ochered", "voprosy?", "otvet\\w*", "klient\\w*", "saity?", "web",
       "prosto", "luchshe", "bolshe", "menshe", "pervy\\w*", "novy\\w*",
       "nichego", "vsegda", "nikogda", "konechno", "navernoe", "znachit",
+      "skolko", "stoit", "stoyat", "cena", "ceny", "tsena", "chistka", "zapis\\w*",
+      "vremya", "chasy", "adres", "uslug\\w*", "zubov", "zub", "strizhk\\w*",
       "vot", "taki[ey]?", "takaya", "kotory[ei]", "kotoraya", "kotorye",
       "govorit", "govorish", "dolzh[ea]n", "dolzhna", "dolzhno", "budesh",
       "sdelal", "mozhet", "nravitsya", "cvet\\w*", "dizain\\w*", "okno",
@@ -37,6 +39,16 @@ const EN_WORDS =
 
 const DIGRAPHS = /(zh|kh|shch|sch|ts|ya|yu|yo|ch|sh|ye)/gi;
 
+/**
+ * Endings no English word has and most Russian ones do.
+ *
+ * "Dadite skidku 70%" carries no word from the list above and no digraph, so
+ * word matching alone read it as English and the customer got an English reply
+ * to a Russian question. Morphology catches what vocabulary misses.
+ */
+const RU_ENDINGS =
+  /\w{3,}(ite|ete|aem|aet|ayu|yut|yat|ish|esh|sya|tsya|ovat|enie|nie|ost|ami|ami|ogo|omu|ykh|imi|uyu|oi|ei|ku|ke|am|em|ov|ev|ka|ki|nyi|aya|oe)\b/gi;
+
 /** True when Latin text is more plausibly Russian than English. */
 export function isTranslitRussian(text: string) {
   const latin = text.replace(/[^A-Za-z' ]/g, " ");
@@ -46,11 +58,15 @@ export function isTranslitRussian(text: string) {
   const ru = (latin.match(RU_WORDS) ?? []).length;
   const en = (latin.match(EN_WORDS) ?? []).length;
   const digraphs = (latin.match(DIGRAPHS) ?? []).length;
+  const endings = (latin.match(RU_ENDINGS) ?? []).length;
 
-  if (en > ru) return false;
+  if (en > ru + endings) return false;
   if (ru >= 2) return true;
-  if (ru >= 1 && en === 0 && words.length >= 3) return true;
-  return digraphs / words.length > 0.3;
+  if (ru >= 1 && en === 0) return true;
+  // no known word, no digraph, but the shape of the words gives it away
+  if (en === 0 && endings >= 2 && words.length >= 3) return true;
+  if (en === 0 && endings >= 1 && digraphs >= 1) return true;
+  return en === 0 && digraphs / words.length > 0.22;
 }
 
 // Longest first, or "sh" would eat the "s" of "shch".
