@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { saveConnection } from "@/lib/content/connections";
 import { safeRecord } from "@/lib/activity";
-
-const GRAPH = "https://graph.facebook.com/v21.0";
-
-type Page = {
-  id: string;
-  name: string;
-  access_token: string;
-  instagram_business_account?: { id: string; username?: string };
-};
+import { connectMetaAccounts } from "@/lib/content/meta";
 
 /**
  * One token in, both channels connected.
@@ -28,58 +19,11 @@ export async function POST(request: Request) {
 
   const companyId = session.companyId ?? "preview";
 
-  const url = new URL(`${GRAPH}/me/accounts`);
-  url.searchParams.set("fields", "id,name,access_token,instagram_business_account{id,username}");
-  url.searchParams.set("access_token", accessToken);
-
-  const response = await fetch(url, { cache: "no-store" });
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    return NextResponse.json(
-      { error: payload?.error?.message ?? "Facebook refused that token." },
-      { status: 400 },
-    );
-  }
-
-  const pages = (payload?.data ?? []) as Page[];
-  if (!pages.length) {
-    return NextResponse.json(
-      {
-        error:
-          "That token works, but it manages no Pages. Generate a Page Access Token rather than a User token, and pick your Page.",
-      },
-      { status: 400 },
-    );
-  }
-
-  const connected: { channel: string; account: string }[] = [];
-
-  for (const page of pages) {
-    // each Page carries its own token, which is the one publishing needs
-    await saveConnection({
-      companyId,
-      channel: "facebook",
-      accountId: page.id,
-      accessToken: page.access_token || accessToken,
-      accountName: page.name,
-    });
-    connected.push({ channel: "facebook", account: page.name });
-
-    const instagram = page.instagram_business_account;
-    if (instagram?.id) {
-      await saveConnection({
-        companyId,
-        channel: "instagram",
-        accountId: instagram.id,
-        accessToken: page.access_token || accessToken,
-        accountName: instagram.username ? `@${instagram.username}` : page.name,
-      });
-      connected.push({ channel: "instagram", account: instagram.username ?? instagram.id });
-    }
-
-    // one workspace publishes to one Page, so the first is the one that counts
-    break;
+  let connected: { channel: string; account: string }[];
+  try {
+    connected = await connectMetaAccounts(companyId, accessToken);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Facebook refused that token." }, { status: 400 });
   }
 
   safeRecord({
@@ -92,10 +36,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     connected,
-    pages: pages.map((page) => ({
-      id: page.id,
-      name: page.name,
-      instagram: page.instagram_business_account?.username ?? null,
-    })),
+    pages: [],
   });
 }

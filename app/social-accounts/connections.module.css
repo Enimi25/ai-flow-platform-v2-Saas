@@ -25,42 +25,22 @@
 }
 .ghost:hover { background: var(--surface-soft); }
 
-.form { padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); display: grid; gap: 8px; }
-.form h2 { font-size: 19px; letter-spacing: -.03em; margin: 0 0 6px; }
-.where { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.55; }
-.where a { color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
-.form label { font-size: 13px; font-weight: 660; margin-top: 10px; }
-.form input {
-  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-control);
-  background: var(--bg); color: var(--text); outline: none; font: inherit;
-}
-.form input::placeholder { color: var(--muted); }
-.form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-.hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
-.actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
-.note { color: var(--muted); font-size: 14px; }
-
 @media (max-width: 700px) { .list li { grid-template-columns: 1fr; } }
 
-.magic {
+.oneTap {
   padding: 24px;
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
   border-radius: var(--r-panel);
-  background:
-    radial-gradient(120% 100% at 100% 0%, var(--accent-dim), transparent 60%),
-    var(--surface);
-  display: grid;
-  gap: 14px;
+  background: var(--surface);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center;
 }
-.magicHead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 13px; align-items: start; }
-.magicHead svg { color: var(--accent); margin-top: 3px; }
-.magicHead h2 { font-size: 18px; letter-spacing: -.03em; margin: 0 0 6px; }
-.magicHead p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 62ch; }
-.magicRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
-.magicRow input {
-  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-control);
-  background: var(--bg); color: var(--text); outline: none; font: inherit;
-}
-.magicRow input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-.magicNote { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
-@media (max-width: 640px) { .magicRow { grid-template-columns: 1fr; } }
+.oneTapCopy { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 13px; align-items: start; }
+.oneTapIcon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--accent-dim); color: var(--accent); }
+.oneTap h2 { font-size: 18px; letter-spacing: -.03em; margin: 0 0 6px; }
+.oneTap p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 62ch; }
+.oneTapNote { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; }
+.oneTapNote svg { color: var(--accent); flex: none; }
+.ready { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-weight: 700; }
+.notice { margin: 0; padding: 12px 14px; border-radius: var(--r-control); background: var(--surface-soft); color: var(--text); font-size: 14px; }
+.groupHint { color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { .oneTap { grid-template-columns: 1fr; } }

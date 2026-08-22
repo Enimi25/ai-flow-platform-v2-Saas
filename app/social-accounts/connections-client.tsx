@@ -1,138 +1,75 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle, LinkSimple, Trash, ArrowSquareOut, MagicWand } from "@phosphor-icons/react";
+import { CheckCircle, LinkSimple, Trash, ArrowSquareOut, ShieldCheck } from "@phosphor-icons/react";
 import s from "./connections.module.css";
 
 type Row = { channel: "facebook" | "instagram" | "tiktok"; connected: boolean; accountName: string | null; connectedAt: string | null };
 
-const META = {
-  facebook: {
-    label: "Facebook Page",
-    blurb: "Replies in Messenger and posts to your Page.",
-    idLabel: "Page ID",
-    where: "Meta for Developers, Graph API Explorer: pick your Page, then copy the Page Access Token.",
-    doc: "https://developers.facebook.com/tools/explorer/",
-  },
-  instagram: {
-    label: "Instagram Business",
-    blurb: "Publishes posts and answers direct messages.",
-    idLabel: "Instagram user ID",
-    where: "The account must be Business and linked to the Page. The token is the same Page Access Token.",
-    doc: "https://developers.facebook.com/docs/instagram-api/getting-started",
-  },
-  tiktok: {
-    label: "TikTok",
-    blurb: "Publishes videos through the Content Posting API.",
-    idLabel: "Open ID",
-    where: "TikTok for Developers, your app, Content Posting API. The app has to pass review before it can post publicly.",
-    doc: "https://developers.tiktok.com/doc/content-posting-api-get-started",
-  },
+const META_CHANNELS = new Set<Row["channel"]>(["facebook", "instagram"]);
+const COPY = {
+  facebook: { label: "Facebook Page", blurb: "Replies to Messenger and publishes to your Page." },
+  instagram: { label: "Instagram Business", blurb: "Publishes posts and helps with direct messages." },
+  tiktok: { label: "TikTok", blurb: "Publishes videos through the Content Posting API." },
 } as const;
 
 export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [open, setOpen] = useState<Row["channel"] | null>(null);
-  const [accountId, setAccountId] = useState("");
-  const [token, setToken] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Row["channel"] | "meta" | null>(null);
   const [note, setNote] = useState("");
-  const [metaToken, setMetaToken] = useState("");
-  const [finding, setFinding] = useState(false);
-  const [found, setFound] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch("/api/content/connect");
     if (response.ok) setRows((await response.json()).connections);
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
-
-  async function connect(event: React.FormEvent) {
-    event.preventDefault();
-    if (!open) return;
-    setBusy(true);
-    setNote("");
-    const response = await fetch("/api/content/connect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: open, accountId, accessToken: token, accountName }),
-    });
-    const data = await response.json();
-    setBusy(false);
-    if (!response.ok) return setNote(data.error ?? "Could not connect that.");
-    setOpen(null);
-    setAccountId("");
-    setToken("");
-    setAccountName("");
+  useEffect(() => {
     void load();
-  }
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("meta") || params.get("tiktok");
+    if (status === "connected") setNote("Connected. AI FLOW can now use this account.");
+    else if (status && status !== "not_configured") setNote("Connection was not finished. Try again and approve the requested access.");
+  }, [load]);
+
+  const metaReady = rows.some((row) => META_CHANNELS.has(row.channel) && row.connected);
 
   async function disconnect(channel: Row["channel"]) {
-    setBusy(true);
+    setBusy(channel);
     await fetch("/api/content/connect", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ channel }),
     });
-    setBusy(false);
-    void load();
-  }
-
-  async function discover(event: React.FormEvent) {
-    event.preventDefault();
-    setFinding(true);
-    setFound("");
-    const response = await fetch("/api/content/discover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessToken: metaToken }),
-    });
-    const data = await response.json();
-    setFinding(false);
-    if (!response.ok) return setFound(data.error ?? "Could not read that token.");
-    setFound(
-      `Connected ${data.connected.map((c: { channel: string; account: string }) => `${c.channel} (${c.account})`).join(" and ")}.`,
-    );
-    setMetaToken("");
+    setBusy(null);
     void load();
   }
 
   return (
     <div className={s.wrap}>
-      <form className={s.magic} onSubmit={discover}>
-        <div className={s.magicHead}>
-          <MagicWand size={22} weight="fill" />
+      <section className={s.oneTap} aria-label="Connect Meta accounts">
+        <div className={s.oneTapCopy}>
+          <span className={s.oneTapIcon}><LinkSimple size={22} weight="bold" /></span>
           <div>
-            <h2>Connect Facebook and Instagram at once</h2>
-            <p>
-              Paste one Page Access Token. The Page id and the Instagram account behind
-              it are read from Meta, so there is nothing else to look up.
-            </p>
+            <h2>Connect Facebook and Instagram in one step</h2>
+            <p>Sign in with Meta, choose your Page, and AI FLOW finds the linked Instagram Business account automatically.</p>
           </div>
         </div>
-        <div className={s.magicRow}>
-          <input
-            type="password"
-            value={metaToken}
-            onChange={(event) => setMetaToken(event.target.value)}
-            placeholder="EAAG…"
-            autoComplete="off"
-            aria-label="Meta access token"
-            required
-          />
-          <button className="btn" type="submit" disabled={finding || !canEdit}>
-            {finding ? "Reading…" : "Find my accounts"}
-          </button>
-        </div>
-        <p className={s.magicNote}>
-          {found || "Meta for Developers, Graph API Explorer, pick your Page, then Generate Access Token."}
-        </p>
-      </form>
+        {metaReady ? (
+          <span className={s.ready}><CheckCircle size={17} weight="fill" /> Meta connected</span>
+        ) : (
+          <a className="btn" href="/api/social/connect/meta" aria-disabled={!canEdit} onClick={(event) => { if (!canEdit) event.preventDefault(); setBusy("meta"); }}>
+            <LinkSimple size={16} weight="bold" /> {busy === "meta" ? "Opening Meta…" : "Connect Meta"}
+          </a>
+        )}
+        <p className={s.oneTapNote}><ShieldCheck size={16} weight="fill" /> You approve access directly with Meta. Passwords never reach AI FLOW.</p>
+      </section>
+
+      {note && <p className={s.notice} role="status">{note}</p>}
+
       <ul className={s.list}>
         {rows.map((row) => {
-          const meta = META[row.channel];
+          const meta = COPY[row.channel];
+          const isMeta = META_CHANNELS.has(row.channel);
           return (
             <li key={row.channel} data-on={row.connected || undefined}>
               <div className={s.info}>
@@ -145,52 +82,19 @@ export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
                 <p>{meta.blurb}</p>
                 {row.connected && row.accountName && <p className={s.account}>{row.accountName}</p>}
               </div>
-
               {row.connected ? (
-                <button type="button" className={s.ghost} onClick={() => disconnect(row.channel)} disabled={busy || !canEdit}>
+                <button type="button" className={s.ghost} onClick={() => disconnect(row.channel)} disabled={busy !== null || !canEdit}>
                   <Trash size={16} /> Disconnect
                 </button>
-              ) : (
-                row.channel === "tiktok" ? (
-                  <a className="btn btn-sm" href="/api/social/connect/tiktok" aria-disabled={!canEdit} onClick={(event) => { if (!canEdit) event.preventDefault(); }}>
-                    <LinkSimple size={16} weight="bold" /> Connect
-                  </a>
-                ) : (
-                  <button type="button" className="btn btn-sm" onClick={() => setOpen(row.channel)} disabled={!canEdit}>
-                    <LinkSimple size={16} weight="bold" /> Connect
-                  </button>
-                )
-              )}
+              ) : row.channel === "tiktok" ? (
+                <a className="btn btn-sm" href="/api/social/connect/tiktok" aria-disabled={!canEdit} onClick={(event) => { if (!canEdit) event.preventDefault(); setBusy("tiktok"); }}>
+                  <ArrowSquareOut size={16} weight="bold" /> {busy === "tiktok" ? "Opening TikTok…" : "Connect"}
+                </a>
+              ) : <span className={s.groupHint}>{isMeta ? "Connect with Meta above" : ""}</span>}
             </li>
           );
         })}
       </ul>
-
-      {open && open !== "tiktok" && (
-        <form className={s.form} onSubmit={connect}>
-          <h2>Connect {META[open].label}</h2>
-          <p className={s.where}>
-            {META[open].where}{" "}
-            <a href={META[open].doc} target="_blank" rel="noreferrer">Open the docs <ArrowSquareOut size={13} /></a>
-          </p>
-
-          <label htmlFor="account-id">{META[open].idLabel}</label>
-          <input id="account-id" value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder="1234567890" />
-
-          <label htmlFor="account-name">Account name, so you recognise it later</label>
-          <input id="account-name" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="AI FLOW" />
-
-          <label htmlFor="token">Access token</label>
-          <input id="token" type="password" value={token} onChange={(e) => setToken(e.target.value)} required autoComplete="off" />
-          <p className={s.hint}>Stored encrypted. It is never shown again after saving.</p>
-
-          <div className={s.actions}>
-            <button className="btn" type="submit" disabled={busy}>{busy ? "Connecting…" : "Connect"}</button>
-            <button type="button" className={s.ghost} onClick={() => setOpen(null)}>Cancel</button>
-            <span className={s.note}>{note}</span>
-          </div>
-        </form>
-      )}
     </div>
   );
 }

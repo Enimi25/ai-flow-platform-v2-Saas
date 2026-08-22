@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 
 const providers = {
+  meta: "META_OAUTH_URL",
   facebook: "FACEBOOK_OAUTH_URL",
   instagram: "INSTAGRAM_OAUTH_URL",
   whatsapp: "WHATSAPP_OAUTH_URL",
@@ -18,6 +19,8 @@ export async function GET(request: Request, context: RouteContext<"/api/social/c
   const envKey = providers[provider as keyof typeof providers];
   const oauthUrl = provider === "tiktok"
     ? "https://www.tiktok.com/v2/auth/authorize/"
+    : provider === "meta"
+      ? "https://www.facebook.com/v21.0/dialog/oauth"
     : process.env[envKey];
   if (!oauthUrl) return NextResponse.redirect(new URL(`/social-accounts?setup=${provider}`, request.url));
 
@@ -36,6 +39,17 @@ export async function GET(request: Request, context: RouteContext<"/api/social/c
     destination.searchParams.set("response_type", "code");
     destination.searchParams.set("scope", "user.info.basic,video.upload");
     destination.searchParams.set("redirect_uri", redirectUri);
+  }
+  if (provider === "meta") {
+    const clientId = process.env.FACEBOOK_CLIENT_ID;
+    const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
+    if (!clientId || !redirectUri) {
+      return NextResponse.redirect(new URL("/social-accounts?setup=meta", request.url));
+    }
+    destination.searchParams.set("client_id", clientId);
+    destination.searchParams.set("redirect_uri", redirectUri);
+    destination.searchParams.set("response_type", "code");
+    destination.searchParams.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,instagram_basic,instagram_content_publish");
   }
   return NextResponse.redirect(destination);
 }
