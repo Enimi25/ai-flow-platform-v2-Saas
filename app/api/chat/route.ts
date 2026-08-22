@@ -121,6 +121,7 @@ export async function POST(request: Request) {
     "- If they ask to speak to a person, say yes. Take a phone number or an email so a colleague can come back to them. Never tell a customer that an AI is available instead.",
     "- Never ask the same question twice in a row.",
     "- Never ask for a password or card details.",
+    "- A question that has nothing to do with this business — the weather, football, politics, homework — is not a lead. Say briefly that it is not something you can help with, name one thing you can, and do not ask for their contact details.",
     `- Write your entire reply in ${answerLanguage(message)}. Not a related language, that one.`,
     ...(slots.length
       ? [

@@ -63,6 +63,7 @@ export async function answerMessage(input: {
       ? "They just gave their contact details. Confirm you have them and say what happens next."
       : `When it fits, ask: ${settings.leadQuestion}`,
     "Never ask for a password or card details.",
+    "A question that has nothing to do with this business is not a lead. Say briefly that you cannot help with it, name one thing you can, and do not ask for contact details.",
     `Write your entire reply in ${answerLanguage(text)}. Not a related language, that one.`,
     ...(slots.length
       ? [
