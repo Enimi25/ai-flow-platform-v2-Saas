@@ -37,3 +37,82 @@
 .note { color: var(--muted); font-size: 14px; }
 
 @media (max-width: 980px) { .board { grid-template-columns: 1fr; } }
+
+/* --- opening hours ------------------------------------------------------ */
+.toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  margin: 6px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+
+.toggle input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent-2); cursor: pointer; }
+.toggle b { display: block; font-size: 14.5px; font-weight: 640; }
+.toggle small { display: block; margin-top: 3px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+.days {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  background: var(--surface);
+}
+
+.day[data-shut="true"] { background: var(--surface-soft); }
+
+.dayName { display: flex; align-items: center; gap: 11px; cursor: pointer; margin: 0; }
+.dayName input { width: 16px; height: 16px; accent-color: var(--accent-2); cursor: pointer; }
+.dayName span { font-size: 14px; font-weight: 580; }
+.day[data-shut="true"] .dayName span { color: var(--muted); }
+
+.dayTimes { display: flex; align-items: center; gap: 9px; }
+
+.dayTimes input {
+  width: auto;
+  min-width: 108px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dayTimes input:focus { outline: none; border-color: var(--accent-2); }
+.dayTimes em { font-style: normal; font-size: 12.5px; color: var(--muted); }
+
+.shut { font-size: 13px; color: var(--muted); }
+
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.pair > div { display: grid; align-content: start; }
+
+/* --- how often to post -------------------------------------------------- */
+.rangeValue { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.rangeValue b { color: var(--accent); font-size: 17px; font-variant-numeric: tabular-nums; }
+.rangeValue span { color: var(--muted); }
+
+.panel input[type="range"] { accent-color: var(--accent-2); width: 100%; }
+
+@media (max-width: 640px) {
+  .pair { grid-template-columns: 1fr; }
+  .day { flex-wrap: wrap; }
+}
