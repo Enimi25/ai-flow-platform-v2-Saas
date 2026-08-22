@@ -52,5 +52,17 @@ services:
         sync: false
       - key: INSTAGRAM_USER_ID
         sync: false
+      # TikTok Sandbox / production credentials are supplied in the Render dashboard.
+      # Keep them out of Git and rotate any credential that has been exposed.
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: TIKTOK_REDIRECT_URI
+        value: https://aiflow.forum/api/social/callback/tiktok
+      - key: TIKTOK_ACCESS_TOKEN
+        sync: false
+      - key: TIKTOK_OPEN_ID
+        sync: false
       - key: PUBLIC_SITE_URL
         value: https://aiflow.forum
