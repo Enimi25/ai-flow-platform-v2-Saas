@@ -212,11 +212,11 @@ export default function Home() {
             <i className={s.dot} /> AI sales agents for small business
           </p>
 
-          <h1 className={s.title}>Turn every message into a customer.</h1>
+          <h1 className={s.title}>Take your business to a new level.</h1>
 
           <p className={s.sub}>
-            It answers in seconds, saves their phone number, and books them in.
-            On your website, Messenger, Instagram and WhatsApp.
+            AI agents answer your customers and book them in. AI content factories run your
+            social networks. Day and night, in every language.
           </p>
 
           <div className={s.heroActions}>
@@ -469,7 +469,7 @@ export default function Home() {
               <span className={s.mark}>AI</span>
               <span>AI FLOW</span>
             </Link>
-            <p className={s.slogan}>Turn every message into a customer.</p>
+            <p className={s.slogan}>Take your business to a new level.</p>
             <p className={s.footBlurb}>
               AI sales agents for small business. We answer your customers, save every lead, book
               appointments and post for you. Day and night, in any language.
