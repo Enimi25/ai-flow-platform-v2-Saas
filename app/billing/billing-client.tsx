@@ -18,6 +18,8 @@ type Data = {
 
 export function BillingClient() {
   const [data, setData] = useState<Data | null>(null);
+  const [openingPlan, setOpeningPlan] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -34,6 +36,24 @@ export function BillingClient() {
     { label: "Posts published", value: data.usage.postsPublished },
     { label: "Paid bookings", value: data.usage.bookingsPaid },
   ];
+
+  async function startCheckout(planId: string) {
+    setOpeningPlan(planId);
+    setError(null);
+    try {
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      });
+      const payload = await response.json() as { checkoutUrl?: string; error?: string };
+      if (!response.ok || !payload.checkoutUrl) throw new Error(payload.error ?? "Could not open checkout.");
+      window.location.assign(payload.checkoutUrl);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not open checkout.");
+      setOpeningPlan(null);
+    }
+  }
 
   return (
     <div className={s.wrap}>
@@ -58,6 +78,7 @@ export function BillingClient() {
           Payments are not connected on this server, so no plan can be bought yet.
         </p>
       )}
+      {error && <p className={s.warn}><WarningCircle size={18} weight="fill" /> {error}</p>}
 
       <div className={s.plans}>
         {data.plans.map((plan) => (
@@ -76,9 +97,10 @@ export function BillingClient() {
             <button
               type="button"
               className={plan.featured ? "btn" : "btn btn-ghost"}
-              disabled={!data.paymentsReady}
+              disabled={!data.paymentsReady || data.current === plan.id || openingPlan !== null}
+              onClick={() => startCheckout(plan.id)}
             >
-              {data.current === plan.id ? "Current plan" : data.paymentsReady ? "Choose" : "Payments off"}
+              {data.current === plan.id ? "Current plan" : openingPlan === plan.id ? "Opening Stripe…" : data.paymentsReady ? "Choose" : "Payments off"}
             </button>
           </section>
         ))}

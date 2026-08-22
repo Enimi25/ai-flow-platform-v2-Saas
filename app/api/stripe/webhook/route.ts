@@ -3,6 +3,8 @@ import { verifyWebhook } from "@/lib/booking/stripe";
 import { bookingBySession, saveBooking } from "@/lib/booking/store";
 import { createEvent } from "@/lib/google/calendar";
 import { safeRecord } from "@/lib/activity";
+import Stripe from "stripe";
+import { saveSubscription } from "@/lib/billing/store";
 
 /**
  * The only trusted signal that money arrived. The browser redirect after
@@ -21,11 +23,48 @@ export async function POST(request: Request) {
     );
   }
 
+  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const companyId = subscription.metadata.companyId;
+    const planId = subscription.metadata.planId;
+    if (companyId && planId) {
+      await saveSubscription({
+        companyId,
+        planId,
+        stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+        stripeSubscriptionId: subscription.id,
+        status: subscription.status,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   if (event.type !== "checkout.session.completed") {
     return NextResponse.json({ ignored: event.type });
   }
 
-  const session = event.data.object as { id: string; payment_status?: string };
+  const session = event.data.object as Stripe.Checkout.Session;
+
+  if (session.metadata?.kind === "subscription") {
+    const companyId = session.metadata.companyId;
+    const planId = session.metadata.planId;
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+    if (!companyId || !planId || !subscriptionId) return NextResponse.json({ ignored: "missing subscription metadata" });
+    await saveSubscription({
+      companyId,
+      planId,
+      stripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
+      stripeSubscriptionId: subscriptionId,
+      status: session.payment_status === "paid" ? "active" : "incomplete",
+      updatedAt: new Date().toISOString(),
+    });
+    safeRecord({ companyId, kind: "subscription.started", level: "success", title: "AI FLOW subscription started", detail: planId });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (session.metadata?.kind !== "booking") return NextResponse.json({ ignored: "unknown checkout" });
+
   if (session.payment_status && session.payment_status !== "paid") {
     return NextResponse.json({ ignored: "unpaid" });
   }
