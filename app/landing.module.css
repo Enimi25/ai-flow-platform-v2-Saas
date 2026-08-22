@@ -55,6 +55,17 @@
 
 .orb { z-index: -1; }
 
+/* The sphere sits right behind the copy and its dots eat the smaller type, so
+   the text carries its own pool of ground rather than relying on luck. */
+.heroInner::before {
+  content: "";
+  position: absolute;
+  inset: -8% -6%;
+  z-index: -1;
+  background: radial-gradient(58% 52% at 50% 50%, rgba(9, 19, 17, .88) 0%, rgba(9, 19, 17, .62) 46%, transparent 78%);
+  pointer-events: none;
+}
+
 .heroInner {
   position: relative;
   width: 100%;
