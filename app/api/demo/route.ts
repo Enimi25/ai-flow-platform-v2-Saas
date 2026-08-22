@@ -3,6 +3,7 @@ import { sendEmail, EmailNotConfigured, isEmailReady } from "@/lib/email/send";
 import { proposalEmail } from "@/lib/email/proposal";
 import { safeRecord } from "@/lib/activity";
 import { houseCompanyId } from "@/lib/workspace/store";
+import { previewConversation } from "@/lib/email/preview";
 import { captureLead } from "@/lib/leads/store";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
   }
 
   const house = await houseCompanyId();
+  // their own agent, answering their own customers, before they have paid anything
+  const preview = await previewConversation(question).catch(() => []);
   const origin = new URL(request.url).origin;
   const siteUrl = process.env.PUBLIC_SITE_URL || origin;
 
@@ -75,11 +78,12 @@ export async function POST(request: Request) {
   try {
     await sendEmail({
       to: email,
-      subject: `${name}, here is what an AI FLOW agent would have answered`,
+      subject: `${name}, we built your agent`,
       replyTo: process.env.EMAIL_REPLY_TO || "baskinltd@yahoo.com",
       html: proposalEmail({
         name,
         question,
+        preview,
         siteUrl,
         videoUrl: process.env.DEMO_VIDEO_URL,
         contactEmail: process.env.EMAIL_REPLY_TO || "baskinltd@yahoo.com",

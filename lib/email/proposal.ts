@@ -11,7 +11,10 @@ const BRAND = {
 
 export type ProposalInput = {
   name: string;
+  /** What the business told us it does, in their own words. */
   question: string;
+  /** Their own agent, answering their own customers. Written for this email. */
+  preview?: { asked: string; answered: string }[];
   siteUrl: string;
   videoUrl?: string;
   contactEmail: string;
@@ -53,6 +56,28 @@ export function proposalEmail(input: ProposalInput) {
       </td></tr>`
     : "";
 
+  const chat = input.preview?.length
+    ? `<tr><td style="padding:0 28px 26px">
+        <div style="font:600 13px/1.3 Helvetica,Arial,sans-serif;color:${BRAND.accent};letter-spacing:1px;text-transform:uppercase;margin-bottom:14px">Your agent, answering your customers</div>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.surface};border:1px solid ${BRAND.line};border-radius:14px">
+          <tr><td style="padding:20px">
+            ${input.preview
+              .map(
+                (turn) => `
+              <div style="margin-bottom:16px">
+                <div style="font:400 14px/1.5 Helvetica,Arial,sans-serif;color:${BRAND.text};background:#1a2f29;border-radius:12px 12px 12px 4px;padding:11px 14px;display:inline-block;max-width:88%">${turn.asked}</div>
+                <div style="font:400 14px/1.5 Helvetica,Arial,sans-serif;color:${BRAND.ink};background:${BRAND.accent};border-radius:12px 12px 4px 12px;padding:11px 14px;margin-top:8px;display:inline-block;max-width:88%">${turn.answered}</div>
+              </div>`,
+              )
+              .join("")}
+            <div style="font:400 12px/1.5 Helvetica,Arial,sans-serif;color:${BRAND.muted};border-top:1px solid ${BRAND.line};padding-top:12px;margin-top:4px">
+              Nobody wrote these answers. They came from the few lines you sent us.
+            </div>
+          </td></tr>
+        </table>
+      </td></tr>`
+    : "";
+
   return `<!doctype html>
 <html><body style="margin:0;padding:0;background:${BRAND.bg}">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};padding:28px 12px">
@@ -66,17 +91,16 @@ export function proposalEmail(input: ProposalInput) {
 
   <tr><td style="padding:0 28px 20px">
     <div style="font:700 30px/1.15 Helvetica,Arial,sans-serif;color:${BRAND.text};letter-spacing:-.5px">
-      ${input.name}, here is what your agent would have done.
-    </div>
-    <div style="font:400 15px/1.6 Helvetica,Arial,sans-serif;color:${BRAND.muted};margin-top:14px">
-      You asked us: &ldquo;${input.question}&rdquo;
+      ${input.name}, we built your agent.
     </div>
     <div style="font:400 15px/1.6 Helvetica,Arial,sans-serif;color:${BRAND.text};margin-top:14px">
-      An AI FLOW agent answers a question like that in about four seconds, at any hour,
-      captures the contact, and offers a time in your calendar. Below is what it costs
-      and how to try it on your own site.
+      You told us what you do. Below is your own agent answering your own customers,
+      written from those few lines and nothing else. It replies in about four seconds,
+      at any hour, takes the contact and offers a time in your calendar.
     </div>
   </td></tr>
+
+  ${chat}
 
   ${video}
 
