@@ -3,6 +3,7 @@ import { ask, weigh, tidyText, ESCALATION_RULE, UNSURE } from "@/lib/model";
 import { appendTurn } from "@/lib/conversations/store";
 import { captureLead, detectContact, type Source } from "@/lib/leads/store";
 import { safeRecord } from "@/lib/activity";
+import { answerLanguage } from "@/lib/language";
 import { freeSlots } from "@/lib/booking/slots";
 import { confirmBooking, bookingLine, BOOK_MARK, ANY_MARK } from "@/lib/booking/confirm";
 import { recentTurns } from "@/lib/conversations/store";
@@ -61,8 +62,8 @@ export async function answerMessage(input: {
     contact.found
       ? "They just gave their contact details. Confirm you have them and say what happens next."
       : `When it fits, ask: ${settings.leadQuestion}`,
-    "Never ask for a password or card details. Reply in the language they wrote in.",
-    "If they typed Russian in Latin letters, answer in normal Cyrillic.",
+    "Never ask for a password or card details.",
+    `Write your entire reply in ${answerLanguage(text)}. Not a related language, that one.`,
     ...(slots.length
       ? [
           "",

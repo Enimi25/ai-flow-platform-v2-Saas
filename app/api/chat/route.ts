@@ -4,6 +4,7 @@ import { appendTurn, recentTurns } from "@/lib/conversations/store";
 import { getSettings } from "@/lib/settings/store";
 import { ask, weigh, tidyText, ESCALATION_RULE, UNSURE, NoModelAvailable } from "@/lib/model";
 import { safeRecord } from "@/lib/activity";
+import { answerLanguage } from "@/lib/language";
 import { houseCompanyId } from "@/lib/workspace/store";
 import { freeSlots } from "@/lib/booking/slots";
 import { confirmBooking, bookingLine, BOOK_MARK, ANY_MARK } from "@/lib/booking/confirm";
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     "- If they ask to speak to a person, say yes. Take a phone number or an email so a colleague can come back to them. Never tell a customer that an AI is available instead.",
     "- Never ask the same question twice in a row.",
     "- Never ask for a password or card details.",
-    "- Reply in the language the customer wrote in. If they typed Russian in Latin letters, answer in normal Cyrillic.",
+    `- Write your entire reply in ${answerLanguage(message)}. Not a related language, that one.`,
     ...(slots.length
       ? [
           "",

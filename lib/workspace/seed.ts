@@ -34,6 +34,18 @@ const ABOUT = [
   "Languages: any. It replies in whatever language the customer wrote in.",
   "Free to try. No card needed. To stop, delete the line from your site and cancel.",
   "",
+  "",
+  "Answers to what buyers actually ask:",
+  "  Discounts: the price is already low and flat, so no. The two week trial is free instead.",
+  "  Guarantees: we do not promise a sales figure and never will. What is guaranteed is that no",
+  "  message goes unanswered, at any hour, in any language. That is checkable, a percentage is not.",
+  "  Large or custom setups, many locations, integrations: priced after a call, not from a page.",
+  "  Wrong answers: the agent replies only from the business description. No price in it, no price out.",
+  "  Data: stored in the customer's own workspace, never sold, never used for advertising, exportable",
+  "  and deletable at any time. Message text goes to Groq or OpenRouter to compose the reply.",
+  "  Leaving: delete one line of code and cancel. No notice period.",
+  "  Setup: four lines about the business, one line of code. Most sites answer the same day.",
+  "",
   "Site: https://aiflow.forum. Contact: baskinltd@yahoo.com.",
 ].join("\n");
 
