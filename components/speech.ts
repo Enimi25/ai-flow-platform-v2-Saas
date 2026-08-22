@@ -132,8 +132,11 @@ export function say(text: string, { onStart, onEnd }: Speaking = {}) {
     const utterance = new SpeechSynthesisUtterance(speak);
     utterance.lang = lang;
     if (voice) utterance.voice = voice;
-    utterance.rate = 1;
-    utterance.pitch = 1.02;
+    // Flo is a puppy, so a touch brighter and a touch quicker than neutral.
+    // Not higher: past about 1.2 the voice stops sounding young and starts
+    // sounding synthetic, which is the thing this was meant to fix.
+    utterance.rate = 1.04;
+    utterance.pitch = 1.12;
     utterance.onstart = () => {
       if (started) return;
       started = true;
