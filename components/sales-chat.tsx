@@ -50,7 +50,7 @@ export function SalesChat() {
   const [name, setName] = useState<string | undefined>();
   const [typing, setTyping] = useState("");
   const [loading, setLoading] = useState(false);
-  const [voice, setVoice] = useState(false);
+  const [voice, setVoice] = useState(true);
   const [teaser, setTeaser] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [talking, setTalking] = useState(false);
@@ -62,12 +62,17 @@ export function SalesChat() {
   const mood: Mood =
     talking || typing ? "speaking" : loading ? "thinking" : open ? "listening" : "idle";
 
+  // The line he is on right now, trimmed to something that fits beside him.
+  const lastAgent = [...messages].reverse().find((m) => m.role === "agent")?.text;
+  const said =
+    typing || (talking ? lastAgent : null) || (!open ? teaser : null) || null;
+
   // restore the previous visit
   useEffect(() => {
     const saved = load();
     setName(saved.name);
     setMessages(saved.messages.length ? saved.messages : [{ role: "agent", text: OPENER }]);
-    setVoice(localStorage.getItem(`${STORE}_voice`) === "on");
+    setVoice(localStorage.getItem(`${STORE}_voice`) !== "off");
     warmVoices();
     setReady(true);
   }, []);
@@ -127,6 +132,16 @@ export function SalesChat() {
     if (revealTimer.current) window.clearTimeout(revealTimer.current);
     hush();
   }, []);
+
+  // He greets out loud when the panel opens. Speech needs a user gesture and
+  // the click on the launcher is one, so this is the only moment it is allowed.
+  const greeted = useRef(false);
+  useEffect(() => {
+    if (!open || !ready || !voice || greeted.current) return;
+    greeted.current = true;
+    const last = [...messages].reverse().find((m) => m.role === "agent");
+    if (last) speak(last.text);
+  }, [open, ready, voice, messages, speak]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,7 +245,12 @@ export function SalesChat() {
 
       {/* Flo stands on the button when shut and on the panel's top edge when
           open, so he stays in view and keeps talking either way */}
-      <Mascot className={s.flo} mood={mood} size={150} open={open} onClick={launch} />
+      <Mascot className={s.flo} mood={mood} size={190} open={open} onClick={launch} />
+
+      {/* what he is saying, next to him, so it reads as him speaking */}
+      {said && (
+        <p className={s.bubble} data-open={open} aria-hidden="true">{said}</p>
+      )}
 
       <button
         className={s.launcher}

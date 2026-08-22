@@ -226,16 +226,18 @@
 .flo {
   position: fixed;
   right: 0;
-  bottom: 54px;
+  bottom: 46px;
   z-index: 62;
   transition: bottom .4s var(--ease), right .4s var(--ease);
 }
 
 /* on the panel's top edge, overlapping it, so he reads as standing on the
    window rather than floating beside it */
+/* Standing on the panel's top edge, overlapping it by a paw, so he reads as
+   sitting on the window rather than floating next to it. */
 .flo[data-open="true"] {
-  bottom: calc(100px + var(--panel-h) - 30px);
-  right: 24px;
+  bottom: calc(100px + var(--panel-h) - 26px);
+  right: 30px;
 }
 
 @media (max-width: 560px) {
@@ -244,4 +246,38 @@
   .panel { right: 16px; bottom: 90px; }
   .flo { right: 3px; bottom: 46px; width: 86px !important; height: 120px !important; }
   .flo[data-open="true"] { bottom: calc(90px + var(--panel-h) - 24px); right: 18px; }
+}
+
+/* --- what he is saying, beside him -------------------------------------- */
+.bubble {
+  position: fixed;
+  right: 150px;
+  bottom: 108px;
+  z-index: 62;
+  max-width: 250px;
+  margin: 0;
+  padding: 12px 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px 16px 4px 16px;
+  background: var(--surface-high);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.5;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
+  animation: bubbleIn .24s var(--ease) both;
+  pointer-events: none;
+}
+
+.bubble[data-open="true"] {
+  bottom: calc(100px + var(--panel-h) + 44px);
+  right: 172px;
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(6px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (max-width: 900px) {
+  .bubble { display: none; }
 }

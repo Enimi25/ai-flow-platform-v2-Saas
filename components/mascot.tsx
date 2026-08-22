@@ -34,6 +34,7 @@ export function Mascot({
   onClick?: () => void;
 }) {
   const [art, setArt] = useState<"unknown" | "yes" | "no">("unknown");
+  const [hasTalkFrame, setHasTalkFrame] = useState(false);
   const [talkFrame, setTalkFrame] = useState(false);
 
   useEffect(() => {
@@ -42,6 +43,14 @@ export function Mascot({
     probe.onload = () => live && setArt("yes");
     probe.onerror = () => live && setArt("no");
     probe.src = REST;
+
+    // The second frame is optional. Without it Flo still breathes and nods; he
+    // just does not open his mouth. Treating it as required would hide him
+    // entirely over one missing file.
+    const mouth = new Image();
+    mouth.onload = () => live && setHasTalkFrame(true);
+    mouth.src = TALK;
+
     return () => {
       live = false;
     };
@@ -49,13 +58,13 @@ export function Mascot({
 
   // the two-frame mouth, only while the voice is actually running
   useEffect(() => {
-    if (mood !== "speaking" || art !== "yes") {
+    if (mood !== "speaking" || art !== "yes" || !hasTalkFrame) {
       setTalkFrame(false);
       return;
     }
     const timer = window.setInterval(() => setTalkFrame((f) => !f), 165);
     return () => window.clearInterval(timer);
-  }, [mood, art]);
+  }, [mood, art, hasTalkFrame]);
 
   if (art === "no") return null;
 
@@ -73,7 +82,7 @@ export function Mascot({
       aria-label={onClick ? "Open the chat with Flo" : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={talkFrame ? TALK : REST} alt="" draggable={false} onError={() => setArt("no")} />
+      <img src={talkFrame && hasTalkFrame ? TALK : REST} alt="" draggable={false} onError={() => setArt("no")} />
     </span>
   );
 }
