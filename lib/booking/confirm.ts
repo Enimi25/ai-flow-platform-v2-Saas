@@ -2,6 +2,8 @@ import { saveBooking, slotTaken, type Booking } from "./store";
 import { slotIsFree } from "./slots";
 import { safeRecord } from "@/lib/activity";
 import type { Settings } from "@/lib/settings/options";
+import { workspaceById } from "@/lib/workspace/store";
+import { createEvent } from "@/lib/google/calendar";
 
 /**
  * The marker the agent writes when a customer settles on a time.
@@ -37,11 +39,12 @@ export async function confirmBooking(input: {
 
   const starts = new Date(startsAt);
   const ends = new Date(starts.getTime() + (settings.slotMinutes || 60) * 60_000);
+  const workspace = await workspaceById(settings.companyId);
 
   const booking: Booking = {
     id: crypto.randomUUID(),
     companyId: settings.companyId,
-    ownerEmail: "",
+    ownerEmail: workspace?.ownerEmail ?? "",
     customerName: (input.customerName || "").slice(0, 120),
     customerEmail: (input.customerEmail || "").slice(0, 254),
     startsAt: starts.toISOString(),
@@ -67,7 +70,41 @@ export async function confirmBooking(input: {
     }).format(starts)}`,
   });
 
-  return booking;
+  // A chat booking is already confirmed (there is no Stripe checkout in this
+  // path), so write it to the selected Google Calendar immediately. A calendar
+  // outage must never erase the booking; the error remains visible for retry.
+  if (!booking.ownerEmail) return booking;
+
+  try {
+    const event = await createEvent(booking.ownerEmail, {
+      summary: `${booking.service} — ${booking.customerName || booking.customerEmail || "Customer"}`,
+      description: "Booked through AI FLOW.",
+      startsAt: booking.startsAt,
+      endsAt: booking.endsAt,
+      attendeeEmail: booking.customerEmail || undefined,
+      timeZone: settings.timezone,
+    });
+    const saved = await saveBooking({ ...booking, calendarEventId: event.id, calendarLink: event.htmlLink });
+    safeRecord({
+      companyId: booking.companyId,
+      kind: "calendar.created",
+      level: "success",
+      title: "Appointment written to the calendar",
+      detail: new Date(booking.startsAt).toLocaleString(),
+    });
+    return saved;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Calendar write failed.";
+    const saved = await saveBooking({ ...booking, error: message });
+    safeRecord({
+      companyId: booking.companyId,
+      kind: "calendar.failed",
+      level: "error",
+      title: "Appointment booked, but calendar sync failed",
+      detail: message,
+    });
+    return saved;
+  }
 }
 
 /**
