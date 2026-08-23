@@ -232,7 +232,7 @@ export default function Home() {
             <i className={s.dot} /> AI sales agents for small business
           </p>
 
-          <h1 className={s.title}>Take your business to a new level.</h1>
+          <h1 className={s.title}>Integrate Your Business to the Next Level with Artificial Intelligence.</h1>
 
           <p className={s.sub}>
             AI agents answer your customers and book them in. AI content factories run your
