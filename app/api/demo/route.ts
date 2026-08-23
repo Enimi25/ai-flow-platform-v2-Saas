@@ -27,8 +27,14 @@ export async function POST(request: Request) {
   const name = typeof data.name === "string" ? data.name.trim().slice(0, 80) : "";
   const email = typeof data.email === "string" ? data.email.trim().toLowerCase().slice(0, 254) : "";
   const question = typeof data.question === "string" ? data.question.trim().slice(0, 1_000) : "";
-  if (name.length < 2 || !emailPattern.test(email) || question.length < 8) {
-    return NextResponse.json({ message: "Check the form fields and try again." }, { status: 422 });
+  if (name.length < 2) {
+    return NextResponse.json({ message: "Please enter your name (at least 2 characters)." }, { status: 422 });
+  }
+  if (!emailPattern.test(email)) {
+    return NextResponse.json({ message: "Please enter a valid business email address." }, { status: 422 });
+  }
+  if (question.length < 3) {
+    return NextResponse.json({ message: "Please add a short description of your business." }, { status: 422 });
   }
 
   const house = await houseCompanyId();
