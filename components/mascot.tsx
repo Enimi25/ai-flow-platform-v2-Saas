@@ -37,6 +37,7 @@ export function Mascot({
   const [hasTalkFrame, setHasTalkFrame] = useState(false);
   const [talkFrame, setTalkFrame] = useState(false);
   const [idlePose, setIdlePose] = useState<"rest" | "curious" | "greeting">("rest");
+  const [celebrating, setCelebrating] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -80,18 +81,27 @@ export function Mascot({
 
   if (art === "no") return null;
 
+  const react = () => {
+    if (!onClick) return;
+    setCelebrating(false);
+    requestAnimationFrame(() => setCelebrating(true));
+    window.setTimeout(() => setCelebrating(false), 900);
+    onClick();
+  };
+
   return (
     <span
       className={[s.mascot, className].filter(Boolean).join(" ")}
       data-mood={mood}
       data-pose={mood === "idle" ? idlePose : mood}
+      data-reacting={celebrating ? "true" : undefined}
       data-open={open ? "true" : "false"}
       data-pending={art === "unknown" ? "true" : undefined}
       style={{ width: Math.round(size * 0.72), height: size }}
-      onClick={onClick}
+      onClick={react}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
+      onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && react() : undefined}
       aria-label={onClick ? "Open the chat with Flo" : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

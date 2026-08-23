@@ -26,6 +26,8 @@
 
 .mascot:hover { animation: perk .5s var(--ease); }
 .mascot:active { transform: scale(.97); }
+.mascot[data-reacting="true"] { animation: clickHello .88s cubic-bezier(.22, .78, .24, 1) both !important; }
+.mascot[data-reacting="true"] img { transform: rotate(7deg) translate(5px, -8px) scale(1.07); }
 
 /* Deliberately distinct screen poses, not a permanently frozen mascot. */
 .mascot[data-pose="curious"] img { transform: rotate(-5deg) translate(-3px, -3px) scale(1.025); }
@@ -72,4 +74,12 @@
   0%, 100% { transform: translateY(0) rotate(0deg); }
   35% { transform: translateY(-8px) rotate(4deg); }
   65% { transform: translateY(-4px) rotate(-2deg); }
+}
+
+@keyframes clickHello {
+  0% { transform: translateY(0) rotate(0deg) scale(1); }
+  28% { transform: translateY(-15px) rotate(-8deg) scale(1.08); }
+  54% { transform: translateY(-7px) rotate(7deg) scale(1.04); }
+  76% { transform: translateY(-11px) rotate(-4deg) scale(1.06); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
 }
