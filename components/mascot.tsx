@@ -36,6 +36,7 @@ export function Mascot({
   const [art, setArt] = useState<"unknown" | "yes" | "no">("unknown");
   const [hasTalkFrame, setHasTalkFrame] = useState(false);
   const [talkFrame, setTalkFrame] = useState(false);
+  const [idlePose, setIdlePose] = useState<"rest" | "curious" | "greeting">("rest");
 
   useEffect(() => {
     let live = true;
@@ -66,12 +67,24 @@ export function Mascot({
     return () => window.clearInterval(timer);
   }, [mood, art, hasTalkFrame]);
 
+  // A small pose change keeps Flo from reading as a static sticker while the
+  // chat is waiting. The actual image stays crisp; CSS supplies the motion.
+  useEffect(() => {
+    if (mood !== "idle" || art !== "yes") return;
+    const poses: Array<"rest" | "curious" | "greeting"> = ["rest", "curious", "greeting"];
+    const timer = window.setInterval(() => {
+      setIdlePose((current) => poses[(poses.indexOf(current) + 1) % poses.length]);
+    }, 5600);
+    return () => window.clearInterval(timer);
+  }, [mood, art]);
+
   if (art === "no") return null;
 
   return (
     <span
       className={[s.mascot, className].filter(Boolean).join(" ")}
       data-mood={mood}
+      data-pose={mood === "idle" ? idlePose : mood}
       data-open={open ? "true" : "false"}
       data-pending={art === "unknown" ? "true" : undefined}
       style={{ width: Math.round(size * 0.72), height: size }}

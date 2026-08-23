@@ -16,6 +16,8 @@
   object-position: bottom center;
   user-select: none;
   -webkit-user-drag: none;
+  transform-origin: 50% 90%;
+  transition: transform .65s var(--ease), filter .65s var(--ease);
 }
 
 /* the art loads a frame or two after mount; fading in beats a pop */
@@ -25,11 +27,19 @@
 .mascot:hover { animation: perk .5s var(--ease); }
 .mascot:active { transform: scale(.97); }
 
+/* Deliberately distinct screen poses, not a permanently frozen mascot. */
+.mascot[data-pose="curious"] img { transform: rotate(-5deg) translate(-3px, -3px) scale(1.025); }
+.mascot[data-pose="greeting"] img { transform: rotate(3deg) translate(3px, -5px) scale(1.035); }
+.mascot[data-pose="listening"] img { transform: rotate(-4deg) translate(-3px, -3px); }
+.mascot[data-pose="thinking"] img { transform: rotate(4deg) translate(3px, -2px) scale(.98); }
+.mascot[data-pose="speaking"] img { filter: saturate(1.08) brightness(1.04); }
+
 @media (prefers-reduced-motion: no-preference) {
   .mascot { animation: bob 3.4s ease-in-out infinite; }
   .mascot[data-mood="listening"] { animation: lean 2.6s ease-in-out infinite; }
   .mascot[data-mood="thinking"]  { animation: ponder 2.2s ease-in-out infinite; }
   .mascot[data-mood="speaking"]  { animation: chat .52s ease-in-out infinite; }
+  .mascot[data-pose="greeting"] { animation: wave 1.05s ease-in-out 2; }
 }
 
 @keyframes bob {
@@ -56,4 +66,10 @@
   0%   { transform: translateY(0) rotate(0deg); }
   40%  { transform: translateY(-9px) rotate(-4deg); }
   100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes wave {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  35% { transform: translateY(-8px) rotate(4deg); }
+  65% { transform: translateY(-4px) rotate(-2deg); }
 }
