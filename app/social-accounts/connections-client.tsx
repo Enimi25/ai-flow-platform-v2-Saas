@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle, LinkSimple, Trash, ArrowSquareOut, ShieldCheck } from "@phosphor-icons/react";
 import s from "./connections.module.css";
 
-type Row = { channel: "facebook" | "instagram" | "tiktok"; connected: boolean; accountName: string | null; connectedAt: string | null };
+type Row = { channel: "facebook" | "instagram" | "tiktok" | "whatsapp"; connected: boolean; accountName: string | null; connectedAt: string | null };
 
 const META_CHANNELS = new Set<Row["channel"]>(["facebook", "instagram"]);
 const COPY = {
   facebook: { label: "Facebook Page", blurb: "Replies to Messenger and publishes to your Page." },
   instagram: { label: "Instagram Business", blurb: "Publishes posts and helps with direct messages." },
   tiktok: { label: "TikTok", blurb: "Publishes videos through the Content Posting API." },
+  whatsapp: { label: "WhatsApp", blurb: "Replies to messages through WhatsApp Business." },
 } as const;
 
 export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
@@ -26,7 +27,7 @@ export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
   useEffect(() => {
     void load();
     const params = new URLSearchParams(window.location.search);
-    const status = params.get("meta") || params.get("tiktok");
+    const status = params.get("meta") || params.get("tiktok") || params.get("whatsapp");
     if (status === "connected") setNote("Connected. AI FLOW can now use this account.");
     else if (status && status !== "not_configured") setNote("Connection was not finished. Try again and approve the requested access.");
   }, [load]);
@@ -86,9 +87,9 @@ export function ConnectionsClient({ canEdit }: { canEdit: boolean }) {
                 <button type="button" className={s.ghost} onClick={() => disconnect(row.channel)} disabled={busy !== null || !canEdit}>
                   <Trash size={16} /> Disconnect
                 </button>
-              ) : row.channel === "tiktok" ? (
-                <a className="btn btn-sm" href="/api/social/connect/tiktok" aria-disabled={!canEdit} onClick={(event) => { if (!canEdit) event.preventDefault(); setBusy("tiktok"); }}>
-                  <ArrowSquareOut size={16} weight="bold" /> {busy === "tiktok" ? "Opening TikTok…" : "Connect"}
+              ) : row.channel === "tiktok" || row.channel === "whatsapp" ? (
+                <a className="btn btn-sm" href={`/api/social/connect/${row.channel}`} aria-disabled={!canEdit} onClick={(event) => { if (!canEdit) event.preventDefault(); setBusy(row.channel); }}>
+                  <ArrowSquareOut size={16} weight="bold" /> {busy === row.channel ? `Opening ${COPY[row.channel].label}…` : "Connect"}
                 </a>
               ) : <span className={s.groupHint}>{isMeta ? "Connect with Meta above" : ""}</span>}
             </li>

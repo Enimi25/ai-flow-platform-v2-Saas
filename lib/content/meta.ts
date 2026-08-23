@@ -9,6 +9,16 @@ type Page = {
   instagram_business_account?: { id: string; username?: string };
 };
 
+async function subscribePageToMessages(pageId: string, pageToken: string) {
+  const url = new URL(`${GRAPH}/${pageId}/subscribed_apps`);
+  url.searchParams.set("access_token", pageToken);
+  url.searchParams.set("subscribed_fields", "messages,messaging_postbacks");
+
+  const response = await fetch(url, { method: "POST", cache: "no-store" });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message ?? "Facebook could not subscribe this Page to messages.");
+}
+
 export async function connectMetaAccounts(companyId: string, accessToken: string) {
   const url = new URL(`${GRAPH}/me/accounts`);
   url.searchParams.set("fields", "id,name,access_token,instagram_business_account{id,username}");
@@ -22,6 +32,7 @@ export async function connectMetaAccounts(companyId: string, accessToken: string
   if (!page) throw new Error("This Facebook account has no Page you can manage.");
 
   const pageToken = page.access_token || accessToken;
+  await subscribePageToMessages(page.id, pageToken);
   await saveConnection({ companyId, channel: "facebook", accountId: page.id, accessToken: pageToken, accountName: page.name });
 
   const connected = [{ channel: "facebook", account: page.name }];

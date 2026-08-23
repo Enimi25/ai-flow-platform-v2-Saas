@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { saveConnection, removeConnection, connectionsFor } from "@/lib/content/connections";
-import { CHANNELS, type Channel } from "@/lib/content/types";
+import { CONNECTION_CHANNELS, saveConnection, removeConnection, connectionsFor, type ConnectionChannel } from "@/lib/content/connections";
 import { safeRecord } from "@/lib/activity";
 
 export async function GET() {
@@ -18,7 +17,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const body = (await request.json().catch(() => ({}))) as Record<string, string>;
-  if (!CHANNELS.includes(body.channel as Channel)) {
+  if (!CONNECTION_CHANNELS.includes(body.channel as ConnectionChannel)) {
     return NextResponse.json({ error: "Unknown channel." }, { status: 400 });
   }
   if (!body.accessToken) {
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
   const companyId = session.companyId ?? "preview";
   await saveConnection({
     companyId,
-    channel: body.channel as Channel,
+    channel: body.channel as ConnectionChannel,
     accountId: body.accountId ?? "",
     accessToken: body.accessToken,
     accountName: body.accountName,
@@ -49,8 +48,8 @@ export async function DELETE(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
-  const { channel } = (await request.json().catch(() => ({}))) as { channel?: Channel };
-  if (!channel || !CHANNELS.includes(channel)) {
+  const { channel } = (await request.json().catch(() => ({}))) as { channel?: ConnectionChannel };
+  if (!channel || !CONNECTION_CHANNELS.includes(channel)) {
     return NextResponse.json({ error: "Unknown channel." }, { status: 400 });
   }
 

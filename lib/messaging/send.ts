@@ -4,8 +4,8 @@ import type { Channel } from "@/lib/content/types";
 const GRAPH = "https://graph.facebook.com/v21.0";
 
 /**
- * Messenger and Instagram direct messages go out the same way: the Page sends
- * on behalf of the business, using the token stored for that workspace.
+ * The connected Page or Instagram Business account sends on behalf of the
+ * business. Instagram requires its business account id rather than `/me`.
  */
 export async function sendMessage(input: {
   companyId: string;
@@ -17,14 +17,14 @@ export async function sendMessage(input: {
   if (!link) throw new Error(`${input.channel} is not connected for ${input.companyId}`);
 
   const response = await fetch(
-    `${GRAPH}/me/messages?access_token=${encodeURIComponent(link.accessToken)}`,
+    `${GRAPH}/${encodeURIComponent(link.accountId || "me")}/messages?access_token=${encodeURIComponent(link.accessToken)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         recipient: { id: input.to },
         message: { text: input.text.slice(0, 900) },
-        messaging_type: "RESPONSE",
+        ...(input.channel === "facebook" ? { messaging_type: "RESPONSE" } : {}),
       }),
     },
   );

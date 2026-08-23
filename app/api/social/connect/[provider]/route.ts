@@ -49,7 +49,7 @@ export async function GET(request: Request, context: RouteContext<"/api/social/c
     destination.searchParams.set("client_id", clientId);
     destination.searchParams.set("redirect_uri", redirectUri);
     destination.searchParams.set("response_type", "code");
-    destination.searchParams.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,instagram_basic,instagram_content_publish");
+    destination.searchParams.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_metadata,pages_messaging,instagram_basic,instagram_content_publish,instagram_manage_messages");
   }
   return NextResponse.redirect(destination);
 }
