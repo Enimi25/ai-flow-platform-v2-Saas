@@ -5,6 +5,8 @@ import { writeOffline } from "@/lib/content/offline";
 import { savePost, listPosts } from "@/lib/content/store";
 import { CHANNELS, type Channel, type Post } from "@/lib/content/types";
 import { safeRecord } from "@/lib/activity";
+import { renderReelVideo, localBrandImage, siteOrigin } from "@/lib/content/video";
+import { getSettings } from "@/lib/settings/store";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -32,16 +34,42 @@ export async function POST(request: Request) {
     const wroteOffline = !isGeneratorReady();
 
     const now = Date.now();
+    const origin = siteOrigin(new URL(request.url).origin);
+    const brandImage = format === "reel" ? await localBrandImage() : undefined;
+    const settings = format === "reel" ? await getSettings(companyId) : null;
+
     const saved: Post[] = [];
+    let rendered = 0;
     for (const [index, draft] of drafts.entries()) {
+      const id = crypto.randomUUID();
+      let mediaUrl: string | undefined;
+      let body = draft.body;
+
+      if (format === "reel" && draft.script?.length) {
+        // The script becomes the video; the caption stays a caption.
+        try {
+          const video = await renderReelVideo({
+            id,
+            cards: draft.script,
+            brand: settings?.companyName || undefined,
+            imagePath: brandImage,
+          });
+          mediaUrl = origin ? origin + video.publicPath : video.publicPath;
+          rendered += 1;
+        } catch (error) {
+          // No video, no silent loss: the shot list rides along in the draft.
+          body = `${draft.body}\n\n--- shot list ---\n${draft.script.map((shot, n) => `${n + 1}. ${shot}`).join("\n")}`;
+          console.error("[content] reel render failed:", error instanceof Error ? error.message : error);
+        }
+      }
+
       saved.push(
         await savePost({
-          id: crypto.randomUUID(),
+          id,
           companyId,
           channel: draft.channel,
-          body: draft.script?.length
-            ? `${draft.body}\n\n--- shot list ---\n${draft.script.map((shot, n) => `${n + 1}. ${shot}`).join("\n")}`
-            : draft.body,
+          body,
+          mediaUrl,
           scheduledAt: new Date(now + (index * everyDays + 1) * 86_400_000).toISOString(),
           status: "draft",
           createdAt: new Date().toISOString(),
@@ -54,7 +82,11 @@ export async function POST(request: Request) {
       kind: "content.generated",
       level: "success",
       title: `${saved.length} ${body.channel} ${format === "reel" ? "reels" : "posts"} written`,
-      detail: wroteOffline ? "Written from the built in library, no model key set" : "Written by the model",
+      detail: wroteOffline
+        ? "Written from the built in library, no model key set"
+        : format === "reel"
+          ? `Written by the model, ${rendered} of ${saved.length} rendered to video`
+          : "Written by the model",
     });
 
     return NextResponse.json({ posts: saved, model: !wroteOffline }, { status: 201 });

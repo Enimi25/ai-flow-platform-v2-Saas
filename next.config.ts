@@ -25,6 +25,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // ffmpeg-static resolves to a real binary on disk; bundling breaks the path
+  serverExternalPackages: ["ffmpeg-static"],
   turbopack: { root: process.cwd() },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

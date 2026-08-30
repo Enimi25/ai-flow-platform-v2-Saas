@@ -3,6 +3,7 @@ import { getSettings } from "@/lib/settings/store";
 import { connectionsFor } from "./connections";
 import { listPosts, savePost } from "./store";
 import { generatePosts, isGeneratorReady } from "./generate";
+import { renderReelVideo, localBrandImage, siteOrigin } from "@/lib/content/video";
 import { CHANNELS, type Channel, type Post } from "./types";
 import { safeRecord } from "@/lib/activity";
 import { instantFor } from "@/lib/booking/slots";
@@ -21,7 +22,8 @@ import { dataFile } from "@/lib/data-dir";
  */
 
 const WORKSPACES = dataFile("workspaces.json");
-const HOURS = [10, 14, 18];
+const HOURS = [10, 14];
+const REEL_HOUR = [18];
 const EVERY = 6 * 60 * 60 * 1000;
 
 /** TikTok needs a video, so a text-only autopilot cannot feed it. */
@@ -52,7 +54,7 @@ async function allCompanyIds() {
  * clinic in Moscow would have found its lunchtime posts going out at seven in
  * the morning.
  */
-function slotsAfter(from: Date, count: number, zone: string) {
+function slotsAfter(from: Date, count: number, zone: string, hours: number[] = HOURS) {
   const out: string[] = [];
   const day = new Date(from);
 
@@ -63,7 +65,7 @@ function slotsAfter(from: Date, count: number, zone: string) {
     }).formatToParts(cursor);
     const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
 
-    for (const hour of HOURS) {
+    for (const hour of hours) {
       if (out.length >= count) break;
       const at = instantFor(get("year"), get("month"), get("day"), hour, 0, zone);
       if (at > from) out.push(at.toISOString());
@@ -77,7 +79,7 @@ async function topUp(companyId: string) {
   if (!settings.contentAuto) return 0;
   if (!settings.businessDescription) return 0;
 
-  const links = await connectionsFor(companyId).catch(() => []);
+  const links: Links = await connectionsFor(companyId).catch(() => []);
   // connectionsFor lists every channel with a flag, so the flag is what counts
   const connected = CHANNELS.filter(
     (channel) =>
@@ -85,7 +87,7 @@ async function topUp(companyId: string) {
       (channel !== "instagram" || DEFAULT_IMAGE) &&
       links.some((link) => link.channel === channel && link.connected),
   );
-  if (!connected.length) return 0;
+  // no early return: a workspace with only TikTok still gets its reels
 
   const posts = await listPosts(companyId);
   const now = new Date();
@@ -121,6 +123,8 @@ async function topUp(companyId: string) {
     }
   }
 
+  made += await topUpReels(companyId, settings, links, posts, now);
+
   if (made) {
     safeRecord({
       companyId,
@@ -129,6 +133,74 @@ async function topUp(companyId: string) {
       title: `Queued ${made} post${made === 1 ? "" : "s"}`,
       detail: "The content factory topped the schedule up on its own.",
     });
+  }
+
+  return made;
+}
+
+/** One reel a day per connected channel, rendered to a real video at 18:00. */
+const REEL_CHANNELS: Channel[] = ["instagram", "facebook", "tiktok"];
+const REELS_AHEAD = 3;
+
+type Links = Awaited<ReturnType<typeof connectionsFor>>;
+type Settings = Awaited<ReturnType<typeof getSettings>>;
+
+async function topUpReels(companyId: string, settings: Settings, links: Links, posts: Post[], now: Date) {
+  // Meta pulls the finished file over HTTPS, so without a public origin a
+  // rendered reel would be a video nobody can fetch.
+  const origin = siteOrigin();
+  if (!origin) return 0;
+
+  const connected = REEL_CHANNELS.filter((channel) =>
+    links.some((link) => link.channel === channel && link.connected),
+  );
+  if (!connected.length) return 0;
+
+  const brandImage = await localBrandImage();
+  let made = 0;
+
+  for (const channel of connected) {
+    const pending = posts.filter(
+      (post) =>
+        post.channel === channel &&
+        post.status === "scheduled" &&
+        Boolean(post.mediaUrl?.includes("/api/media/")) &&
+        new Date(post.scheduledAt) > now,
+    );
+    const want = Math.max(0, REELS_AHEAD - pending.length);
+    if (!want) continue;
+
+    const drafts = await generatePosts({ companyId, channel, count: want, format: "reel" }).catch(() => []);
+    const last = pending
+      .map((post) => new Date(post.scheduledAt))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    const when = slotsAfter(last && last > now ? last : now, drafts.length, settings.timezone || "Europe/London", REEL_HOUR);
+
+    for (const [index, draft] of drafts.entries()) {
+      if (!draft.script?.length) continue;
+      const id = crypto.randomUUID();
+      try {
+        const video = await renderReelVideo({
+          id,
+          cards: draft.script,
+          brand: settings.companyName || undefined,
+          imagePath: brandImage,
+        });
+        await savePost({
+          id,
+          companyId,
+          channel,
+          body: draft.body,
+          mediaUrl: origin + video.publicPath,
+          scheduledAt: when[index],
+          status: "scheduled",
+          createdAt: new Date().toISOString(),
+        });
+        made += 1;
+      } catch (error) {
+        console.error("[autopilot] reel render failed:", error instanceof Error ? error.message : error);
+      }
+    }
   }
 
   return made;
