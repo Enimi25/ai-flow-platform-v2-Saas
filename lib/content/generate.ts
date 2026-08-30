@@ -47,6 +47,8 @@ export async function generatePosts(input: {
   channel: Channel;
   count: number;
   format?: Format;
+  /** A specific subject to write about, or a reel to write ones like. */
+  topic?: string;
 }): Promise<Generated[]> {
   const format: Format = input.format ?? "post";
 
@@ -81,8 +83,13 @@ export async function generatePosts(input: {
       ? `Write ${input.count} different reels for ${CHANNEL_LABEL[input.channel]}. Nothing that needs a budget, an actor or a studio: a phone, a screen and a hand are all that exist.`
       : `Write ${input.count} different posts for ${CHANNEL_LABEL[input.channel]}.`,
     format === "reel" ? REEL_SHAPE[input.channel] : SHAPE[input.channel],
+    input.topic
+      ? `Every one of them must be about, or modelled on, this brief from the owner: ${input.topic.slice(0, 600)}`
+      : "",
     "Each post must stand on its own and open differently from the others.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   let answer;
   try {

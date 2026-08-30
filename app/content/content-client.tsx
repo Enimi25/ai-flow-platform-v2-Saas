@@ -38,6 +38,7 @@ export function ContentClient({ canPost }: { canPost: boolean }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [topic, setTopic] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch("/api/content");
@@ -78,7 +79,7 @@ export function ContentClient({ canPost }: { canPost: boolean }) {
     const response = await fetch("/api/content/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel, count: 5, format }),
+      body: JSON.stringify({ channel, count: 5, format, topic: topic.trim() || undefined }),
     });
     const data = await response.json();
     setGenerating(false);
@@ -198,6 +199,15 @@ export function ContentClient({ canPost }: { canPost: boolean }) {
           <button className="btn" type="submit" disabled={busy || !canPost}>
             <PaperPlaneTilt weight="fill" /> {canPost ? "Add to queue" : "Sign in to queue"}
           </button>
+          <label htmlFor="post-topic">Write about (optional)</label>
+          <input
+            id="post-topic"
+            type="text"
+            value={topic}
+            onChange={(event) => setTopic(event.target.value)}
+            placeholder="A subject, an offer, or a link to a reel to write ones like"
+          />
+
           <div className={s.generateRow}>
             <button
               type="button"

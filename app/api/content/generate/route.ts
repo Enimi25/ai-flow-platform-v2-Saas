@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Sign in to generate posts." }, { status: 401 });
 
   const companyId = session.companyId ?? "preview";
-  const body = (await request.json().catch(() => ({}))) as { channel?: Channel; count?: number; everyDays?: number; format?: "post" | "reel" };
+  const body = (await request.json().catch(() => ({}))) as { channel?: Channel; count?: number; everyDays?: number; format?: "post" | "reel"; topic?: string };
 
   if (!CHANNELS.includes(body.channel as Channel)) {
     return NextResponse.json({ error: "Unknown channel." }, { status: 400 });
@@ -20,13 +20,14 @@ export async function POST(request: Request) {
   const everyDays = Math.min(Math.max(Number(body.everyDays ?? 2), 1), 14);
 
   const format = body.format === "reel" ? "reel" : "post";
+  const topic = typeof body.topic === "string" ? body.topic.trim().slice(0, 600) : "";
 
   try {
     // The model writes when it can. Without a key the workspace still gets
     // usable drafts instead of an error and an empty queue.
     const existing = (await listPosts(companyId)).length;
     const drafts = isGeneratorReady()
-      ? await generatePosts({ companyId, channel: body.channel as Channel, count, format })
+      ? await generatePosts({ companyId, channel: body.channel as Channel, count, format, topic: topic || undefined })
       : await writeOffline({ companyId, channel: body.channel as Channel, count, format, offset: existing });
     const wroteOffline = !isGeneratorReady();
 
