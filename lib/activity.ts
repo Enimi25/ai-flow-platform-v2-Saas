@@ -1,5 +1,5 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 export type Level = "info" | "success" | "warn" | "error";
 
@@ -13,7 +13,7 @@ export type Event = {
   level: Level;
 };
 
-const FILE = path.join(process.cwd(), ".data", "activity.json");
+const FILE = dataFile("activity.json");
 const KEEP = 500;
 
 const readAll = () => readJson<Event[]>(FILE, []);

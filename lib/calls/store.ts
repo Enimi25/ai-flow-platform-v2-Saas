@@ -1,8 +1,8 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
 import type { Call, Outcome } from "./types";
+import { dataFile } from "@/lib/data-dir";
 
-const FILE = path.join(process.cwd(), ".data", "calls.json");
+const FILE = dataFile("calls.json");
 const readAll = () => readJson<Call[]>(FILE, []);
 
 export async function listCalls(companyId: string) {

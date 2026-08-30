@@ -1,6 +1,7 @@
 import { seal, open } from "./crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { dataFile } from "@/lib/data-dir";
 
 const AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN = "https://oauth2.googleapis.com/token";
@@ -113,7 +114,7 @@ export async function profileFrom(accessToken: string) {
 /* --- stored grants ------------------------------------------------------ */
 
 type Grant = { email: string; refreshToken: string; connectedAt: string; calendarId?: string };
-const FILE = path.join(process.cwd(), ".data", "google-grants.json");
+const FILE = dataFile("google-grants.json");
 
 async function readAll(): Promise<Record<string, Grant>> {
   try {

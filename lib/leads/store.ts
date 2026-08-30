@@ -1,6 +1,6 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
 import { safeRecord } from "@/lib/activity";
+import { dataFile } from "@/lib/data-dir";
 
 export type LeadStatus = "new" | "in_progress" | "converted" | "lost";
 export const SOURCES = ["website", "facebook", "instagram", "whatsapp", "demo"] as const;
@@ -18,7 +18,7 @@ export type Lead = {
   createdAt: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "leads.json");
+const FILE = dataFile("leads.json");
 
 const readAll = () => readJson<Lead[]>(FILE, []);
 

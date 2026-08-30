@@ -1,5 +1,5 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 const FILES = ["leads.json", "conversations.json", "activity.json", "bookings.json", "content.json"];
 
@@ -16,7 +16,7 @@ export async function adoptPreviewRecords(companyId: string) {
   let moved = 0;
 
   for (const name of FILES) {
-    const file = path.join(process.cwd(), ".data", name);
+    const file = dataFile(name);
     await withFileLock(file, async () => {
       const rows = await readJson<Array<Record<string, unknown>>>(file, []);
       if (!Array.isArray(rows) || !rows.length) return;

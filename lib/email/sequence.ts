@@ -1,8 +1,8 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
 import { sendEmail, isEmailReady } from "./send";
 import { followUpEmail, type Step } from "./follow-up";
 import { safeRecord } from "@/lib/activity";
+import { dataFile } from "@/lib/data-dir";
 
 /**
  * What happens after the proposal.
@@ -31,7 +31,7 @@ export type Enrolled = {
   stopReason?: "replied" | "converted" | "unsubscribed" | "finished";
 };
 
-const FILE = path.join(process.cwd(), ".data", "sequence.json");
+const FILE = dataFile("sequence.json");
 const readAll = () => readJson<Enrolled[]>(FILE, []);
 
 /** Day offset, and what that mail is for. */

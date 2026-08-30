@@ -1,5 +1,5 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 /**
  * Erases everything one person left behind.
@@ -21,7 +21,7 @@ export async function forgetVisitor(visitorId: string) {
   let removed = 0;
 
   for (const target of TARGETS) {
-    const file = path.join(process.cwd(), ".data", target.file);
+    const file = dataFile(target.file);
     await withFileLock(file, async () => {
       const rows = await readJson<Record<string, unknown>[]>(file, []);
       if (!Array.isArray(rows) || !rows.length) return;

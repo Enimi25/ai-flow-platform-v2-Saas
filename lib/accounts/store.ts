@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 const scrypt = promisify(scryptCallback) as (
   password: string,
@@ -18,7 +18,7 @@ export type Account = {
   createdAt: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "accounts.json");
+const FILE = dataFile("accounts.json");
 const readAll = () => readJson<Account[]>(FILE, []);
 
 /**

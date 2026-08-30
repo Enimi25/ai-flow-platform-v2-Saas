@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { dataFile } from "@/lib/data-dir";
 
 export type Workspace = {
   companyId: string;
@@ -8,7 +9,7 @@ export type Workspace = {
   createdAt: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "workspaces.json");
+const FILE = dataFile("workspaces.json");
 
 async function readAll(): Promise<Record<string, Workspace>> {
   try {

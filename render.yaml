@@ -8,7 +8,16 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npm run start
     healthCheckPath: /api/activity
+    # Connected accounts, the post queue and every workspace live as JSON on
+    # disk. Without a mounted volume each deploy wipes them and the schedule
+    # goes quiet, so this disk is load-bearing rather than an optimisation.
+    disk:
+      name: ai-flow-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: DATA_DIR
+        value: /var/data
       # Secrets are set in the Render dashboard, never committed here.
       - key: SESSION_SECRET
         generateValue: true

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
-import path from "node:path";
 import { getSession } from "@/lib/session";
+import { dataFile } from "@/lib/data-dir";
 
-const FILE = path.join(process.cwd(), ".data", "widget-installs.json");
+const FILE = dataFile("widget-installs.json");
 
 export async function GET() {
   const session = await getSession();

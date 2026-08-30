@@ -1,5 +1,5 @@
-import path from "node:path";
 import { readJson, withFileLock, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 export type Subscription = {
   companyId: string;
@@ -10,7 +10,7 @@ export type Subscription = {
   updatedAt: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "subscriptions.json");
+const FILE = dataFile("subscriptions.json");
 
 export async function subscriptionFor(companyId: string) {
   return (await readJson<Subscription[]>(FILE, [])).find((subscription) => subscription.companyId === companyId) ?? null;

@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { seal, open } from "@/lib/google/crypto";
 import { CHANNELS } from "./types";
+import { dataFile } from "@/lib/data-dir";
 
 /** WhatsApp is a messaging connection, not a publishing channel. */
 export const CONNECTION_CHANNELS = [...CHANNELS, "whatsapp"] as const;
@@ -17,7 +18,7 @@ export type Connection = {
   connectedAt: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "connections.json");
+const FILE = dataFile("connections.json");
 const key = (companyId: string, channel: ConnectionChannel) => `${companyId}:${channel}`;
 
 async function readAll(): Promise<Record<string, Connection>> {

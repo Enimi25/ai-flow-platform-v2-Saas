@@ -1,4 +1,3 @@
-import path from "node:path";
 import { promises as fs } from "node:fs";
 import { getSettings } from "@/lib/settings/store";
 import { connectionsFor } from "./connections";
@@ -7,6 +6,7 @@ import { generatePosts, isGeneratorReady } from "./generate";
 import { CHANNELS, type Channel, type Post } from "./types";
 import { safeRecord } from "@/lib/activity";
 import { instantFor } from "@/lib/booking/slots";
+import { dataFile } from "@/lib/data-dir";
 
 /**
  * Keeps every workspace's queue full.
@@ -20,12 +20,19 @@ import { instantFor } from "@/lib/booking/slots";
  * midnight and wake somebody up for nothing.
  */
 
-const WORKSPACES = path.join(process.cwd(), ".data", "workspaces.json");
-const HOURS = [11, 17];
+const WORKSPACES = dataFile("workspaces.json");
+const HOURS = [10, 14, 18];
 const EVERY = 6 * 60 * 60 * 1000;
 
 /** TikTok needs a video, so a text-only autopilot cannot feed it. */
 const TEXT_CHANNELS: Channel[] = ["facebook", "instagram"];
+
+/**
+ * Instagram refuses a post without media, so an autopilot caption alone would
+ * be queued only to fail at publish time. With a brand image configured the
+ * caption rides on that; without one, Instagram is left out of the top-up.
+ */
+const DEFAULT_IMAGE = process.env.CONTENT_DEFAULT_IMAGE_URL ?? "";
 
 let lastRun = 0;
 
@@ -75,6 +82,7 @@ async function topUp(companyId: string) {
   const connected = CHANNELS.filter(
     (channel) =>
       TEXT_CHANNELS.includes(channel) &&
+      (channel !== "instagram" || DEFAULT_IMAGE) &&
       links.some((link) => link.channel === channel && link.connected),
   );
   if (!connected.length) return 0;
@@ -103,6 +111,7 @@ async function topUp(companyId: string) {
         companyId,
         channel,
         body: draft.body,
+        mediaUrl: channel === "instagram" ? DEFAULT_IMAGE : undefined,
         scheduledAt: when[index],
         status: "scheduled",
         createdAt: new Date().toISOString(),

@@ -1,5 +1,5 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 export type BookingStatus = "held" | "paid" | "released" | "failed";
 
@@ -24,7 +24,7 @@ export type Booking = {
   createdAt: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "bookings.json");
+const FILE = dataFile("bookings.json");
 export const HOLD_MINUTES = 15;
 
 const readAll = () => readJson<Booking[]>(FILE, []);

@@ -1,5 +1,5 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
+import { dataFile } from "@/lib/data-dir";
 
 export type Turn = { role: "customer" | "agent"; text: string; at: string };
 
@@ -14,7 +14,7 @@ export type Conversation = {
   leadId?: string;
 };
 
-const FILE = path.join(process.cwd(), ".data", "conversations.json");
+const FILE = dataFile("conversations.json");
 const KEEP_TURNS = 60;
 
 const readAll = () => readJson<Conversation[]>(FILE, []);

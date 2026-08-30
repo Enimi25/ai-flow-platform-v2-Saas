@@ -1,12 +1,12 @@
-import path from "node:path";
 import { withFileLock, readJson, writeJson } from "@/lib/json-store";
 import type { Post } from "./types";
+import { dataFile } from "@/lib/data-dir";
 
 /**
  * File backed for now. Every read and write goes through this module, so
  * moving to Postgres is a change here and nowhere else.
  */
-const FILE = path.join(process.cwd(), ".data", "content.json");
+const FILE = dataFile("content.json");
 
 const readAll = () => readJson<Post[]>(FILE, []);
 const writeAll = (posts: Post[]) => writeJson(FILE, posts);

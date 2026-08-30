@@ -3,8 +3,9 @@ import path from "node:path";
 
 export * from "./options";
 import { INDUSTRIES, TONES, GOALS, DEFAULT_HOURS, type Settings } from "./options";
+import { dataFile } from "@/lib/data-dir";
 
-const FILE = path.join(process.cwd(), ".data", "settings.json");
+const FILE = dataFile("settings.json");
 
 export function defaults(companyId: string): Settings {
   return {
