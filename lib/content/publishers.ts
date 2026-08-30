@@ -23,22 +23,68 @@ async function graph(url: string, body: Record<string, string>) {
   return payload as { id?: string };
 }
 
+const VIDEO = /\.(mp4|mov|m4v|webm)(\?|#|$)/i;
+
+/** A reel is just a post whose media is a video, so the URL decides. */
+export function isVideo(url: string | undefined): boolean {
+  return Boolean(url && VIDEO.test(url));
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Meta accepts a video container immediately and then transcodes it in the
+ * background. Calling media_publish before that finishes fails with a bare
+ * "media is not ready", so the container has to be watched until it is.
+ */
+async function waitForContainer(containerId: string, token: string) {
+  const attempts = Number(process.env.REELS_STATUS_ATTEMPTS ?? 60);
+  const gap = Number(process.env.REELS_STATUS_INTERVAL_MS ?? 3000);
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const response = await fetch(
+      `${GRAPH}/${containerId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`,
+    );
+    const payload = (await response.json()) as {
+      status_code?: string;
+      status?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      throw new Error(payload?.error?.message ?? `Could not read the upload status (${response.status}).`);
+    }
+    if (payload.status_code === "FINISHED") return;
+    if (payload.status_code === "ERROR" || payload.status_code === "EXPIRED") {
+      throw new Error(payload.status ?? `Instagram could not process the video (${payload.status_code}).`);
+    }
+    await sleep(gap);
+  }
+  const waited = Math.round((attempts * gap) / 1000);
+  throw new Error(`Instagram was still processing the video after ${waited}s. It may still publish on its own.`);
+}
+
 /** A Page post. Text alone is allowed, a photo goes to the photos edge. */
 async function publishFacebook(post: Post) {
   const link = await connectionFor(post.companyId, "facebook");
   if (!link) throw new NotConfigured(["FACEBOOK_PAGE_ID", "FACEBOOK_PAGE_ACCESS_TOKEN"]);
   const pageId = link.accountId;
   const token = link.accessToken;
-  const result = post.mediaUrl
-    ? await graph(`${GRAPH}/${pageId}/photos`, {
-        url: post.mediaUrl,
-        caption: post.body,
+  const result = isVideo(post.mediaUrl)
+    ? await graph(`${GRAPH}/${pageId}/videos`, {
+        file_url: post.mediaUrl as string,
+        description: post.body,
         access_token: token,
       })
-    : await graph(`${GRAPH}/${pageId}/feed`, {
-        message: post.body,
-        access_token: token,
-      });
+    : post.mediaUrl
+      ? await graph(`${GRAPH}/${pageId}/photos`, {
+          url: post.mediaUrl,
+          caption: post.body,
+          access_token: token,
+        })
+      : await graph(`${GRAPH}/${pageId}/feed`, {
+          message: post.body,
+          access_token: token,
+        });
   if (!result.id) throw new Error("Facebook accepted the call but returned no post id.");
   return result.id;
 }
@@ -51,12 +97,27 @@ async function publishInstagram(post: Post) {
   const token = link.accessToken;
   if (!post.mediaUrl) throw new Error("Instagram will not accept a post without an image or video.");
 
-  const container = await graph(`${GRAPH}/${userId}/media`, {
-    image_url: post.mediaUrl,
-    caption: post.body,
-    access_token: token,
-  });
+  const video = isVideo(post.mediaUrl);
+  const container = await graph(
+    `${GRAPH}/${userId}/media`,
+    video
+      ? {
+          media_type: "REELS",
+          video_url: post.mediaUrl,
+          caption: post.body,
+          share_to_feed: "true",
+          access_token: token,
+        }
+      : {
+          image_url: post.mediaUrl,
+          caption: post.body,
+          access_token: token,
+        },
+  );
   if (!container.id) throw new Error("Instagram did not return a media container.");
+
+  // Photos are ready the moment the container exists; reels are not.
+  if (video) await waitForContainer(container.id, token);
 
   const published = await graph(`${GRAPH}/${userId}/media_publish`, {
     creation_id: container.id,
@@ -80,7 +141,12 @@ async function publishTikTok(post: Post) {
       "Content-Type": "application/json; charset=UTF-8",
     },
     body: JSON.stringify({
-      post_info: { title: post.body.slice(0, 150), privacy_level: "SELF_ONLY" },
+      // SELF_ONLY until the app clears TikTok's audit; public posting is
+      // rejected before that, so this stays opt-in through the environment.
+      post_info: {
+        title: post.body.slice(0, 150),
+        privacy_level: process.env.TIKTOK_PRIVACY_LEVEL ?? "SELF_ONLY",
+      },
       source_info: { source: "PULL_FROM_URL", video_url: post.mediaUrl },
     }),
   });
