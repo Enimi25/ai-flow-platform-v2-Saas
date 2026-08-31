@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { safeRecord } from "@/lib/activity";
 import { saveConnection } from "@/lib/content/connections";
 import { getSession } from "@/lib/session";
+import { publicUrl } from "@/lib/public-url";
 
 type TokenResponse = {
   access_token?: string;
@@ -19,12 +20,12 @@ type UserResponse = {
 };
 
 function returnTo(request: Request, status: string) {
-  return NextResponse.redirect(new URL(`/social-accounts?tiktok=${encodeURIComponent(status)}`, request.url));
+  return NextResponse.redirect(publicUrl(`/social-accounts?tiktok=${encodeURIComponent(status)}`, request));
 }
 
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.redirect(new URL("/login?returnTo=/social-accounts&reason=session", request.url));
+  if (!session) return NextResponse.redirect(publicUrl("/login?returnTo=/social-accounts&reason=session", request));
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

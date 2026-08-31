@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { sendEmail, isEmailReady } from "@/lib/email/send";
 import { installEmail, PLATFORM_STEPS } from "@/lib/email/install-instructions";
 import { safeRecord } from "@/lib/activity";
+import { publicUrl } from "@/lib/public-url";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 422 });
   }
 
-  const origin = new URL(request.url).origin;
+  const origin = publicUrl("/", request).origin;
   const siteUrl = process.env.PUBLIC_SITE_URL || origin;
   const snippet = `<script src="${siteUrl}/widget.js" data-company-id="${companyId}"></script>`;
   const chosen = platform && platform in PLATFORM_STEPS ? platform : "html";

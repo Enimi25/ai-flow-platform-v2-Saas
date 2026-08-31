@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { HOLD_MINUTES, saveBooking, slotTaken, releaseExpired, type Booking } from "@/lib/booking/store";
 import { createCheckout, StripeNotConfigured } from "@/lib/booking/stripe";
 import { safeRecord } from "@/lib/activity";
+import { publicUrl } from "@/lib/public-url";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     createdAt: new Date().toISOString(),
   };
 
-  const origin = new URL(request.url).origin;
+  const origin = publicUrl("/", request).origin;
 
   try {
     const checkout = await createCheckout({

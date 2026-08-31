@@ -4,11 +4,12 @@ import { exchangeCode, profileFrom, saveGrant } from "@/lib/google/oauth";
 import { setSession } from "@/lib/session";
 import { workspaceFor } from "@/lib/workspace/store";
 import { safeRecord } from "@/lib/activity";
+import { publicUrl } from "@/lib/public-url";
 
 const STATE_COOKIE = "ai_flow_oauth_state";
 
 function back(request: Request, path: string, reason?: string) {
-  const target = new URL(path, new URL(request.url).origin);
+  const target = publicUrl(path, request);
   if (reason) target.searchParams.set("reason", reason);
   return NextResponse.redirect(target);
 }
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
       detail: tokens.refresh_token ? "Google account and calendar connected" : "Signed in, calendar already connected",
     });
 
-    return NextResponse.redirect(new URL(returnTo, url.origin));
+    return NextResponse.redirect(publicUrl(returnTo, request));
   } catch {
     return back(request, "/login", "google-failed");
   }

@@ -7,6 +7,7 @@ import { CHANNELS, type Channel, type Post } from "@/lib/content/types";
 import { safeRecord } from "@/lib/activity";
 import { renderReelVideo, localBrandImage, siteOrigin } from "@/lib/content/video";
 import { getSettings } from "@/lib/settings/store";
+import { publicUrl } from "@/lib/public-url";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     const wroteOffline = !isGeneratorReady();
 
     const now = Date.now();
-    const origin = siteOrigin(new URL(request.url).origin);
+    const origin = siteOrigin(publicUrl("/", request).origin);
     const brandImage = format === "reel" ? await localBrandImage() : undefined;
     const settings = format === "reel" ? await getSettings(companyId) : null;
 

@@ -3,14 +3,15 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { connectMetaAccounts } from "@/lib/content/meta";
 import { safeRecord } from "@/lib/activity";
+import { publicUrl } from "@/lib/public-url";
 
 function returnTo(request: Request, status: string) {
-  return NextResponse.redirect(new URL(`/social-accounts?meta=${encodeURIComponent(status)}`, request.url));
+  return NextResponse.redirect(publicUrl(`/social-accounts?meta=${encodeURIComponent(status)}`, request));
 }
 
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.redirect(new URL("/login?returnTo=/social-accounts&reason=session", request.url));
+  if (!session) return NextResponse.redirect(publicUrl("/login?returnTo=/social-accounts&reason=session", request));
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

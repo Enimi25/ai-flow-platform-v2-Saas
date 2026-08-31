@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { billingPlan } from "@/lib/billing/plans";
 import { stripeClient, StripeNotConfigured } from "@/lib/booking/stripe";
+import { publicUrl } from "@/lib/public-url";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
   if (!plan) return NextResponse.json({ error: "Choose an available plan." }, { status: 400 });
 
   try {
-    const origin = new URL(request.url).origin;
+    const origin = publicUrl("/", request).origin;
     const checkout = await stripeClient().checkout.sessions.create({
       mode: "subscription",
       success_url: `${origin}/billing?success=1`,

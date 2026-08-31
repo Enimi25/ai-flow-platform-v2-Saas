@@ -6,6 +6,7 @@ import { houseCompanyId } from "@/lib/workspace/store";
 import { previewConversation } from "@/lib/email/preview";
 import { enrol } from "@/lib/email/sequence";
 import { captureLead } from "@/lib/leads/store";
+import { publicUrl } from "@/lib/public-url";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   const house = await houseCompanyId();
   // their own agent, answering their own customers, before they have paid anything
   const preview = await previewConversation(question).catch(() => []);
-  const origin = new URL(request.url).origin;
+  const origin = publicUrl("/", request).origin;
   const siteUrl = process.env.PUBLIC_SITE_URL || origin;
 
   await captureLead({
