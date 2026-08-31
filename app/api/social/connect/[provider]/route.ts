@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { publicUrl } from "@/lib/public-url";
 
 const providers = {
   meta: "META_OAUTH_URL",
@@ -13,7 +14,7 @@ const providers = {
 
 export async function GET(request: Request, context: RouteContext<"/api/social/connect/[provider]">) {
   const session = await getSession();
-  if (!session) return NextResponse.redirect(new URL("/login?returnTo=/social-accounts&reason=session", request.url));
+  if (!session) return NextResponse.redirect(publicUrl("/login?returnTo=/social-accounts&reason=session", request));
   const { provider } = await context.params;
   if (!(provider in providers)) return NextResponse.json({ message: "Unknown provider." }, { status: 404 });
   const envKey = providers[provider as keyof typeof providers];
@@ -22,7 +23,7 @@ export async function GET(request: Request, context: RouteContext<"/api/social/c
     : provider === "meta"
       ? "https://www.facebook.com/v21.0/dialog/oauth"
     : process.env[envKey];
-  if (!oauthUrl) return NextResponse.redirect(new URL(`/social-accounts?setup=${provider}`, request.url));
+  if (!oauthUrl) return NextResponse.redirect(publicUrl(`/social-accounts?setup=${provider}`, request));
 
   const state = randomBytes(24).toString("base64url");
   const store = await cookies();
@@ -33,7 +34,7 @@ export async function GET(request: Request, context: RouteContext<"/api/social/c
     const clientKey = process.env.TIKTOK_CLIENT_KEY;
     const redirectUri = process.env.TIKTOK_REDIRECT_URI;
     if (!clientKey || !redirectUri) {
-      return NextResponse.redirect(new URL("/social-accounts?setup=tiktok", request.url));
+      return NextResponse.redirect(publicUrl("/social-accounts?setup=tiktok", request));
     }
     destination.searchParams.set("client_key", clientKey);
     destination.searchParams.set("response_type", "code");
@@ -44,7 +45,7 @@ export async function GET(request: Request, context: RouteContext<"/api/social/c
     const clientId = process.env.FACEBOOK_CLIENT_ID;
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
     if (!clientId || !redirectUri) {
-      return NextResponse.redirect(new URL("/social-accounts?setup=meta", request.url));
+      return NextResponse.redirect(publicUrl("/social-accounts?setup=meta", request));
     }
     destination.searchParams.set("client_id", clientId);
     destination.searchParams.set("redirect_uri", redirectUri);
