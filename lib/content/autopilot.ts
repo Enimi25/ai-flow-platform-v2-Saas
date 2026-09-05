@@ -22,8 +22,8 @@ import { dataFile } from "@/lib/data-dir";
  */
 
 const WORKSPACES = dataFile("workspaces.json");
-const HOURS = [10, 14];
-const REEL_HOUR = [18];
+const HOURS = [10, 14, 18];
+const REEL_HOUR = [20];
 const EVERY = 6 * 60 * 60 * 1000;
 
 /** TikTok needs a video, so a text-only autopilot cannot feed it. */
@@ -97,7 +97,10 @@ async function topUp(companyId: string) {
     const pending = posts.filter(
       (post) => post.channel === channel && post.status === "scheduled" && new Date(post.scheduledAt) > now,
     );
-    const want = Math.max(0, settings.contentPerWeek - pending.length);
+    // three posts a day, at 10:00, 14:00 and 18:00, kept topped up 3 days out
+    const POSTS_PER_DAY = 3;
+    const KEEP_DAYS = 3;
+    const want = Math.max(0, POSTS_PER_DAY * KEEP_DAYS - pending.length);
     if (!want) continue;
 
     const last = pending
