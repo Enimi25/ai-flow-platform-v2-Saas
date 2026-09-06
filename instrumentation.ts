@@ -5,6 +5,16 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // Only one live instance may own the publishing loop. The lock that guards
+  // the queue (lib/json-store.ts withFileLock) is per-process, so a second
+  // instance authenticated to the same accounts would generate, publish and
+  // email a second time. Set SCHEDULER=off on every standby (a mirror on
+  // another host, say); leave it unset on the single owner so it keeps running.
+  if ((process.env.SCHEDULER ?? "on").toLowerCase() === "off") {
+    console.log("[scheduler] disabled (SCHEDULER=off); running as a standby");
+    return;
+  }
+
   const globalKey = Symbol.for("ai-flow.scheduler");
   const store = globalThis as unknown as Record<symbol, NodeJS.Timeout | undefined>;
   if (store[globalKey]) return;

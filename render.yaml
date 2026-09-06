@@ -7,7 +7,9 @@ services:
     plan: starter
     buildCommand: npm ci && npm run build
     startCommand: npm run start
-    healthCheckPath: /api/activity
+    # Must be a route that answers 200 without a session cookie. /api/activity
+    # is auth-gated (401 to an anonymous probe), which Render reads as unhealthy.
+    healthCheckPath: /api/health
     # Connected accounts, the post queue and every workspace live as JSON on
     # disk. Without a mounted volume each deploy wipes them and the schedule
     # goes quiet, so this disk is load-bearing rather than an optimisation.
@@ -18,6 +20,11 @@ services:
     envVars:
       - key: DATA_DIR
         value: /var/data
+      # This instance is a warm standby: it serves web traffic but must NOT run
+      # the publishing loop, or posts and follow-up emails would go out twice
+      # (once here, once on the primary). The primary leaves SCHEDULER unset.
+      - key: SCHEDULER
+        value: "off"
       # Secrets are set in the Render dashboard, never committed here.
       - key: SESSION_SECRET
         generateValue: true
@@ -33,10 +40,12 @@ services:
         value: openai/gpt-oss-120b
       - key: GROQ_LIGHT_MODEL
         value: openai/gpt-oss-20b
+      # Match what the Railway primary actually runs, so both instances generate
+      # with the same model.
       - key: OPENROUTER_MODEL
-        value: nvidia/nemotron-3-super-120b-a12b:free
+        value: google/gemma-4-26b-a4b-it:free
       - key: OPENROUTER_LIGHT_MODEL
-        value: openai/gpt-oss-20b:free
+        value: google/gemma-4-26b-a4b-it:free
       - key: GROQ_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
@@ -45,11 +54,21 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      # Host-specific: https://<this-service>.onrender.com/api/auth/google/callback
+      # and add that exact URI to the Google OAuth client. NOT the aiflow.forum value.
       - key: GOOGLE_REDIRECT_URI
         sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_REPLY_TO
+        value: baskinltd@yahoo.com
+      # Verify inbound Meta / WhatsApp webhook signatures and the data-deletion
+      # callback. Required by the wired-up webhook routes; set in the dashboard.
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_VERIFY_TOKEN
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
@@ -65,19 +84,31 @@ services:
         sync: false
       - key: FACEBOOK_CLIENT_SECRET
         sync: false
+      # Host-specific: must be THIS instance's own callback URL, not the
+      # primary's, or the OAuth state cookie set here never matches on return.
+      # Set to https://<this-service>.onrender.com/api/social/callback/meta and
+      # register that exact URI in the Meta app.
       - key: FACEBOOK_REDIRECT_URI
-        value: https://aiflow.forum/api/social/callback/meta
+        sync: false
       # TikTok Sandbox / production credentials are supplied in the Render dashboard.
       # Keep them out of Git and rotate any credential that has been exposed.
       - key: TIKTOK_CLIENT_KEY
         sync: false
       - key: TIKTOK_CLIENT_SECRET
         sync: false
+      # Host-specific, same rule as FACEBOOK_REDIRECT_URI above. Set to
+      # https://<this-service>.onrender.com/api/social/callback/tiktok and
+      # register it in the TikTok app.
       - key: TIKTOK_REDIRECT_URI
-        value: https://aiflow.forum/api/social/callback/tiktok
+        sync: false
       - key: TIKTOK_ACCESS_TOKEN
         sync: false
       - key: TIKTOK_OPEN_ID
         sync: false
+      # Host-specific: pins every generated link / redirect to this instance.
+      # Leave empty to fall back to the request host (fine for a standby), or set
+      # to https://<this-service>.onrender.com once the URL is known. Do NOT set
+      # it to aiflow.forum here, or this instance bounces its own visitors to the
+      # primary and breaks sign-in.
       - key: PUBLIC_SITE_URL
-        value: https://aiflow.forum
+        sync: false
